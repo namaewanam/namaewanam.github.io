@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode - Ivory & Warm Palette */
+    --background: 48 20% 97%; /* #FFFFF0 - Ivory */
+    --foreground: 25 40% 15%; /* Dark brown */
+    --card: 48 30% 95%;
+    --card-foreground: 25 40% 15%;
+    --primary: 35 80% 55%; /* Warm amber */
+    --primary-foreground: 48 20% 97%;
+    --secondary: 40 60% 88%;
+    --secondary-foreground: 25 40% 15%;
+    --accent: 25 75% 60%; /* Terracotta */
+    --accent-foreground: 48 20% 97%;
+    --muted: 40 30% 90%;
+    --muted-foreground: 25 30% 40%;
+    --border: 40 25% 85%;
+    --ring: 35 80% 55%;
+  }
+
+  .dark {
+    /* Dark mode - Deep warm tones */
+    --background: 25 30% 8%; /* Deep charcoal brown */
+    --foreground: 48 20% 95%;
+    --card: 25 25% 12%;
+    --card-foreground: 48 20% 95%;
+    --primary: 35 85% 60%; /* Bright amber */
+    --primary-foreground: 25 30% 8%;
+    --secondary: 25 20% 18%;
+    --secondary-foreground: 48 20% 95%;
+    --accent: 25 70% 55%; /* Warm terracotta */
+    --accent-foreground: 48 20% 95%;
+    --muted: 25 20% 20%;
+    --muted-foreground: 40 15% 60%;
+    --border: 25 20% 25%;
+    --ring: 35 85% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/50 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary;
+}
