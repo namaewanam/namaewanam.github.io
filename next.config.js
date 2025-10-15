@@ -6,8 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  basePath: isProd ? '/notes' : '',
-  assetPrefix: isProd ? '/notes/' : '',
+  basePath: isProd ? '/namaewanam.github.io' : '',
+  assetPrefix: isProd ? '/namaewanam.github.io/' : '',
   trailingSlash: true,
 }
 
