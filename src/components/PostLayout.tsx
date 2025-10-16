@@ -67,7 +67,7 @@ export default function PostLayout({ post }: Readonly<{ post: Post }>) {
 			{/* Back Button */}
 			<div className="pt-6 md:pt-8 border-t border-border">
 				<Link
-					href={`/blog/${post.categoryName}`}
+					href={`/blog/${post.categoryName.toLowerCase()}`}
 					className="inline-flex items-center text-sm md:text-base text-primary hover:text-accent transition-colors font-medium"
 				>
 					<svg
