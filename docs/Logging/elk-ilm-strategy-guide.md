@@ -1237,3 +1237,5 @@ Remember:
 For more information, refer to the official Elasticsearch documentation:
 - https://www.elastic.co/guide/en/elasticsearch/reference/current/index-lifecycle-management.html
 - https://www.elastic.co/guide/en/logstash/current/index.html
+- https://www.elastic.co/docs/reference/logstash
+- https://github.com/mareZ-noob/ptudwnc

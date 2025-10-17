@@ -1,12 +1,8 @@
 ---
 title: Java Streams API Guide
-date: 2024-01-20
+date: 2025-10-17
 description: Master the Java Streams API for functional-style operations on collections
 ---
-
-# Java Streams API Guide
-
-The Java Streams API, introduced in Java 8, provides a functional approach to processing collections of objects.
 
 ## What are Streams?
 

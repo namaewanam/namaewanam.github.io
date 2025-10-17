@@ -1,12 +1,8 @@
 ---
 title: Getting Started with Spring Boot
-date: 2024-01-15
+date: 2025-10-17
 description: A comprehensive guide to building your first Spring Boot application
 ---
-
-# Getting Started with Spring Boot
-
-Spring Boot makes it easy to create stand-alone, production-grade Spring-based applications that you can run with minimal configuration.
 
 ## What is Spring Boot?
 
