@@ -7,6 +7,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import MobileMenu from '@/components/MobileMenu'
 import './globals.css';
 import { CodeThemeProvider, CodeThemeScript } from '@/contexts/CodeThemeContext';
+import GitHubButton from '@/components/GitHubButton';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -50,7 +51,7 @@ export default function RootLayout({
 												>
 													Home
 												</Link>
-												{categories.map((category) => (
+												{categories.slice(0, 5).map((category) => (
 													<Link
 														key={category.slug}
 														href={`/blog/${category.slug}`}
@@ -61,11 +62,13 @@ export default function RootLayout({
 												))}
 											</nav>
 											<ThemeToggle />
+											<GitHubButton />
 										</div>
 
 										{/* Mobile Navigation */}
 										<div className="flex md:hidden items-center gap-2">
 											<ThemeToggle />
+											<GitHubButton />
 											<MobileMenu categories={categories} />
 										</div>
 									</div>
@@ -80,7 +83,7 @@ export default function RootLayout({
 							{/* Footer */}
 							<footer className="border-t border-border bg-card/80 backdrop-blur-sm mt-auto">
 								<div className="container mx-auto px-4 py-4 md:py-6 text-center text-sm md:text-base text-muted-foreground">
-									<p>© {new Date().getFullYear()} Nam's Blog. Built with Next.js & TypeScript</p>
+									<p>© {new Date().getFullYear()} Nam's Blog. Built with AI & Next.js & TypeScript</p>
 								</div>
 							</footer>
 						</div>
