@@ -29,7 +29,7 @@ export default function MarkdownContent({ content }: Readonly<MarkdownContentPro
       prose-hr:border-border
       prose-table:border prose-table:border-border prose-table:text-sm md:prose-table:text-base prose-table:overflow-x-auto prose-table:block md:prose-table:table
       prose-th:bg-muted prose-th:text-foreground prose-th:font-semibold
-      prose-td:border prose-td:border-border
+      prose-td:border prose-td:border-border prose-td:text-foreground/90
       prose-img:rounded-lg prose-img:shadow-md prose-img:border prose-img:border-border prose-img:max-w-full prose-img:h-auto
 			[&_th]:px-2 md:[&_th]:px-4 [&_th]:py-2
       [&_td]:px-2 md:[&_td]:px-4 [&_td]:py-2
