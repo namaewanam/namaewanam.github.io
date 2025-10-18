@@ -1,7 +1,7 @@
-# Machine Learning Lecture 2: Is Learning Feasible?
-
-A Complete Beginner's Guide to Understanding Learning Theory
-
+---
+title: Lecture 2 - Is Learning Feasible?
+date: 2025-10-18
+description: A Complete Beginner's Guide to Understanding Learning Theory
 ---
 
 ## Table of Contents
@@ -62,7 +62,7 @@ We use machine learning when:
 **Outside our training data, the function f can be ANYTHING!**
 
 Imagine you have these data points:
-```
+```text
 x:  1    2    3    4
 y:  2    4    6    8
 ```
@@ -112,7 +112,7 @@ Now we perform an experiment:
 
 The mathematical proof that ν tells us about μ:
 
-```
+```text
 P[|ν - μ| > ε] ≤ 2e^(-2ε²N)
 ```
 
@@ -133,7 +133,7 @@ Let's say:
 - N = 1000 marbles
 - ε = 0.05 (we want ν within 5% of μ)
 
-```
+```text
 P[|ν - μ| > 0.05] ≤ 2e^(-2 × 0.05² × 1000)
                   ≤ 2e^(-5)
                   ≤ 2 × 0.0067
@@ -171,7 +171,7 @@ Now comes the magic! Let's map the marble experiment to machine learning:
 
 ### Visualization
 
-```
+```text
 Input Space X (the "bin"):
 ┌─────────────────────────────────┐
 │  x₁ ✓  x₂ ✗  x₃ ✓  x₄ ✓  x₅ ✗  │
@@ -211,7 +211,7 @@ We introduce proper machine learning notation:
 
 ### Hoeffding for Learning
 
-```
+```text
 P[|Eᵢₙ(h) - Eₒᵤₜ(h)| > ε] ≤ 2e^(-2ε²N)
 ```
 
@@ -219,7 +219,7 @@ P[|Eᵢₙ(h) - Eₒᵤₜ(h)| > ε] ≤ 2e^(-2ε²N)
 
 ### Visual Example
 
-```
+```text
 Hypothesis h performance:
 
 Training Set (100 examples):
@@ -246,7 +246,7 @@ So far we've only considered ONE hypothesis h. But in real learning, we have MAN
 
 ### Multiple Bins Visualization
 
-```
+```text
 Hypothesis Set:
 ┌──────┐  ┌──────┐  ┌──────┐       ┌──────┐
 │  h₁  │  │  h₂  │  │  h₃  │  ...  │  h_M │
@@ -276,7 +276,7 @@ This analogy brilliantly illustrates the multiple hypothesis problem.
 
 **If you toss a fair coin 10 times, what's the probability of getting 10 heads?**
 
-```
+```text
 P(10 heads) = (1/2)^10 = 1/1024 ≈ 0.1%
 ```
 
@@ -286,7 +286,7 @@ Very unlikely! ✓
 
 **If you toss 1,000 fair coins 10 times each, what's the probability that SOME coin gets 10 heads?**
 
-```
+```text
 P(at least one coin gets 10 heads) ≈ 63%
 ```
 
@@ -294,7 +294,7 @@ Very likely! 😱
 
 ### The Insight for Learning
 
-```
+```text
 Single Hypothesis (one coin):
 - Test h on data
 - If Eᵢₙ(h) is small, probably Eₒᵤₜ(h) is small ✓
@@ -310,7 +310,7 @@ Multiple Hypotheses (many coins):
 
 When we have many hypotheses, we're more likely to find one that performs well on training data by chance alone, even if it's not actually good!
 
-```
+```text
   h₁  h₂  h₃  h₄  h₅  h₆  h₇  h₈  h₉  h₁₀
   ✗   ✗   ✗   ✗   ✓   ✗   ✗   ✗   ✗   ✗
                 BINGO!
@@ -325,7 +325,7 @@ When we have many hypotheses, we're more likely to find one that performs well o
 
 We can bound the probability of ANY hypothesis being bad:
 
-```
+```text
 P[|Eᵢₙ(g) - Eₒᵤₜ(g)| > ε] ≤ Σ P[|Eᵢₙ(hₘ) - Eₒᵤₜ(hₘ)| > ε]
                               m=1 to M
 ```
@@ -336,13 +336,13 @@ Where g is the hypothesis our algorithm selects.
 
 Each term in the sum satisfies Hoeffding:
 
-```
+```text
 P[|Eᵢₙ(hₘ) - Eₒᵤₜ(hₘ)| > ε] ≤ 2e^(-2ε²N)
 ```
 
 ### The Final Result
 
-```
+```text
 P[|Eᵢₙ(g) - Eₒᵤₜ(g)| > ε] ≤ 2M·e^(-2ε²N)
 ```
 
@@ -352,7 +352,7 @@ P[|Eᵢₙ(g) - Eₒᵤₜ(g)| > ε] ≤ 2M·e^(-2ε²N)
 
 **With probability ≥ 1 - δ:**
 
-```
+```text
 |Eᵢₙ(g) - Eₒᵤₜ(g)| ≤ ε
 ```
 
@@ -397,7 +397,7 @@ Learning success depends on:
 
 ### 4. The Generalization Guarantee
 
-```
+```text
 With probability ≥ 1 - 2M·e^(-2ε²N):
 
 Eₒᵤₜ(g) ≤ Eᵢₙ(g) + ε
@@ -417,7 +417,7 @@ Eₒᵤₜ(g) ≤ Eᵢₙ(g) + ε
 - Tolerance: ε = 0.05 (5% error)
 
 **Bound Calculation:**
-```
+```text
 δ = 2M·e^(-2ε²N)
   = 2(100)·e^(-2(0.05)²(10,000))
   = 200·e^(-50)
@@ -434,7 +434,7 @@ Eₒᵤₜ(g) ≤ Eᵢₙ(g) + ε
 - Desired confidence: 1 - δ = 0.95 (95%)
 
 **What ε can we achieve?**
-```
+```text
 0.05 = 2(1,000,000)·e^(-2ε²(1,000))
 Solving: ε ≈ 0.092 (9.2%)
 ```
@@ -446,14 +446,14 @@ Solving: ε ≈ 0.092 (9.2%)
 **Scenario:** Same task, same data (N = 5,000)
 
 **Simple model:** M = 10
-```
+```text
 δ = 2(10)·e^(-2(0.05)²(5,000))
   ≈ 0.00067
 Confidence: 99.93%
 ```
 
 **Complex model:** M = 1,000,000
-```
+```text
 δ = 2(1,000,000)·e^(-2(0.05)²(5,000))
   ≈ 67.4%
 Confidence: Only 32.6%! 😱

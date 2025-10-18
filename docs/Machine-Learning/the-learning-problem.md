@@ -56,7 +56,7 @@ Every machine learning problem has three essential components:
 The perceptron is one of the simplest machine learning models. It's like a basic decision maker.
 
 **Formula:**
-```
+```text
 h(x) = sign(w₁x₁ + w₂x₂ + ... + wₙxₙ + b)
      = sign(wᵀx + b)
 ```
@@ -79,7 +79,7 @@ Let's say we learn:
 - b = -50
 
 For a person with income = $60k and credit score = 700:
-```
+```text
 h(x) = sign(0.5 × 60 + 0.8 × 700 - 50)
      = sign(30 + 560 - 50)
      = sign(540)
@@ -146,7 +146,7 @@ This is a crucial distinction!
   - Medical: Disease or Healthy
 
 **Example:**
-```
+```text
 Training Data:
 Email 1: "Win free money!!!" → Spam (1)
 Email 2: "Meeting at 3pm" → Not Spam (0)
@@ -163,7 +163,7 @@ New Email: "Free gift inside" → Model predicts: Spam (1)
   - Stock price: $145.32
 
 **Example:**
-```
+```text
 Training Data:
 House 1: 1500 sqft, 2 bed → $200,000
 House 2: 2000 sqft, 3 bed → $280,000
@@ -187,13 +187,13 @@ New House: 1800 sqft, 3 bed → Model predicts: $265,000
 - **Rewards:** Positive/negative feedback
 
 **Formula:**
-```
+```text
 Goal: Maximize cumulative reward
 R_total = r₁ + r₂ + r₃ + ... + rₙ
 ```
 
 **Real Example: Teaching a Dog**
-```
+```text
 Dog jumps → You give treat (+10 reward) → Dog learns to jump more
 Dog bites → You scold (-10 reward) → Dog learns not to bite
 ```
@@ -225,7 +225,7 @@ Dog bites → You scold (-10 reward) → Dog learns not to bite
 **1. Clustering** (Grouping similar items)
 - Example: Customer segmentation
 
-```
+```text
 Netflix has millions of users
 Clustering discovers:
 - Group 1: Action movie lovers
@@ -241,13 +241,13 @@ No one told the algorithm these groups exist!
 
 **3. Anomaly Detection** (Finding outliers)
 - Example: Credit card fraud detection
-```
+```text
 Normal transactions: $5, $23, $45, $12, $67
 Anomaly: $15,000 (Flag as suspicious!)
 ```
 
 **Real-World Example:**
-```
+```text
 Google News:
 - Receives thousands of news articles daily
 - Automatically groups similar stories together
@@ -295,7 +295,7 @@ This is the fundamental question: **Can we actually learn from limited data and 
 You train on a small dataset, but need to make predictions on NEW data you've never seen.
 
 **Example:**
-```
+```text
 Training: 1,000 emails
 Real world: Billions of possible emails
 
@@ -307,7 +307,7 @@ Question: Will your model work on emails it's never seen?
 Multiple hypotheses can fit your training data perfectly but disagree on new data!
 
 **Simple Illustration:**
-```
+```text
 Training data (3 points):
 x₁ = 1 → y₁ = 1
 x₂ = 2 → y₂ = 4
@@ -334,30 +334,30 @@ Which is correct for x = 4?
 **Introducing: Generalization Error**
 
 **In-Sample Error (Training Error):**
-```
-E_in(h) = (1/N) Σ[h(xᵢ) ≠ yᵢ]
+```text
+Eᵢₙ(h) = (1/N) Σ[h(xᵢ) ≠ yᵢ]
 ```
 - Error on your training data
 - Easy to measure
 
 **Out-of-Sample Error (True Error):**
-```
-E_out(h) = Probability that h(x) ≠ y for random new point
+```text
+Eₒᵤₜ(h) = Probability that h(x) ≠ y for random new point
 ```
 - Error on unseen data
 - What we actually care about!
 - Cannot measure directly
 
 **The Learning Question:**
-```
-When does E_in(h) ≈ E_out(h)?
+```text
+When does Eᵢₙ(h) ≈ Eₒᵤₜ(h)?
 ```
 
 **Probability Framework:**
 
 Think of learning like polling in elections:
 
-```
+```text
 Election Polling Analogy:
 - Population: All voters (like all possible data points)
 - Sample: 1,000 polled voters (like training data)
@@ -368,8 +368,8 @@ If sample is random and large enough → YES!
 
 **Hoeffding's Inequality** (Mathematical guarantee):
 
-```
-P[|E_in(h) - E_out(h)| > ε] ≤ 2e^(-2ε²N)
+```text
+P[|Eᵢₙ(h) - Eₒᵤₜ(h)| > ε] ≤ 2e^(-2ε²N)
 ```
 
 **What this means in plain English:**
@@ -378,9 +378,9 @@ P[|E_in(h) - E_out(h)| > ε] ≤ 2e^(-2ε²N)
 - As N increases, probability of large difference decreases exponentially!
 
 **Practical Example:**
-```
+```text
 If N = 1,000 training examples:
-- Probability that |E_in - E_out| > 0.1 is less than 0.03 (3%)
+- Probability that |Eᵢₙ - Eₒᵤₜ| > 0.1 is less than 0.03 (3%)
 - With 95% confidence, training error ≈ true error
 
 If N = 10,000:
@@ -401,19 +401,19 @@ If N = 10,000:
 Learning is feasible under these conditions:
 
 **1. The Training Set is Representative**
-```
+```text
 Sample randomly from the true distribution
 D ~ P(X, Y)
 ```
 
 **2. Sufficient Data Size**
-```
+```text
 N must be large enough
 Rule of thumb: N > 10 × (number of parameters)
 ```
 
 **3. Limited Hypothesis Space**
-```
+```text
 Can't consider ALL possible functions
 Must restrict to reasonable family (e.g., linear functions)
 ```
@@ -421,22 +421,22 @@ Must restrict to reasonable family (e.g., linear functions)
 **The Trade-off:**
 
 **Small Hypothesis Space:**
-- ✅ E_in ≈ E_out (generalizes well)
+- ✅ Eᵢₙ ≈ Eₒᵤₜ (generalizes well)
 - ❌ Might not find good fit to data
 
 **Large Hypothesis Space:**
 - ✅ Can fit data very well
-- ❌ E_in might not ≈ E_out (overfitting!)
+- ❌ Eᵢₙ might not ≈ Eₒᵤₜ (overfitting!)
 
 **The Union Bound Problem:**
 
 If testing M different hypotheses:
-```
+```text
 P[Bad generalization for any h] ≤ M × 2e^(-2ε²N)
 ```
 
 **Example:**
-```
+```text
 1 hypothesis:   Need N = 1,000
 10 hypotheses:  Need N = 2,000
 100 hypotheses: Need N = 3,000
@@ -448,12 +448,12 @@ More complex models need MORE data!
 
 Instead of counting all hypotheses, we count "effective" number based on what they can do on N points:
 
-```
+```text
 m(N) = maximum number of dichotomies (ways to classify N points)
 ```
 
 For perceptron in 2D:
-```
+```text
 m(N) ≈ N³ (polynomial, not exponential!)
 ```
 
@@ -470,14 +470,14 @@ m(N) ≈ N³ (polynomial, not exponential!)
 A way to quantify how wrong your predictions are.
 
 **General Form:**
-```
+```text
 Error = E(h(x), y)
 ```
 
 **Common Error Measures:**
 
 **1. 0/1 Loss (Classification)**
-```
+```text
 E(h(x), y) = {
   0 if h(x) = y    (correct)
   1 if h(x) ≠ y    (wrong)
@@ -487,7 +487,7 @@ Overall Error = (Number of mistakes) / (Total predictions)
 ```
 
 **Example:**
-```
+```text
 Predictions: [Cat, Dog, Cat, Bird]
 True labels: [Cat, Dog, Dog, Bird]
 Errors:      [✓,   ✓,   ✗,   ✓]
@@ -496,7 +496,7 @@ Error = 1/4 = 0.25 = 25%
 ```
 
 **2. Squared Error (Regression)**
-```
+```text
 E(h(x), y) = (h(x) - y)²
 
 Overall Error = (1/N) Σ(h(xᵢ) - yᵢ)²
@@ -504,7 +504,7 @@ Also called: Mean Squared Error (MSE)
 ```
 
 **Example:**
-```
+```text
 True prices:     [$200k, $300k, $250k]
 Predicted:       [$210k, $280k, $260k]
 Squared errors:  [100,   400,   100]  (in millions²)
@@ -514,7 +514,7 @@ RMSE = √200 = $14.14k average error
 ```
 
 **3. Absolute Error**
-```
+```text
 E(h(x), y) = |h(x) - y|
 
 Mean Absolute Error (MAE) = (1/N) Σ|h(xᵢ) - yᵢ|
@@ -539,7 +539,7 @@ Consider your application:
 - House pricing: Large errors might be equally bad as small errors
 
 **Custom Loss:**
-```
+```text
 E(h(x), y) = {
   10  if (y = diseased) and (h(x) = healthy)  ← Very bad!
   1   if (y = healthy) and (h(x) = diseased)   ← Acceptable
@@ -563,13 +563,13 @@ Real-world data is messy! The relationship between input and output isn't perfec
 - Example: Temperature sensor reads 71.2°F when true temp is 72.0°F
 
 **2. Class Noise** (Wrong labels)
-```
+```text
 Email actually spam but labeled as not spam
 Image of dog labeled as cat
 ```
 
 **3. Inherent Noise** (Randomness in the world)
-```
+```text
 Same house features → Different prices
 Reason: Market conditions, negotiation, timing, etc.
 ```
@@ -577,24 +577,24 @@ Reason: Market conditions, negotiation, timing, etc.
 **Mathematical Model:**
 
 **Without Noise:**
-```
+```text
 y = f(x)
 Deterministic: Same input → Always same output
 ```
 
 **With Noise:**
-```
+```text
 y = f(x) + ε
 where ε ~ N(0, σ²) is random noise
 ```
 
 Or probabilistically:
-```
+```text
 y ~ P(y|x)
 ```
 
 **Example with Noise:**
-```
+```text
 Perfect relationship: Price = 100 × sqft
 With noise:          Price = 100 × sqft + ε
 
@@ -607,14 +607,14 @@ With noise:          Price = 100 × sqft + ε
 **Impact on Learning:**
 
 **Irreducible Error (Bayes Error):**
-```
+```text
 E_bayes = Minimum possible error due to noise
 ```
 
 Even the perfect model can't do better than this!
 
 **Total Error Decomposition:**
-```
+```text
 Total Error = Bias + Variance + Noise
 
 Bias:     How far your average prediction is from truth
@@ -623,7 +623,7 @@ Noise:    Inherent randomness (unavoidable)
 ```
 
 **Practical Example:**
-```
+```text
 Target: y = x² + noise(mean=0, std=1)
 Training data: {(1,1.2), (2,3.8), (3,9.1)}
 
@@ -646,7 +646,7 @@ Best polynomial model: h(x) = 0.9x² + 0.1
 4. **Ensemble methods** (multiple models reduce variance)
 
 **Key Insight:**
-```
+```text
 You can never eliminate noise
 But you can prevent OVERFITTING to noise!
 ```
@@ -668,7 +668,7 @@ e) Finding unusual patterns in credit card transactions
 **Problem 2: Calculate Training Error**
 
 Given predictions and true labels:
-```
+```text
 Predicted: [0, 1, 1, 0, 1, 1, 0]
 True:      [0, 1, 0, 0, 1, 1, 1]
 ```
@@ -685,7 +685,7 @@ Which model will definitely perform better on new data? Explain why or why not.
 **Problem 4: Error Measures**
 
 For a house price prediction problem, you have:
-```
+```text
 True:      [$200k, $300k, $250k]
 Predicted: [$220k, $280k, $240k]
 ```
@@ -717,8 +717,8 @@ If Hoeffding's inequality says you need N=1000 examples for 95% confidence that 
 - Reinforcement: Learn from rewards/penalties
 
 **4. Critical Insight:**
-```
-E_in(h) ≈ E_out(h) with high probability
+```text
+Eᵢₙ(h) ≈ Eₒᵤₜ(h) with high probability
 (Training error ≈ Real-world error)
 ```
 

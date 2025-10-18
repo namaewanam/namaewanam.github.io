@@ -1,4 +1,8 @@
-# Machine Learning Fundamentals - Lecture 1: The Learning Problem
+---
+title: Lecture 1 - The Learning Problem
+date: 2025-10-18
+description: A comprehensive beginner's guide to understanding the learning problem in machine learning, covering key concepts, types of learning, feasibility, error measures, and practical exercises.
+---
 
 ## Table of Contents
 1. [What is Machine Learning?](#what-is-machine-learning)
@@ -30,7 +34,7 @@ Machine learning is applicable when **ALL three** conditions are met:
 - We have data: Historical ratings from millions of users
 
 **Traditional Approach** (doesn't work well):
-```
+```text
 IF movie has Tom Cruise AND user likes action THEN rating = 5
 ```
 Too many factors to consider manually!
@@ -62,14 +66,14 @@ x = {
 
 #### 2. **Output: y**
 What you're trying to predict:
-```markdown
+```text
 y = approved or denied (good customer or bad customer)
 y = +1 (good) or -1 (bad)
 ```
 
 #### 3. **Target Function: f**
 The **ideal formula** that perfectly predicts credit worthiness:
-```
+```text
 f: X → Y
 f(x) = ideal decision for applicant x
 ```
@@ -77,11 +81,11 @@ f(x) = ideal decision for applicant x
 
 #### 4. **Training Data: D**
 Historical records of past customers:
-```
+```text
 D = {(x₁, y₁), (x₂, y₂), ..., (xₙ, yₙ)}
 ```
 Example:
-```
+```text
 (x₁, y₁) = ({age: 25, salary: $40k, ...}, approved)
 (x₂, y₂) = ({age: 19, salary: $15k, ...}, denied)
 ...
@@ -89,28 +93,28 @@ Example:
 
 #### 5. **Hypothesis Set: H**
 The set of **candidate formulas** your learning algorithm can choose from:
-```
+```text
 H = {h₁, h₂, h₃, ...}
 ```
 Think of it as your "toolbox" of possible formulas.
 
 #### 6. **Learning Algorithm: A**
 The process that picks the best hypothesis from H using the training data:
-```
+```text
 A: (D, H) → g
 ```
 It searches through H to find g that works best on the data.
 
 #### 7. **Final Hypothesis: g**
 The formula you'll actually use (your learned model):
-```
+```text
 g: X → Y
 g(x) ≈ f(x)  (hopefully!)
 ```
 
 ### The Learning Diagram
 
-```
+```text
 Unknown Target Function (f)
          ↓ generates
     Training Data (D)
@@ -136,7 +140,7 @@ A **perceptron** is one of the simplest machine learning models. It makes decisi
 
 For credit approval, give each factor a **weight** (importance):
 
-```
+```text
 Decision = w₁ × (age) + w₂ × (salary) + w₃ × (debt) + ...
 ```
 
@@ -145,7 +149,7 @@ Decision = w₁ × (age) + w₂ × (salary) + w₃ × (debt) + ...
 
 ### Mathematical Formula
 
-```
+```text
 h(x) = sign(Σ wᵢxᵢ - threshold)
        i=1 to d
 ```
@@ -160,13 +164,13 @@ Where:
 
 Introduce x₀ = 1 (artificial coordinate) to absorb the threshold:
 
-```
+```text
 h(x) = sign(Σ wᵢxᵢ)  = sign(w₀ + w₁x₁ + w₂x₂ + ... + wₐxₐ)
        i=0 to d
 ```
 
 In vector form:
-```
+```text
 h(x) = sign(wᵀx)
 ```
 
@@ -174,7 +178,7 @@ h(x) = sign(wᵀx)
 
 The perceptron creates a **line** (or hyperplane in higher dimensions) that separates two classes:
 
-```
+```text
         +  +  +
       +  +    +
    _______________  ← Decision boundary (wᵀx = 0)
@@ -189,19 +193,19 @@ The perceptron creates a **line** (or hyperplane in higher dimensions) that sepa
 
 Let's say we only consider **salary** (x₁) and **debt** (x₂):
 
-```
+```text
 h(x) = sign(w₀ + w₁ × salary + w₂ × debt)
 ```
 
 If we learn:
-```
+```text
 w₀ = 5
 w₁ = 0.001   (positive = more salary is good)
 w₂ = -0.002  (negative = more debt is bad)
 ```
 
 For an applicant with salary = $50,000 and debt = $10,000:
-```
+```text
 h(x) = sign(5 + 0.001×50,000 + (-0.002)×10,000)
      = sign(5 + 50 - 20)
      = sign(35)
@@ -222,11 +226,11 @@ h(x) = sign(5 + 0.001×50,000 + (-0.002)×10,000)
 
 2. **Repeat** until all points are correctly classified:
    - Pick a **misclassified point** (xₙ, yₙ) where:
-     ```
+     ```text
      sign(wᵀxₙ) ≠ yₙ
      ```
    - **Update** the weights:
-     ```
+     ```text
      w ← w + yₙxₙ
      ```
 
@@ -237,20 +241,20 @@ h(x) = sign(5 + 0.001×50,000 + (-0.002)×10,000)
 The update `w ← w + yₙxₙ` moves the decision boundary toward the misclassified point.
 
 **Case 1**: Point should be +1 but predicted -1
-```
+```text
 w_new = w_old + (+1) × x = w_old + x
 ```
 This makes wᵀx larger (more positive) next time!
 
 **Case 2**: Point should be -1 but predicted +1
-```
+```text
 w_new = w_old + (-1) × x = w_old - x
 ```
 This makes wᵀx smaller (more negative) next time!
 
 ### Visual Example
 
-```
+```text
 Iteration 1:
   +  +  +
 +  +    +
@@ -271,7 +275,7 @@ Iteration 2:
 ### PLA Example (Detailed)
 
 **Training Data**:
-```
+```text
 (x₁, y₁) = ([3, 2], +1)
 (x₂, y₂) = ([1, 1], +1)
 (x₃, y₃) = ([-1, 2], -1)
@@ -301,7 +305,7 @@ Iteration 2:
 **Format**: (input, correct output) pairs
 
 **Example**: Coin recognition in vending machines
-```
+```text
 Training Data:
 (mass=5g, size=21mm) → 25 cent coin
 (mass=2g, size=17mm) → 5 cent coin
@@ -320,14 +324,14 @@ Training Data:
 **Format**: (input, ?) - just inputs, no labels
 
 **Example**: Customer segmentation
-```
+```text
 Data: Customer purchase histories
 Goal: Group similar customers together
 No one tells you what the groups should be!
 ```
 
 **Common Task**: **Clustering**
-```
+```text
      x  x      o o
    x  x  x    o o o
      x  x      o o
@@ -347,7 +351,7 @@ No one tells you what the groups should be!
 **Format**: (input, some output, grade for this output)
 
 **Example**: Game playing (Backgammon)
-```
+```text
 State: Current board position
 Action: Make a move
 Reward: Win (+1), Lose (-1), or Continue (0)
@@ -379,7 +383,7 @@ Reward: Win (+1), Lose (-1), or Continue (0)
 
 ### The Learning Process
 
-```
+```text
 Data → Learning Algorithm → Model → Predictions
 ```
 

@@ -1,4 +1,8 @@
-# Linear Models in Machine Learning - Beginner's Guide
+---
+title: Lecture 3 - Linear Models in Machine Learning
+date: 2025-10-18
+description: A Complete Beginner's Guide to Understanding Linear Models in Machine Learning
+---
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -78,7 +82,7 @@ Imagine you want to recognize handwritten digits (0-9):
 3. Repeat until no errors (if data is linearly separable)
 
 **Formula**:
-```
+```text
 h(x) = sign(w₀ + w₁x₁ + w₂x₂ + ... + wₐxₐ)
      = sign(wᵀx)
 ```
@@ -120,7 +124,7 @@ Pocket algorithm keeps the weights with lowest Eᵢₙ!
 The decision boundary is where wᵀx = 0.
 
 **Example in 2D**:
-```
+```text
 w₀ + w₁x₁ + w₂x₂ = 0
 ```
 
@@ -144,7 +148,7 @@ This is a straight line! Different weights give different orientations and posit
 ### Mathematical Formulation
 
 **Hypothesis (prediction function)**:
-```
+```text
 h(x) = w₀ + w₁x₁ + w₂x₂ + ... + wₐxₐ
      = wᵀx
 ```
@@ -152,7 +156,7 @@ h(x) = w₀ + w₁x₁ + w₂x₂ + ... + wₐxₐ
 **Example: Credit Line Prediction**
 
 Input features:
-```
+```text
 x = [
   1,              (x₀ - constant bias term)
   23,             (x₁ - age in years)
@@ -165,14 +169,14 @@ x = [
 ```
 
 Output:
-```
+```text
 h(x) = $8,500  (predicted credit line)
 ```
 
 ### How to Measure Error
 
 **Squared Error** (most common for regression):
-```
+```text
 Error for one point = (h(x) - y)²
 ```
 
@@ -182,7 +186,7 @@ Where:
 - We square to make all errors positive and penalize large errors more
 
 **In-Sample Error (Eᵢₙ)**:
-```
+```text
 Eᵢₙ(w) = (1/N) Σ(h(xₙ) - yₙ)²
        = (1/N) Σ(wᵀxₙ - yₙ)²
 ```
@@ -194,12 +198,12 @@ This is the average squared error over all N training examples.
 **Goal**: Minimize Eᵢₙ(w)
 
 **Matrix Formulation**:
-```
+```text
 Eᵢₙ(w) = (1/N) ||Xw - y||²
 ```
 
 Where:
-```
+```text
 X = [— x₁ᵀ —]    (N × (d+1) matrix)
     [— x₂ᵀ —]
     [   ⋮   ]
@@ -209,23 +213,23 @@ y = [y₁]         (N × 1 vector)
     [y₂]
     [⋮ ]
     [yₙ]
-```
+```text
 
 **Finding the Minimum** (using calculus):
 
 1. Take the gradient (derivative):
-   ```
+   ```text
    ∇Eᵢₙ(w) = (2/N) Xᵀ(Xw - y)
    ```
 
 2. Set it to zero:
-   ```
+   ```text
    Xᵀ(Xw - y) = 0
    XᵀXw = Xᵀy
    ```
 
 3. Solve for w:
-   ```
+   ```text
    w = (XᵀX)⁻¹Xᵀy = X†y
    ```
 
@@ -235,7 +239,7 @@ y = [y₁]         (N × 1 vector)
 
 **Step-by-step**:
 
-```
+```text
 Input: Training data (x₁, y₁), (x₂, y₂), ..., (xₙ, yₙ)
 
 Step 1: Construct matrix X and vector y
@@ -263,13 +267,13 @@ Output: Weight vector w
 **Simple Example**:
 
 Given 3 data points in 2D:
-```
+```text
 (x₁, y₁) = ([1, 2, 3], 5)
 (x₂, y₂) = ([1, 3, 4], 7)
 (x₃, y₃) = ([1, 1, 2], 3)
 ```
 
-```
+```text
 X = [1  2  3]        y = [5]
     [1  3  4]            [7]
     [1  1  2]            [3]
@@ -304,7 +308,7 @@ w = (XᵀX)⁻¹Xᵀy  ← This gives us optimal weights!
 **Problem**: Not all patterns are linear!
 
 **Example 1 - Circular Pattern**:
-```
+```text
 Data points arranged in circles:
   • Inner circle: Class +1
   • Outer circle: Class -1
@@ -325,7 +329,7 @@ A straight line can't capture this U-shape!
 **Key Insight**: Linear algorithms can handle nonlinear patterns if we transform the input first!
 
 **The Process**:
-```
+```text
 Original Input → Nonlinear Transform (Φ) → Transformed Input → Linear Model
      x                                            z               h(z)
 ```
@@ -333,13 +337,13 @@ Original Input → Nonlinear Transform (Φ) → Transformed Input → Linear Mod
 **Example - Making Circles Separable**:
 
 Original space (2D):
-```
+```text
 Input: (x₁, x₂)
 Cannot separate circles with a line
 ```
 
 Transform to new space:
-```
+```text
 Φ: (x₁, x₂) → (x₁², x₂²)
 
 New space: (z₁, z₂) = (x₁², x₂²)
@@ -352,7 +356,7 @@ Now we CAN separate with a line!
 - A line in (z₁, z₂) space separates them!
 
 **General Formula**:
-```
+```text
 Original: x = (x₀, x₁, x₂, ..., xₐ)
 
 Transform: z = Φ(x) = (1, x₁, x₂, x₁², x₂², x₁x₂, ...)
@@ -396,7 +400,7 @@ Linear in z-space: h(x) = wᵀΦ(x)
 
 ### The Big Picture
 
-```
+```text
 Input x → [Feature Transform Φ] → Features z → [Linear Model w] → Output h(z)
 ```
 
