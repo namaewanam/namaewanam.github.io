@@ -49,7 +49,7 @@ Imagine you work at a bank and need to decide whether to approve credit cards.
 
 #### 1. **Input: x**
 The information you have about the applicant:
-```
+```text
 x = {
     age: 23,
     gender: male,
@@ -62,7 +62,7 @@ x = {
 
 #### 2. **Output: y**
 What you're trying to predict:
-```text
+```markdown
 y = approved or denied (good customer or bad customer)
 y = +1 (good) or -1 (bad)
 ```
