@@ -335,7 +335,7 @@ Which is correct for x = 4?
 
 **In-Sample Error (Training Error):**
 ```
-Eᵢₙ(h) = (1/N) Σ[h(xᵢ) ≠ yᵢ]
+E_in(h) = (1/N) Σ[h(xᵢ) ≠ yᵢ]
 ```
 - Error on your training data
 - Easy to measure
@@ -350,7 +350,7 @@ E_out(h) = Probability that h(x) ≠ y for random new point
 
 **The Learning Question:**
 ```
-When does Eᵢₙ(h) ≈ E_out(h)?
+When does E_in(h) ≈ E_out(h)?
 ```
 
 **Probability Framework:**
@@ -369,7 +369,7 @@ If sample is random and large enough → YES!
 **Hoeffding's Inequality** (Mathematical guarantee):
 
 ```
-P[|Eᵢₙ(h) - E_out(h)| > ε] ≤ 2e^(-2ε²N)
+P[|E_in(h) - E_out(h)| > ε] ≤ 2e^(-2ε²N)
 ```
 
 **What this means in plain English:**
@@ -380,7 +380,7 @@ P[|Eᵢₙ(h) - E_out(h)| > ε] ≤ 2e^(-2ε²N)
 **Practical Example:**
 ```
 If N = 1,000 training examples:
-- Probability that |Eᵢₙ - E_out| > 0.1 is less than 0.03 (3%)
+- Probability that |E_in - E_out| > 0.1 is less than 0.03 (3%)
 - With 95% confidence, training error ≈ true error
 
 If N = 10,000:
@@ -421,12 +421,12 @@ Must restrict to reasonable family (e.g., linear functions)
 **The Trade-off:**
 
 **Small Hypothesis Space:**
-- ✅ Eᵢₙ ≈ E_out (generalizes well)
+- ✅ E_in ≈ E_out (generalizes well)
 - ❌ Might not find good fit to data
 
 **Large Hypothesis Space:**
 - ✅ Can fit data very well
-- ❌ Eᵢₙ might not ≈ E_out (overfitting!)
+- ❌ E_in might not ≈ E_out (overfitting!)
 
 **The Union Bound Problem:**
 
@@ -718,7 +718,7 @@ If Hoeffding's inequality says you need N=1000 examples for 95% confidence that 
 
 **4. Critical Insight:**
 ```
-Eᵢₙ(h) ≈ E_out(h) with high probability
+E_in(h) ≈ E_out(h) with high probability
 (Training error ≈ Real-world error)
 ```
 
