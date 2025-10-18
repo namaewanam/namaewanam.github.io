@@ -62,7 +62,7 @@ x = {
 
 #### 2. **Output: y**
 What you're trying to predict:
-```
+```text
 y = approved or denied (good customer or bad customer)
 y = +1 (good) or -1 (bad)
 ```
