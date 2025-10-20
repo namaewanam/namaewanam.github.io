@@ -6,6 +6,7 @@
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
+		"generate-posts": "node scripts/generate-posts-json.js",
 		"lint": "next lint",
 		"lint:fix": "next lint --fix",
 		"format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",

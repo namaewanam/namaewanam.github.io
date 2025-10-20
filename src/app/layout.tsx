@@ -1,13 +1,12 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import Link from 'next/link';
-import { getCategories } from '@/lib/markdown';
 import { ThemeProvider, ThemeScript } from '@/components/ThemeProvider';
 import ThemeToggle from '@/components/ThemeToggle';
-import MobileMenu from '@/components/MobileMenu';
 import './globals.css';
 import { CodeThemeProvider, CodeThemeScript } from '@/contexts/CodeThemeContext';
 import GitHubButton from '@/components/GitHubButton';
+import SearchBar from '@/components/SearchBar';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,8 +20,6 @@ export default function RootLayout({
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
-	const categories = getCategories();
-
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<body className={inter.className}>
@@ -34,42 +31,23 @@ export default function RootLayout({
 							{/* Header */}
 							<header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
 								<div className="container mx-auto px-4 py-3 md:py-4">
-									<div className="flex items-center justify-between">
+									<div className="flex items-center justify-between gap-4">
 										<Link
 											href="/"
-											className="text-xl font-bold text-primary transition-colors hover:text-accent md:text-2xl"
+											className="whitespace-nowrap text-xl font-bold text-primary transition-colors hover:text-accent md:text-2xl"
 										>
 											Playground
 										</Link>
 
-										{/* Desktop Navigation */}
-										<div className="hidden items-center gap-6 md:flex">
-											<nav className="flex gap-6">
-												<Link
-													href="/"
-													className="font-medium text-foreground/80 transition-colors hover:text-primary"
-												>
-													Home
-												</Link>
-												{categories.slice(0, 5).map((category) => (
-													<Link
-														key={category.slug}
-														href={`/blog/${category.slug}`}
-														className="font-medium text-foreground/80 transition-colors hover:text-primary"
-													>
-														{category.name.replaceAll('-', ' ')}
-													</Link>
-												))}
-											</nav>
-											<ThemeToggle />
-											<GitHubButton />
+										{/* Search Bar */}
+										<div className="max-w-2xl flex-1">
+											<SearchBar />
 										</div>
 
-										{/* Mobile Navigation */}
-										<div className="flex items-center gap-2 md:hidden">
+										{/* Right side buttons */}
+										<div className="flex items-center gap-2">
 											<ThemeToggle />
 											<GitHubButton />
-											<MobileMenu categories={categories} />
 										</div>
 									</div>
 								</div>
