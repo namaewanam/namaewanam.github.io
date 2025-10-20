@@ -36,7 +36,7 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 		<>
 			<button
 				onClick={() => setIsOpen(!isOpen)}
-				className="p-2 rounded-lg bg-secondary hover:bg-accent/20 transition-colors border border-border"
+				className="rounded-lg border border-border bg-secondary p-2 transition-colors hover:bg-accent/20"
 				aria-label="Toggle menu"
 			>
 				{isOpen ? (
@@ -49,20 +49,21 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 			{/* Mobile Menu Overlay */}
 			{isOpen && (
 				<div
-					className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+					className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
 					onClick={() => setIsOpen(false)}
 				/>
 			)}
 
 			{/* Mobile Menu Panel */}
 			<div
-				className={`fixed top-[57px] right-0 h-[calc(100vh-57px)] w-64 bg-card border-l border-border z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
-					}`}
+				className={`fixed right-0 top-[57px] z-50 h-[calc(100vh-57px)] w-64 transform border-l border-border bg-card transition-transform duration-300 ease-in-out ${
+					isOpen ? 'translate-x-0' : 'translate-x-full'
+				}`}
 			>
-				<nav className="flex flex-col p-4 space-y-2">
+				<nav className="flex flex-col space-y-2 p-4">
 					<Link
 						href="/"
-						className="px-4 py-3 text-foreground/80 hover:text-primary hover:bg-muted rounded-lg transition-colors font-medium"
+						className="rounded-lg px-4 py-3 font-medium text-foreground/80 transition-colors hover:bg-muted hover:text-primary"
 					>
 						Home
 					</Link>
@@ -70,9 +71,9 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 						<Link
 							key={category.slug}
 							href={`/blog/${category.slug}`}
-							className="px-4 py-3 text-foreground/80 hover:text-primary hover:bg-muted rounded-lg transition-colors capitalize font-medium"
+							className="rounded-lg px-4 py-3 font-medium text-foreground/80 transition-colors hover:bg-muted hover:text-primary"
 						>
-							{category.name.replace("-", " ")}
+							{category.name.replace(/-/g, ' ')}
 						</Link>
 					))}
 				</nav>

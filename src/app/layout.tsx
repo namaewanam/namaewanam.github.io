@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import { getCategories } from '@/lib/markdown';
-import { ThemeProvider, ThemeScript } from '@/components/ThemeProvider'
-import ThemeToggle from '@/components/ThemeToggle'
-import MobileMenu from '@/components/MobileMenu'
+import { ThemeProvider, ThemeScript } from '@/components/ThemeProvider';
+import ThemeToggle from '@/components/ThemeToggle';
+import MobileMenu from '@/components/MobileMenu';
 import './globals.css';
 import { CodeThemeProvider, CodeThemeScript } from '@/contexts/CodeThemeContext';
 import GitHubButton from '@/components/GitHubButton';
@@ -12,7 +12,7 @@ import GitHubButton from '@/components/GitHubButton';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-	title: `Nam's Blog`,
+	title: `Nam&apos; Blog`,
 	description: 'A modern blog about programming and technology',
 };
 
@@ -30,24 +30,24 @@ export default function RootLayout({
 				<CodeThemeScript />
 				<CodeThemeProvider>
 					<ThemeProvider>
-						<div className="min-h-screen flex flex-col">
+						<div className="flex min-h-screen flex-col">
 							{/* Header */}
-							<header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+							<header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
 								<div className="container mx-auto px-4 py-3 md:py-4">
 									<div className="flex items-center justify-between">
 										<Link
 											href="/"
-											className="text-xl md:text-2xl font-bold text-primary hover:text-accent transition-colors"
+											className="text-xl font-bold text-primary transition-colors hover:text-accent md:text-2xl"
 										>
 											Playground
 										</Link>
 
 										{/* Desktop Navigation */}
-										<div className="hidden md:flex items-center gap-6">
+										<div className="hidden items-center gap-6 md:flex">
 											<nav className="flex gap-6">
 												<Link
 													href="/"
-													className="text-foreground/80 hover:text-primary transition-colors font-medium"
+													className="font-medium text-foreground/80 transition-colors hover:text-primary"
 												>
 													Home
 												</Link>
@@ -55,9 +55,9 @@ export default function RootLayout({
 													<Link
 														key={category.slug}
 														href={`/blog/${category.slug}`}
-														className="text-foreground/80 hover:text-primary transition-colors capitalize font-medium"
+														className="font-medium text-foreground/80 transition-colors hover:text-primary"
 													>
-														{category.name.replace("-", " ")}
+														{category.name.replace(/-/g, ' ')}
 													</Link>
 												))}
 											</nav>
@@ -66,7 +66,7 @@ export default function RootLayout({
 										</div>
 
 										{/* Mobile Navigation */}
-										<div className="flex md:hidden items-center gap-2">
+										<div className="flex items-center gap-2 md:hidden">
 											<ThemeToggle />
 											<GitHubButton />
 											<MobileMenu categories={categories} />
@@ -76,14 +76,14 @@ export default function RootLayout({
 							</header>
 
 							{/* Main Content */}
-							<main className="flex-1 container mx-auto px-4 py-6 md:py-8">
-								{children}
-							</main>
+							<main className="container mx-auto flex-1 px-4 py-6 md:py-8">{children}</main>
 
 							{/* Footer */}
-							<footer className="border-t border-border bg-card/80 backdrop-blur-sm mt-auto">
-								<div className="container mx-auto px-4 py-4 md:py-6 text-center text-sm md:text-base text-muted-foreground">
-									<p>© {new Date().getFullYear()} Nam's Blog. Built with AI & Next.js & TypeScript</p>
+							<footer className="mt-auto border-t border-border bg-card/80 backdrop-blur-sm">
+								<div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground md:py-6 md:text-base">
+									<p>
+										© {new Date().getFullYear()} Nam's Blog. Built with AI & Next.js & TypeScript
+									</p>
 								</div>
 							</footer>
 						</div>

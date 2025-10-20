@@ -2,6 +2,7 @@
 title: Lecture 3 - Linear Models in Machine Learning
 date: 2025-10-18
 description: A Complete Beginner's Guide to Understanding Linear Models in Machine Learning
+order: 3
 ---
 
 ## Table of Contents

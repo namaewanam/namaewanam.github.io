@@ -1,23 +1,52 @@
-import fs from "fs";
-import path from "path";
-import matter from "gray-matter";
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
 
-const postsDirectory = path.join(process.cwd(), "docs");
+const postsDirectory = path.join(process.cwd(), 'docs');
 
 export interface Post {
 	slug: string;
 	category: string;
 	categoryName: string;
+	subcategory?: string; // For nested folders
 	title: string;
 	date?: string;
 	description?: string;
 	content: string;
+	order?: number; // For series ordering
+	fullPath: string; // For navigation
 }
 
 export interface Category {
 	slug: string;
 	name: string;
 	count: number;
+}
+
+// Helper function to recursively get all markdown files
+function getAllMarkdownFiles(dir: string, category: string, filesList: Post[] = []): Post[] {
+	const files = fs.readdirSync(dir);
+
+	files.forEach((file) => {
+		const filePath = path.join(dir, file);
+		const stat = fs.statSync(filePath);
+
+		if (stat.isDirectory()) {
+			// Recursively search subdirectories
+			getAllMarkdownFiles(filePath, category, filesList);
+		} else if (file.endsWith('.md')) {
+			// Get relative path from category directory
+			const categoryPath = path.join(postsDirectory, category);
+			const relativePath = path.relative(categoryPath, filePath);
+
+			const post = getPostByPath(category, relativePath);
+			if (post) {
+				filesList.push(post);
+			}
+		}
+	});
+
+	return filesList;
 }
 
 export function getAllPosts(): Post[] {
@@ -27,22 +56,18 @@ export function getAllPosts(): Post[] {
 	categories.forEach((categoryDir) => {
 		const categoryPath = path.join(postsDirectory, categoryDir);
 		if (fs.statSync(categoryPath).isDirectory()) {
-			const files = fs.readdirSync(categoryPath);
-
-			files.forEach((fileName) => {
-				if (fileName.endsWith(".md")) {
-					const slug = fileName.replace(/\.md$/, "");
-					const post = getPostBySlug(categoryDir, slug);
-					if (post) {
-						allPosts.push(post);
-					}
-				}
-			});
+			const posts = getAllMarkdownFiles(categoryPath, categoryDir);
+			allPosts.push(...posts);
 		}
 	});
 
-	// Sort posts by date in descending order
+	// Sort posts by order (if specified), then by date
 	return allPosts.sort((a, b) => {
+		// First sort by order if both have it
+		if (a.order !== undefined && b.order !== undefined) {
+			return a.order - b.order;
+		}
+		// Then by date
 		if (a.date && b.date) {
 			return new Date(b.date).getTime() - new Date(a.date).getTime();
 		}
@@ -51,7 +76,6 @@ export function getAllPosts(): Post[] {
 }
 
 export function getPostsByCategory(category: string): Post[] {
-	// Find the original cased directory name to read files from
 	const categoryDirs = fs.readdirSync(postsDirectory);
 	const originalCategoryDir = categoryDirs.find(
 		(dir) => dir.toLowerCase() === category.toLowerCase()
@@ -62,19 +86,14 @@ export function getPostsByCategory(category: string): Post[] {
 	}
 
 	const categoryPath = path.join(postsDirectory, originalCategoryDir);
-	const files = fs.readdirSync(categoryPath);
-
-	const posts = files
-		.map((fileName) => {
-			if (fileName.endsWith(".md")) {
-				const slug = fileName.replace(/\.md$/, "");
-				return getPostBySlug(originalCategoryDir, slug);
-			}
-			return null;
-		})
-		.filter((post): post is Post => post !== null);
+	const posts = getAllMarkdownFiles(categoryPath, originalCategoryDir);
 
 	return posts.sort((a, b) => {
+		// Sort by order if both have it
+		if (a.order !== undefined && b.order !== undefined) {
+			return a.order - b.order;
+		}
+		// Then by date
 		if (a.date && b.date) {
 			return new Date(b.date).getTime() - new Date(a.date).getTime();
 		}
@@ -82,8 +101,49 @@ export function getPostsByCategory(category: string): Post[] {
 	});
 }
 
+// New function to get post by relative path
+function getPostByPath(category: string, relativePath: string): Post | null {
+	const categoryPath = path.join(postsDirectory, category);
+	const fullPath = path.join(categoryPath, relativePath);
+
+	if (!fs.existsSync(fullPath)) {
+		return null;
+	}
+
+	try {
+		const fileContents = fs.readFileSync(fullPath, 'utf8');
+		const { data, content } = matter(fileContents);
+
+		const pathParts = relativePath.replace(/\.md$/, '').split(path.sep);
+		const slug = pathParts[pathParts.length - 1];
+		const subcategory = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
+
+		// Generate lowercase URL path
+		const urlPath = relativePath
+			.replace(/\.md$/, '')
+			.split(path.sep)
+			.map((part) => part.toLowerCase())
+			.join('/');
+
+		return {
+			category: category.toLowerCase(),
+			categoryName: category,
+			subcategory,
+			slug: slug.toLowerCase(),
+			title: data.title || slug.replace(/-/g, ' '),
+			date: data.date || null,
+			description: data.description || '',
+			content,
+			order: data.order,
+			fullPath: urlPath, // Lowercase URL path
+		};
+	} catch (error) {
+		console.error(`Error reading post: ${fullPath}`, error);
+		return null;
+	}
+}
+
 export function getPostBySlug(category: string, slug: string): Post | null {
-	// Find the original cased directory and file names to read from disk
 	const categoryDirs = fs.readdirSync(postsDirectory);
 	const originalCategoryDir = categoryDirs.find(
 		(dir) => dir.toLowerCase() === category.toLowerCase()
@@ -92,32 +152,42 @@ export function getPostBySlug(category: string, slug: string): Post | null {
 	if (!originalCategoryDir) return null;
 
 	const categoryPath = path.join(postsDirectory, originalCategoryDir);
-	const filesInDir = fs.readdirSync(categoryPath);
-	const originalFileName = filesInDir.find(
-		(file) => file.replace(/\.md$/, "").toLowerCase() === slug.toLowerCase()
-	);
 
-	if (!originalFileName) return null;
+	// Get all posts and find the one matching the lowercase slug
+	const allPosts = getAllMarkdownFiles(categoryPath, originalCategoryDir);
+	const post = allPosts.find((p) => {
+		// Compare lowercase fullPath with lowercase slug
+		return p.fullPath === slug.toLowerCase();
+	});
 
-	const fullPath = path.join(categoryPath, originalFileName);
+	return post || null;
+}
 
-	try {
-		const fileContents = fs.readFileSync(fullPath, "utf8");
-		const { data, content } = matter(fileContents);
+// New function to get previous and next posts
+export function getAdjacentPosts(
+	category: string,
+	currentPost: Post
+): {
+	previous: Post | null;
+	next: Post | null;
+} {
+	const posts = getPostsByCategory(category);
 
-		return {
-			category: category.toLowerCase(),
-			categoryName: originalCategoryDir,
-			slug: slug.toLowerCase(),
-			title: data.title || slug.replace(/-/g, " "),
-			date: data.date || null,
-			description: data.description || "",
-			content,
-		};
-	} catch (error) {
-		console.error(`Error reading post: ${fullPath}`, error);
-		return null;
+	// If post has subcategory, filter to same subcategory
+	const relevantPosts = currentPost.subcategory
+		? posts.filter((p) => p.subcategory === currentPost.subcategory)
+		: posts;
+
+	const currentIndex = relevantPosts.findIndex((p) => p.fullPath === currentPost.fullPath);
+
+	if (currentIndex === -1) {
+		return { previous: null, next: null };
 	}
+
+	return {
+		previous: currentIndex > 0 ? relevantPosts[currentIndex - 1] : null,
+		next: currentIndex < relevantPosts.length - 1 ? relevantPosts[currentIndex + 1] : null,
+	};
 }
 
 export function getCategories(): Category[] {
@@ -127,13 +197,11 @@ export function getCategories(): Category[] {
 	categories.forEach((categoryDir) => {
 		const categoryPath = path.join(postsDirectory, categoryDir);
 		if (fs.statSync(categoryPath).isDirectory()) {
-			const files = fs
-				.readdirSync(categoryPath)
-				.filter((file) => file.endsWith(".md"));
+			const posts = getAllMarkdownFiles(categoryPath, categoryDir);
 			categoryList.push({
 				name: categoryDir,
 				slug: categoryDir.toLowerCase(),
-				count: files.length,
+				count: posts.length,
 			});
 		}
 	});

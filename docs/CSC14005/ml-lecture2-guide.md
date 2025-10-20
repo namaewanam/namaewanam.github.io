@@ -2,6 +2,7 @@
 title: Lecture 2 - Is Learning Feasible?
 date: 2025-10-18
 description: A Complete Beginner's Guide to Understanding Learning Theory
+order: 2
 ---
 
 ## Table of Contents
