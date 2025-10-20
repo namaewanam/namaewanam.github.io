@@ -12,7 +12,7 @@ import GitHubButton from '@/components/GitHubButton';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-	title: `Nam&apos; Blog`,
+	title: `Nam's Blog`,
 	description: 'A modern blog about programming and technology',
 };
 
@@ -82,7 +82,8 @@ export default function RootLayout({
 							<footer className="mt-auto border-t border-border bg-card/80 backdrop-blur-sm">
 								<div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground md:py-6 md:text-base">
 									<p>
-										© {new Date().getFullYear()} Nam's Blog. Built with AI & Next.js & TypeScript
+										© {new Date().getFullYear()} Nam&apos;s Blog. Built with AI & Next.js &
+										TypeScript
 									</p>
 								</div>
 							</footer>
