@@ -114,7 +114,7 @@ export default function SearchBar() {
 
 			{/* Search Results Dropdown */}
 			{isOpen && results.length > 0 && (
-				<div className="absolute top-full z-50 mt-2 max-h-96 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+				<div className="fixed left-1/2 top-[68px] z-50 mt-2 max-h-96 w-[90vw] max-w-lg -translate-x-1/2 overflow-y-auto rounded-lg border border-border bg-card shadow-lg md:absolute md:left-0 md:top-full md:w-full md:max-w-none md:translate-x-0">
 					{results.map((result, index) => (
 						<Link
 							key={index}
@@ -144,9 +144,9 @@ export default function SearchBar() {
 
 			{/* No Results */}
 			{isOpen && query.trim().length >= 2 && results.length === 0 && (
-				<div className="absolute top-full z-50 mt-2 w-full rounded-lg border border-border bg-card p-4 shadow-lg">
+				<div className="fixed left-1/2 top-[68px] z-50 mt-2 w-[90vw] max-w-lg -translate-x-1/2 rounded-lg border border-border bg-card p-4 shadow-lg md:absolute md:left-0 md:top-full md:w-full md:max-w-none md:translate-x-0">
 					<p className="text-center text-sm text-muted-foreground">
-						No results found for "{query}"
+						No results found for &quot;{query}&quot;
 					</p>
 				</div>
 			)}
