@@ -1,5 +1,9 @@
-module.exports = {
+import type { UserConfig } from '@commitlint/types';
+
+const Configuration: UserConfig = {
 	extends: ['@commitlint/config-conventional'],
+	parserPreset: 'conventional-changelog-atom',
+	formatter: '@commitlint/format',
 	rules: {
 		'type-enum': [
 			2,
@@ -20,3 +24,5 @@ module.exports = {
 		],
 	},
 };
+
+export default Configuration;
