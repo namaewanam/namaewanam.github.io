@@ -57,7 +57,7 @@ export default function RootLayout({
 														href={`/blog/${category.slug}`}
 														className="font-medium text-foreground/80 transition-colors hover:text-primary"
 													>
-														{category.name.replace(/-/g, ' ')}
+														{category.name.replaceAll('-', ' ')}
 													</Link>
 												))}
 											</nav>

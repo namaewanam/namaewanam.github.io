@@ -40,13 +40,13 @@ export default function PostLayout({
 					href={`/blog/${post.categoryName.toLowerCase()}`}
 					className="whitespace-nowrap capitalize transition-colors hover:text-primary"
 				>
-					{post.categoryName.replace(/-/g, ' ')}
+					{post.categoryName.replaceAll('-', ' ')}
 				</Link>
 				{post.subcategory && (
 					<>
 						<span>/</span>
 						<span className="whitespace-nowrap capitalize text-foreground/70">
-							{post.subcategory.split('/').join(' / ').replace(/-/g, ' ')}
+							{post.subcategory.split('/').join(' / ').replaceAll('-', ' ')}
 						</span>
 					</>
 				)}
@@ -58,11 +58,11 @@ export default function PostLayout({
 			<header className="space-y-3 border-b border-border pb-6 md:space-y-4 md:pb-8">
 				<div className="flex flex-wrap items-center gap-2 md:gap-3">
 					<span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium capitalize text-primary md:px-3 md:text-sm">
-						{post.categoryName.replace(/-/g, ' ')}
+						{post.categoryName.replaceAll('-', ' ')}
 					</span>
 					{post.subcategory && (
 						<span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-xs font-medium capitalize text-accent md:px-3 md:text-sm">
-							{post.subcategory.split('/').pop()?.replace(/-/g, ' ')}
+							{post.subcategory.split('/').pop()?.replaceAll('-', ' ')}
 						</span>
 					)}
 					{post.date && (
@@ -157,7 +157,7 @@ export default function PostLayout({
 							d="M10 19l-7-7m0 0l7-7m-7 7h18"
 						/>
 					</svg>
-					Back to {post.categoryName.replace(/-/g, ' ')}
+					Back to {post.categoryName.replaceAll('-', ' ')}
 				</Link>
 			</div>
 		</div>

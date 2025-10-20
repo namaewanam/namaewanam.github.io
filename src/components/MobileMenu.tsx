@@ -73,7 +73,7 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 							href={`/blog/${category.slug}`}
 							className="rounded-lg px-4 py-3 font-medium text-foreground/80 transition-colors hover:bg-muted hover:text-primary"
 						>
-							{category.name.replace(/-/g, ' ')}
+							{category.name.replaceAll('-', ' ')}
 						</Link>
 					))}
 				</nav>

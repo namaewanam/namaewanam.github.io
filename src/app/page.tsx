@@ -28,7 +28,7 @@ export default function Home() {
 							className="group rounded-lg border border-border bg-card p-4 transition-all hover:border-primary hover:shadow-lg hover:shadow-primary/10 md:p-6"
 						>
 							<h3 className="mb-2 text-lg font-semibold text-primary group-hover:text-accent md:text-xl">
-								{category.name.replace(/-/g, ' ')}
+								{category.name.replaceAll('-', ' ')}
 							</h3>
 							<p className="text-sm text-muted-foreground md:text-base">
 								{category.count} {category.count === 1 ? 'article' : 'articles'}
@@ -52,7 +52,7 @@ export default function Home() {
 								<div className="min-w-0 flex-1 space-y-2">
 									<div className="flex flex-wrap items-center gap-2 md:gap-3">
 										<span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary md:px-3 md:text-sm">
-											{post.categoryName.replace(/-/g, ' ')}
+											{post.categoryName.replaceAll('-', ' ')}
 										</span>
 										{post.date && (
 											<span className="text-xs text-muted-foreground md:text-sm">

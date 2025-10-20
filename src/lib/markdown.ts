@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import matter from 'gray-matter';
 
 const postsDirectory = path.join(process.cwd(), 'docs');
@@ -130,7 +130,7 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 			categoryName: category,
 			subcategory,
 			slug: slug.toLowerCase(),
-			title: data.title || slug.replace(/-/g, ' '),
+			title: data.title || slug.replaceAll('-', ' '),
 			date: data.date || null,
 			description: data.description || '',
 			content,

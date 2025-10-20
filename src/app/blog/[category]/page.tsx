@@ -58,7 +58,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 					</svg>
 					Back to Home
 				</Link>
-				<h1 className="text-4xl font-bold text-foreground">{categoryName.replace(/-/g, ' ')}</h1>
+				<h1 className="text-4xl font-bold text-foreground">{categoryName.replaceAll('-', ' ')}</h1>
 				<p className="text-muted-foreground">
 					{posts.length} {posts.length === 1 ? 'article' : 'articles'} in this category
 				</p>
@@ -73,7 +73,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 							<h2 className="border-b border-border pb-2 text-2xl font-semibold text-foreground">
 								{subcategory
 									.split('/')
-									.map((part) => part.replace(/-/g, ' '))
+									.map((part) => part.replaceAll('-', ' '))
 									.join(' / ')}
 							</h2>
 						)}
