@@ -4,6 +4,7 @@ import Link from 'next/link';
 import MarkdownContent from '@/components/MarkdownContent';
 import CodeThemeSelector from '@/components/CodeThemeSelector';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import ViewCounter from './ViewCounter';
 
 type Post = {
 	slug: string;
@@ -24,10 +25,15 @@ type AdjacentPosts = {
 export default function PostLayout({
 	post,
 	adjacentPosts,
+	initialViews,
 }: Readonly<{
 	post: Post;
 	adjacentPosts?: AdjacentPosts;
+	initialViews: number;
 }>) {
+	// Generate unique post ID for view counting
+	const postId = `${post.categoryName.toLowerCase()}-${post.fullPath.replaceAll('/', '-')}`;
+
 	return (
 		<div className="mx-auto max-w-4xl space-y-6 md:space-y-8">
 			{/* Breadcrumb */}
@@ -74,6 +80,8 @@ export default function PostLayout({
 							})}
 						</span>
 					)}
+					{/* View Counter */}
+					<ViewCounter postId={postId} initialViews={initialViews} />
 				</div>
 				<h1 className="text-3xl font-bold capitalize leading-tight text-foreground md:text-4xl lg:text-5xl">
 					{post.title}

@@ -1,9 +1,30 @@
 import Link from 'next/link';
 import { getAllPosts, getCategories } from '@/lib/markdown';
+import ViewCounter from '@/components/ViewCounter';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-export default function Home() {
+async function getInitialViews(postId: string): Promise<number> {
+	try {
+		const viewDocRef = doc(db, 'pageViews', postId);
+		const viewDoc = await getDoc(viewDocRef);
+
+		if (viewDoc.exists()) {
+			return viewDoc.data().count || 0;
+		}
+		return 0;
+	} catch (error) {
+		console.error('Failed to fetch initial views:', error);
+		return 0; // Silently fail on server
+	}
+}
+
+export default async function Home() {
 	const posts = getAllPosts();
 	const categories = getCategories();
+
+	// Fetch the views on the server
+	const initialHomepageViews = await getInitialViews('homepage');
 
 	return (
 		<div className="space-y-8 md:space-y-12">
@@ -16,6 +37,10 @@ export default function Home() {
 					Exploring the world of programming, one article at a time
 				</p>
 			</section>
+
+			<div className="flex justify-center pt-4 text-muted-foreground">
+				<ViewCounter postId="homepage" increment={true} initialViews={initialHomepageViews} />
+			</div>
 
 			{/* Two Column Layout */}
 			<div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-12">
