@@ -214,7 +214,7 @@ y = [y₁]         (N × 1 vector)
     [y₂]
     [⋮ ]
     [yₙ]
-```text
+```
 
 **Finding the Minimum** (using calculus):
 
