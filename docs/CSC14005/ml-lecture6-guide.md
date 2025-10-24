@@ -1,5 +1,5 @@
 ---
-title: Lecture 5 - Theory of Generalization
+title: Lecture 6 - Theory of Generalization
 date: 2025-10-24
 description: A Complete Beginner's Guide to Understanding Generalization Theory
 order: 6
