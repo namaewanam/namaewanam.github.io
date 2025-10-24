@@ -1,7 +1,7 @@
 ---
 title: Lecture 7 - VC Dimension
 date: 2025-10-24
-description: A Complete Beginner's Guide to Understanding Generalization Theory
+description: A Complete Beginner's Guide to Understanding VC Dimension
 order: 7
 ---
 
