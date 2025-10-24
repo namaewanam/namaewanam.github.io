@@ -31,13 +31,13 @@ Think of it as a measure of your model's "learning capacity."
 
 ## Key Concepts Review
 
-### Growth Function: m_H(N)
+### Growth Function: mₕ(N)
 
 The **growth function** tells us: "How many different ways can our hypothesis set H classify N data points?"
 
 **Formula:**
 ```text
-m_H(N) ≤ sum from i=0 to k-1 of (N choose i)
+mₕ(N) ≤ sum from i=0 to k-1 of (N choose i)
 ```
 
 where k is the **break point** (the smallest number of points that H cannot shatter).
@@ -65,7 +65,7 @@ In other words:
 ### Mathematical Definition
 
 ```text
-d_vc(H) = largest N where m_H(N) = 2^N
+d_vc(H) = largest N where mₕ(N) = 2^N
 ```
 
 This means:
@@ -88,14 +88,14 @@ This means:
 Once we know the VC dimension, we can bound the growth function:
 
 ```text
-m_H(N) ≤ sum from i=0 to d_vc of (N choose i)
+mₕ(N) ≤ sum from i=0 to d_vc of (N choose i)
 ```
 
 **Key insight:** The maximum power of N is N^(d_vc), which is polynomial!
 
 This is important because:
-- Before: m_H(N) could be exponential (2^N)
-- After: m_H(N) is polynomial (N^(d_vc))
+- Before: mₕ(N) could be exponential (2^N)
+- After: mₕ(N) is polynomial (N^(d_vc))
 - Polynomial growth means learning is feasible!
 
 ---
@@ -183,7 +183,7 @@ This means:
 
 From the VC inequality:
 ```text
-P[|Eₒᵤₜ - Eᵢₙ| > ε] ≤ 4 · m_H(2N) · e^(-ε²N/8)
+P[|Eₒᵤₜ - Eᵢₙ| > ε] ≤ 4 · mₕ(2N) · e^(-ε²N/8)
 ```
 
 **Rule of Thumb:**
@@ -207,12 +207,12 @@ This means:
 
 Starting from:
 ```text
-P[|Eₒᵤₜ - Eᵢₙ| > ε] ≤ 4 · m_H(2N) · e^(-ε²N/8) = δ
+P[|Eₒᵤₜ - Eᵢₙ| > ε] ≤ 4 · mₕ(2N) · e^(-ε²N/8) = δ
 ```
 
 We can rearrange to get:
 ```text
-ε = √(8/N · ln(4·m_H(2N)/δ))
+ε = √(8/N · ln(4·mₕ(2N)/δ))
 ```
 
 Let's call this Ω(N, H, δ)
@@ -323,5 +323,3 @@ Spot     |  ← Optimal Balance
 - **Too simple (low d_vc):** Cannot capture patterns → underfitting
 - **Too complex (high d_vc):** Memorizes noise → overfitting  
 - **Just right:** Balances learning and generalization
-
-Good luck with your machine learning journey! 🚀
