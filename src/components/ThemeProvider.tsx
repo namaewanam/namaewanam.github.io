@@ -1,57 +1,56 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
 type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
 	theme: Theme;
 	toggleTheme: () => void;
+	mounted: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const themeScript = `
-  (function() {
-    function getInitialTheme() {
-      const storedTheme = localStorage.getItem('theme');
-      if (storedTheme) {
-        return storedTheme;
-      }
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      return prefersDark ? 'dark' : 'light';
-    }
-    const theme = getInitialTheme();
-    document.documentElement.classList.add(theme);
-  })();
-`;
+/**
+ * Inline script that runs before React hydration.
+ * Sets the correct class on <html> to prevent FOUC,
+ * but does NOT affect React's server-rendered output.
+ */
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');var d=t||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.classList.add(d)}catch(e){}})()`;
 
 export function ThemeScript() {
-	return <script dangerouslySetInnerHTML={{ __html: themeScript }} />;
+	return <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />;
 }
 
 export function ThemeProvider({ children }: Readonly<{ children: React.ReactNode }>) {
-	// Initialize state from documentElement which was set by the script
-	const [theme, setTheme] = useState<Theme>(() => {
-		if (typeof document !== 'undefined') {
-			return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-		}
-		return 'light';
-	});
+	// IMPORTANT: Always initialize to 'light' on both server AND client
+	// to prevent hydration mismatch. The actual theme is synced in useEffect.
+	const [theme, setTheme] = useState<Theme>('light');
+	const [mounted, setMounted] = useState(false);
 
+	// On mount, read the actual theme from the DOM (set by ThemeScript)
 	useEffect(() => {
+		const isDark = document.documentElement.classList.contains('dark');
+		setTheme(isDark ? 'dark' : 'light');
+		setMounted(true);
+	}, []);
+
+	// Sync theme changes to DOM and localStorage
+	useEffect(() => {
+		if (!mounted) return;
 		const root = document.documentElement;
 		root.classList.remove('light', 'dark');
 		root.classList.add(theme);
 		localStorage.setItem('theme', theme);
-	}, [theme]);
+	}, [theme, mounted]);
 
-	const toggleTheme = () => {
-		setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-	};
+	const toggleTheme = useCallback(() => {
+		setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+	}, []);
 
 	return (
-		<ThemeContext.Provider value={{ theme, toggleTheme }}>
+		<ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
 			{children}
 		</ThemeContext.Provider>
 	);

@@ -2,6 +2,7 @@
 title: Lecture 1 - The Learning Problem
 date: 2025-10-18
 description: A comprehensive beginner's guide to understanding the learning problem in machine learning, covering key concepts, types of learning, feasibility, error measures, and practical exercises.
+order: 1
 ---
 
 ## Table of Contents

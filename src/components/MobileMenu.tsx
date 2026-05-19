@@ -4,29 +4,18 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-
-interface Category {
-	slug: string;
-	name: string;
-	count: number;
-}
+import type { Category } from '@/lib/markdown';
 
 export default function MobileMenu({ categories }: Readonly<{ categories: Category[] }>) {
 	const [isOpen, setIsOpen] = useState(false);
 	const pathname = usePathname();
 
-	// Close menu when route changes
 	useEffect(() => {
 		setIsOpen(false);
 	}, [pathname]);
 
-	// Prevent body scroll when menu is open
 	useEffect(() => {
-		if (isOpen) {
-			document.body.style.overflow = 'hidden';
-		} else {
-			document.body.style.overflow = 'unset';
-		}
+		document.body.style.overflow = isOpen ? 'hidden' : 'unset';
 		return () => {
 			document.body.style.overflow = 'unset';
 		};
@@ -36,43 +25,51 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 		<>
 			<button
 				onClick={() => setIsOpen(!isOpen)}
-				className="p-2 rounded-lg bg-secondary hover:bg-accent/20 transition-colors border border-border"
+				className="rounded border border-border p-2 transition-colors hover:border-primary"
 				aria-label="Toggle menu"
 			>
 				{isOpen ? (
-					<X className="h-5 w-5 text-foreground" />
+					<X className="h-4 w-4 text-foreground" />
 				) : (
-					<Menu className="h-5 w-5 text-foreground" />
+					<Menu className="h-4 w-4 text-foreground" />
 				)}
 			</button>
 
-			{/* Mobile Menu Overlay */}
 			{isOpen && (
 				<div
-					className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+					className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
 					onClick={() => setIsOpen(false)}
 				/>
 			)}
 
-			{/* Mobile Menu Panel */}
 			<div
-				className={`fixed top-[57px] right-0 h-[calc(100vh-57px)] w-64 bg-card border-l border-border z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
-					}`}
+				className={`fixed right-0 top-[57px] z-50 h-[calc(100vh-57px)] w-56 transform border-l border-border bg-card transition-transform duration-200 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
 			>
-				<nav className="flex flex-col p-4 space-y-2">
+				<nav className="flex flex-col space-y-1 p-4">
 					<Link
 						href="/"
-						className="px-4 py-3 text-foreground/80 hover:text-primary hover:bg-muted rounded-lg transition-colors font-medium"
+						className="rounded px-3 py-2.5 font-mono text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
-						Home
+						home
 					</Link>
+					<Link
+						href="/blog"
+						className="rounded px-3 py-2.5 font-mono text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						blog
+					</Link>
+					<div className="my-2 border-t border-border" />
+					<p className="px-3 pb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+						topics
+					</p>
 					{categories.map((category) => (
 						<Link
 							key={category.slug}
 							href={`/blog/${category.slug}`}
-							className="px-4 py-3 text-foreground/80 hover:text-primary hover:bg-muted rounded-lg transition-colors capitalize font-medium"
+							className="rounded px-3 py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 						>
-							{category.name.replace("-", " ")}
+							#{category.name.toLowerCase()}
+							<span className="ml-1.5 text-muted-foreground/50">{category.count}</span>
 						</Link>
 					))}
 				</nav>

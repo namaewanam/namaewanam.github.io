@@ -2,6 +2,7 @@
 title: Lecture 4 - Error and Noise
 date: 2025-10-18
 description: A Complete Beginner's Guide to Understanding Error and Noise
+order: 4
 ---
 
 ## Table of Contents

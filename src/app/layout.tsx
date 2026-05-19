@@ -1,19 +1,38 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import { getCategories } from '@/lib/markdown';
-import { ThemeProvider, ThemeScript } from '@/components/ThemeProvider'
-import ThemeToggle from '@/components/ThemeToggle'
-import MobileMenu from '@/components/MobileMenu'
+import { ThemeProvider, ThemeScript } from '@/components/ThemeProvider';
+import ThemeToggle from '@/components/ThemeToggle';
+import MobileMenu from '@/components/MobileMenu';
+import ReadingProgress from '@/components/ReadingProgress';
+import BackToTop from '@/components/BackToTop';
+import FooterStatus from '@/components/layout/FooterStatus';
+import PageTransition from '@/components/layout/PageTransition';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 import './globals.css';
-import { CodeThemeProvider, CodeThemeScript } from '@/contexts/CodeThemeContext';
-import GitHubButton from '@/components/GitHubButton';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-	title: `Nam's Blog`,
-	description: 'A modern blog about programming and technology',
+	title: `${SITE_NAME} · backend dev`,
+	description: SITE_DESCRIPTION,
+	metadataBase: new URL(SITE_URL),
+	keywords: ['backend', 'developer', 'golang', 'java', 'spring boot', 'engineering'],
+	openGraph: {
+		title: `${SITE_NAME} · backend dev`,
+		description: SITE_DESCRIPTION,
+		siteName: SITE_NAME,
+		type: 'website',
+		url: '/',
+	},
+	twitter: {
+		card: 'summary_large_image',
+		title: `${SITE_NAME} · backend dev`,
+		description: SITE_DESCRIPTION,
+	},
+	alternates: {
+		types: {
+			'application/rss+xml': '/feed.xml',
+		},
+	},
 };
 
 export default function RootLayout({
@@ -25,70 +44,65 @@ export default function RootLayout({
 
 	return (
 		<html lang="en" suppressHydrationWarning>
-			<body className={inter.className}>
+			<body className="font-sans antialiased">
 				<ThemeScript />
-				<CodeThemeScript />
-				<CodeThemeProvider>
-					<ThemeProvider>
-						<div className="min-h-screen flex flex-col">
-							{/* Header */}
-							<header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-								<div className="container mx-auto px-4 py-3 md:py-4">
-									<div className="flex items-center justify-between">
-										<Link
-											href="/"
-											className="text-xl md:text-2xl font-bold text-primary hover:text-accent transition-colors"
-										>
-											Playground
-										</Link>
+				<ThemeProvider>
+					<ReadingProgress />
+					<div className="flex min-h-screen flex-col">
+						{/* Header */}
+						<header className="sticky top-0 z-50 border-b border-border bg-card/70 backdrop-blur-md">
+							<div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
+								<div className="flex items-center justify-between">
+									{/* Logo */}
+									<Link
+										href="/"
+										className="font-mono text-sm font-bold tracking-tight text-foreground transition-colors hover:text-primary"
+									>
+										<span className="text-primary">~/</span>nam
+									</Link>
 
-										{/* Desktop Navigation */}
-										<div className="hidden md:flex items-center gap-6">
-											<nav className="flex gap-6">
-												<Link
-													href="/"
-													className="text-foreground/80 hover:text-primary transition-colors font-medium"
-												>
-													Home
-												</Link>
-												{categories.slice(0, 5).map((category) => (
-													<Link
-														key={category.slug}
-														href={`/blog/${category.slug}`}
-														className="text-foreground/80 hover:text-primary transition-colors capitalize font-medium"
-													>
-														{category.name.replace("-", " ")}
-													</Link>
-												))}
-											</nav>
-											<ThemeToggle />
-											<GitHubButton />
-										</div>
+									{/* Desktop Navigation */}
+									<div className="hidden items-center gap-6 md:flex">
+										<nav className="flex gap-5">
+											<Link
+												href="/"
+												className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+											>
+												home
+											</Link>
+											<Link
+												href="/blog"
+												className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+											>
+												blog
+											</Link>
+										</nav>
+										<ThemeToggle />
+									</div>
 
-										{/* Mobile Navigation */}
-										<div className="flex md:hidden items-center gap-2">
-											<ThemeToggle />
-											<GitHubButton />
-											<MobileMenu categories={categories} />
-										</div>
+									{/* Mobile Navigation */}
+									<div className="flex items-center gap-2 md:hidden">
+										<ThemeToggle />
+										<MobileMenu categories={categories} />
 									</div>
 								</div>
-							</header>
+							</div>
+						</header>
 
-							{/* Main Content */}
-							<main className="flex-1 container mx-auto px-4 py-6 md:py-8">
-								{children}
-							</main>
+						{/* Main Content */}
+						<main className="w-full flex-1 px-4 py-8 sm:px-6 md:py-12">
+							<PageTransition>{children}</PageTransition>
+						</main>
 
-							{/* Footer */}
-							<footer className="border-t border-border bg-card/80 backdrop-blur-sm mt-auto">
-								<div className="container mx-auto px-4 py-4 md:py-6 text-center text-sm md:text-base text-muted-foreground">
-									<p>© {new Date().getFullYear()} Nam's Blog. Built with AI & Next.js & TypeScript</p>
-								</div>
-							</footer>
-						</div>
-					</ThemeProvider>
-				</CodeThemeProvider>
+						{/* Footer */}
+						<footer className="mt-auto border-t border-border">
+							<div className="mx-auto max-w-2xl px-4 py-5 text-center font-mono text-xs text-muted-foreground sm:px-6">
+								<FooterStatus />
+							</div>
+						</footer>
+					</div>
+					<BackToTop />
+				</ThemeProvider>
 			</body>
 		</html>
 	);

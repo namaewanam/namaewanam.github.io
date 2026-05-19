@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>nam · backend dev</title>
+    <link>https://ntnam1605.github.io</link>
+    <description>Notes, articles and thoughts from a backend developer</description>
+    <language>en</language>
+    <lastBuildDate>Tue, 19 May 2026 18:14:11 GMT</lastBuildDate>
+    <atom:link href="https://ntnam1605.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Lecture 1 - The Learning Problem</title>
+      <link>https://ntnam1605.github.io/blog/csc14005/ml-lecture1-guide</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/csc14005/ml-lecture1-guide</guid>
+      <pubDate>Sat, 18 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A comprehensive beginner&apos;s guide to understanding the learning problem in machine learning, covering key concepts, types of learning, feasibility, error measures, and practical exercises.</description>
+      <category>CSC14005</category>
+    </item>
+    <item>
+      <title>Lecture 2 - Is Learning Feasible?</title>
+      <link>https://ntnam1605.github.io/blog/csc14005/ml-lecture2-guide</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/csc14005/ml-lecture2-guide</guid>
+      <pubDate>Sat, 18 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A Complete Beginner&apos;s Guide to Understanding Learning Theory</description>
+      <category>CSC14005</category>
+    </item>
+    <item>
+      <title>Lecture 3 - Linear Models in Machine Learning</title>
+      <link>https://ntnam1605.github.io/blog/csc14005/ml-lecture3-guide</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/csc14005/ml-lecture3-guide</guid>
+      <pubDate>Sat, 18 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A Complete Beginner&apos;s Guide to Understanding Linear Models in Machine Learning</description>
+      <category>CSC14005</category>
+    </item>
+    <item>
+      <title>Lecture 4 - Error and Noise</title>
+      <link>https://ntnam1605.github.io/blog/csc14005/ml-lecture4-guide</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/csc14005/ml-lecture4-guide</guid>
+      <pubDate>Sat, 18 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A Complete Beginner&apos;s Guide to Understanding Error and Noise</description>
+      <category>CSC14005</category>
+    </item>
+    <item>
+      <title>The Learning Problem - Beginner&apos;s Guide</title>
+      <link>https://ntnam1605.github.io/blog/machine-learning/the-learning-problem</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/machine-learning/the-learning-problem</guid>
+      <pubDate>Sat, 18 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A comprehensive beginner&apos;s guide to understanding the learning problem in machine learning, covering key concepts, types of learning, feasibility, error measures, and practical exercises.</description>
+      <category>Machine-Learning</category>
+    </item>
+    <item>
+      <title>Java Streams API Guide</title>
+      <link>https://ntnam1605.github.io/blog/java/java-streams</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/java/java-streams</guid>
+      <pubDate>Fri, 17 Oct 2025 00:00:00 GMT</pubDate>
+      <description>Master the Java Streams API for functional-style operations on collections</description>
+      <category>Java</category>
+    </item>
+    <item>
+      <title>ELK Index Lifecycle Management (ILM) Strategy Guide</title>
+      <link>https://ntnam1605.github.io/blog/logging/elk-ilm-strategy-guide</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/logging/elk-ilm-strategy-guide</guid>
+      <pubDate>Fri, 17 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A comprehensive guide to managing log indices in an ELK stack using Index Lifecycle Management</description>
+      <category>Logging</category>
+    </item>
+    <item>
+      <title>Getting Started with Spring Boot</title>
+      <link>https://ntnam1605.github.io/blog/spring-boot/spring-boot-intro</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/spring-boot/spring-boot-intro</guid>
+      <pubDate>Fri, 17 Oct 2025 00:00:00 GMT</pubDate>
+      <description>A comprehensive guide to building your first Spring Boot application</description>
+      <category>Spring-Boot</category>
+    </item>
+  </channel>
+</rss>
