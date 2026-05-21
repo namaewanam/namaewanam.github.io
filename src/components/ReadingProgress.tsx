@@ -45,6 +45,7 @@ export default function ReadingProgress() {
 			className="reading-progress"
 			style={{ width: '0%' }}
 			role="progressbar"
+			aria-label="Reading progress"
 			aria-valuenow={0}
 			aria-valuemin={0}
 			aria-valuemax={100}

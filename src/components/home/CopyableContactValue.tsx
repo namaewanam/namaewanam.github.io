@@ -52,10 +52,10 @@ export default function CopyableContactValue({
 				type="button"
 				onClick={handleCopy}
 				className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-				aria-label={`Copy ${copyValue}`}
 				aria-describedby={statusId}
 			>
 				{copied ? 'copied' : 'copy'}
+				<span className="sr-only">{` ${displayValue}`}</span>
 			</button>
 			{secondaryLinks && secondaryLinks.length > 0 && (
 				<div className="flex flex-wrap items-center gap-1">

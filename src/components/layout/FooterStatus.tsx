@@ -10,11 +10,7 @@ export default function FooterStatus() {
 			<div className="flex flex-wrap items-center justify-center gap-3">
 				<span>© {new Date().getFullYear()} nam</span>
 				<span className="text-border">·</span>
-				<a
-					href={FEED_PATHS.rss}
-					className="transition-colors hover:text-primary"
-					aria-label="RSS Feed"
-				>
+				<a href={FEED_PATHS.rss} className="transition-colors hover:text-primary">
 					rss
 				</a>
 				<span className="text-border">·</span>

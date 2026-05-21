@@ -8,9 +8,8 @@ export default function ShortcutHelpButton() {
 			type="button"
 			onClick={openShortcutHelp}
 			className="transition-colors hover:text-primary"
-			aria-label="Open keyboard shortcuts help"
 		>
-			help ?
+			help ?<span className="sr-only">Open keyboard shortcuts help</span>
 		</button>
 	);
 }
