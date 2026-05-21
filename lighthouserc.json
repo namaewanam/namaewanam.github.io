@@ -4,8 +4,8 @@
 			"numberOfRuns": 1,
 			"url": [
 				"http://127.0.0.1:3000/",
-				"http://127.0.0.1:3000/blog",
-				"http://127.0.0.1:3000/blog/logging/elk-ilm-strategy-guide"
+				"http://127.0.0.1:3000/blog.html",
+				"http://127.0.0.1:3000/blog/logging/elk-ilm-strategy-guide.html"
 			]
 		},
 		"assert": {

@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-npx lint-staged || exit 1
+pnpm exec lint-staged || exit 1
 USE_STAGED_LAST_UPDATED=1 pnpm generate:resources || exit 1
 git add public/feed.xml public/sitemap.xml public/og/posts
