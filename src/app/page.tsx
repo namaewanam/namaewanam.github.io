@@ -50,7 +50,7 @@ export default function Home() {
 	];
 
 	return (
-		<div className="mx-auto w-full max-w-2xl space-y-16">
+		<div className="mx-auto w-full max-w-3xl space-y-16">
 			{/* ── Who Am I ── */}
 			<section id="home" className="space-y-4">
 				<div className="space-y-1">
@@ -167,7 +167,7 @@ export default function Home() {
 							key={exp.role}
 							className="grid grid-cols-1 gap-1 sm:grid-cols-[140px_1fr] sm:gap-4"
 						>
-							<span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+							<span className="shrink-0 font-mono text-[11px] text-foreground/60">
 								{exp.period}
 							</span>
 							<div>

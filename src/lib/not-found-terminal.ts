@@ -48,6 +48,38 @@ export const ROOT = '/';
 export const PROMPT_USER = 'nam';
 export const PROMPT_HOST = 'backend-dev';
 
+/** All commands recognised by this 404 shell — used for input + history highlighting */
+export const KNOWN_COMMANDS = new Set([
+	'help',
+	'man',
+	'suggest',
+	'ls',
+	'cd',
+	'tree',
+	'cat',
+	'grep',
+	'open',
+	'whoami',
+	'fastfetch',
+	'neofetch',
+	'clear',
+	'sudo',
+	'rm',
+	'vim',
+	'exit',
+	'pwd',
+	'systemctl',
+	':q',
+	'journalctl',
+	'fetch',
+	'gh',
+	'docs',
+	'home',
+	'li',
+	'fb',
+	'mail',
+]);
+
 export const ALIASES: Record<string, string> = {
 	gh: 'open /links/github',
 	docs: 'open /blog',

@@ -76,7 +76,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 	});
 
 	return (
-		<div className="mx-auto w-full max-w-2xl space-y-10">
+		<div className="mx-auto w-full max-w-3xl space-y-10">
 			{/* Header */}
 			<div className="space-y-3">
 				<Link

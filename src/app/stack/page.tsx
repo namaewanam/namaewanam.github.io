@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function StackPage() {
 	return (
-		<div className="mx-auto w-full max-w-2xl space-y-8">
+		<div className="mx-auto w-full max-w-3xl space-y-8">
 			<div className="space-y-2">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">stack</p>
 				<h1 className="text-2xl font-bold text-foreground">Tools, but with opinions attached</h1>

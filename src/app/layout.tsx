@@ -169,7 +169,7 @@ export default function RootLayout({
 					<div className="flex min-h-screen flex-col">
 						{/* Header */}
 						<header className="sticky top-0 z-50 border-b border-border bg-card/70 backdrop-blur-md">
-							<div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
+							<div className="mx-auto max-w-3xl px-4 py-3 sm:px-6">
 								<div className="flex items-center justify-between">
 									{/* Logo */}
 									<Link
@@ -216,7 +216,7 @@ export default function RootLayout({
 
 						{/* Footer */}
 						<footer className="mt-auto border-t border-border">
-							<div className="mx-auto max-w-2xl px-4 py-5 text-center font-mono text-xs text-muted-foreground sm:px-6">
+							<div className="mx-auto max-w-3xl px-4 py-5 text-center font-mono text-xs text-muted-foreground sm:px-6">
 								<FooterStatus />
 							</div>
 						</footer>

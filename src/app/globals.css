@@ -22,6 +22,9 @@
 		--destructive: 14 70% 49%; /* #d1622b burnt orange */
 		--destructive-foreground: 56 67% 92%;
 		--code-bg: 56 40% 95%;
+		/* Terminal (404 page) — warm Shank brown, not black */
+		--terminal-bg: 27 65% 11%;
+		--terminal-border: 118 80 35;
 	}
 
 	.dark {
@@ -37,12 +40,15 @@
 		--accent: 25 85% 57%; /* #f18231 orange */
 		--accent-foreground: 56 67% 92%;
 		--muted: 27 35% 14%;
-		--muted-foreground: 40 20% 58%;
+		--muted-foreground: 40 25% 65%; /* boosted for WCAG AA on dark background */
 		--border: 27 25% 22%;
 		--ring: 39 96% 57%;
 		--destructive: 14 70% 49%;
 		--destructive-foreground: 56 67% 92%;
 		--code-bg: 27 45% 10%;
+		/* Terminal (404 page) — same as card in dark mode */
+		--terminal-bg: var(--card);
+		--terminal-border: 118 80 35;
 	}
 }
 
@@ -423,33 +429,57 @@ pre:not(.code-block-wrapper pre) {
 		width: 100%;
 		max-height: calc(100vh - 6.5rem);
 		overflow-y: auto;
+		overflow-x: hidden; /* prevent clipping side */
 		padding-left: 1.25rem;
 		border-left: 1px solid hsl(var(--border) / 0.7);
+		/* scrollbar indicator */
+		scrollbar-width: thin;
+		scrollbar-color: hsl(var(--border)) transparent;
+		/* fade bottom to hint at more content */
+		-webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+		mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+	}
+	.toc-sidebar:hover {
+		-webkit-mask-image: none;
+		mask-image: none;
+	}
+	.toc-sidebar::-webkit-scrollbar {
+		width: 3px;
+	}
+	.toc-sidebar::-webkit-scrollbar-thumb {
+		background: hsl(var(--border));
+		border-radius: 3px;
 	}
 }
 
 .toc-link {
 	display: block;
-	padding: 2px 0;
-	font-size: 11px;
+	padding: 3px 0;
+	font-size: 11.5px;
 	font-family: var(--font-mono), monospace;
 	color: hsl(var(--muted-foreground));
 	text-decoration: none;
 	transition: color 0.15s ease;
-	line-height: 1.5;
+	line-height: 1.6;
 	border-left: 2px solid transparent;
 	padding-left: 8px;
+	/* allow long titles to wrap instead of clip */
+	word-break: break-word;
+	overflow-wrap: break-word;
+	white-space: normal;
 }
 .toc-link:hover {
 	color: hsl(var(--foreground));
 }
 .toc-link-h3 {
 	padding-left: 20px;
-	font-size: 10px;
+	font-size: 10.5px;
+	opacity: 0.85;
 }
 .toc-link-active {
 	color: hsl(var(--primary));
 	border-left-color: hsl(var(--primary));
+	opacity: 1;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

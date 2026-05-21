@@ -21,13 +21,26 @@ export default function TerminalQuickActions({
 	onSelect: (command: string) => void;
 }>) {
 	return (
-		<div className="mt-4 flex flex-wrap gap-2 text-[11px] text-muted-foreground/70">
+		<div className="mt-4 flex flex-wrap gap-2 text-[11px]">
 			{QUICK_ACTIONS.map((action) => (
 				<button
 					key={action.label}
 					type="button"
 					onClick={() => onSelect(action.command)}
-					className="rounded border border-border px-2 py-0.5 transition-colors hover:border-primary hover:text-primary"
+					className="rounded px-2 py-0.5 transition-colors"
+					style={{
+						border: '1px solid rgba(118,80,35,0.45)',
+						color: 'rgba(203,213,225,0.6)',
+						background: 'transparent',
+					}}
+					onMouseEnter={(e) => {
+						(e.currentTarget as HTMLButtonElement).style.borderColor = '#fccb26';
+						(e.currentTarget as HTMLButtonElement).style.color = '#fccb26';
+					}}
+					onMouseLeave={(e) => {
+						(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(118,80,35,0.45)';
+						(e.currentTarget as HTMLButtonElement).style.color = 'rgba(203,213,225,0.6)';
+					}}
 				>
 					{action.label}
 				</button>

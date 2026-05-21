@@ -1,76 +1,199 @@
-import { formatPrompt, ROOT, type HistoryLine } from '@/lib/not-found-terminal';
+import {
+	formatPrompt,
+	KNOWN_COMMANDS,
+	ROOT,
+	type HistoryLine,
+	type HistoryTone,
+} from '@/lib/not-found-terminal';
 
-function renderSegments(text: string) {
-	return text.split(/(\s+)/).map((segment, index) => {
-		if (!segment.trim()) {
-			return <span key={index}>{segment}</span>;
+/**
+ * Terminal syntax color palette — fixed, always-dark-background.
+ * Based on Shank warm palette + standard ANSI terminal colors.
+ *
+ * Background: hsl(27 65% 11%) warm brown
+ * These colors are designed specifically for that background.
+ */
+const T = {
+	cream: '#f0ead6', //     default output text
+	hintDim: 'rgba(240,234,214,0.45)', // dim hint text
+	gold: '#fccb26', //      prompt, directories
+	cmd: '#f5f4d5', //       known command name (brighter than gold, Shank cream)
+	orange: '#f18231', //    flags/options (-n, --flag), Shank orange
+	green: '#86efac', //     command typed by user (base)
+	red: '#f87171', //       errors, unknown commands
+	amber: '#fcd34d', //     system/warning messages, [warn]
+	cyan: '#67e8f9', //      numbers, [info]
+	sky: '#7dd3fc', //       paths, URLs
+	violet: '#c4b5fd', //    operators: →, ->, |, &&
+	muted: 'rgba(240,234,214,0.3)', // very dim (separators, #)
+} as const;
+
+// Operators that get their own color
+const OPERATORS = new Set(['→', '->', '|', '&&', ';', '||', '&']);
+
+/**
+ * Tokenize and syntax-color a single line of text.
+ * @param text   The text to highlight
+ * @param tone   The tone of the line (controls base color and highlighting rules)
+ * @param isCmd  Whether this is the first word of a user command (highlight as command name)
+ */
+function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.ReactNode[] {
+	// Split by whitespace but preserve the whitespace tokens for layout
+	const tokens = text.split(/(\s+)/);
+	let isFirstWord = isCmd;
+
+	return tokens.map((token, i) => {
+		// Preserve whitespace as-is
+		if (!token.trim()) {
+			return <span key={i}>{token}</span>;
 		}
 
-		if (segment.startsWith('/') || segment.startsWith('http') || segment.startsWith('mailto:')) {
+		// ── First word of a typed command → gold command name ──────────
+		if (isFirstWord) {
+			isFirstWord = false;
+			const isKnown = KNOWN_COMMANDS.has(token.toLowerCase());
 			return (
-				<span key={index} className="text-sky-400 dark:text-sky-300">
-					{segment}
+				<span key={i} style={{ color: isKnown ? T.cmd : T.red }}>
+					{token}
 				</span>
 			);
 		}
 
-		if (segment.endsWith('/')) {
+		// ── Paths and URLs → sky blue ──────────────────────────────────
+		if (token.startsWith('/') || token.startsWith('http') || token.startsWith('mailto:')) {
 			return (
-				<span key={index} className="text-primary">
-					{segment}
+				<span key={i} style={{ color: T.sky }}>
+					{token}
 				</span>
 			);
 		}
 
-		if (segment.startsWith('[warn]')) {
+		// ── Directory token (word ending with /) → gold ────────────────
+		if (token.endsWith('/') && token.length > 1) {
 			return (
-				<span key={index} className="text-amber-500 dark:text-amber-300">
-					{segment}
+				<span key={i} style={{ color: T.gold }}>
+					{token}
 				</span>
 			);
 		}
 
-		if (segment.startsWith('[info]')) {
+		// ── Bracket tags: [warn] [info] [error] [debug] ───────────────
+		if (/^\[warn\]$/.test(token))
 			return (
-				<span key={index} className="text-cyan-600 dark:text-cyan-300">
-					{segment}
+				<span key={i} style={{ color: T.amber }}>
+					{token}
+				</span>
+			);
+		if (/^\[info\]$/.test(token))
+			return (
+				<span key={i} style={{ color: T.cyan }}>
+					{token}
+				</span>
+			);
+		if (/^\[error\]$/.test(token))
+			return (
+				<span key={i} style={{ color: T.red }}>
+					{token}
+				</span>
+			);
+		if (/^\[debug\]$/.test(token))
+			return (
+				<span key={i} style={{ color: T.muted }}>
+					{token}
+				</span>
+			);
+
+		// ── Flags and options: -n --flag ───────────────────────────────
+		if (/^--?[a-zA-Z]/.test(token)) {
+			return (
+				<span key={i} style={{ color: T.orange }}>
+					{token}
 				</span>
 			);
 		}
 
-		return <span key={index}>{segment}</span>;
+		// ── Standalone numbers ─────────────────────────────────────────
+		if (/^\d+(\.\d+)?$/.test(token)) {
+			return (
+				<span key={i} style={{ color: T.cyan }}>
+					{token}
+				</span>
+			);
+		}
+
+		// ── Operators ─────────────────────────────────────────────────
+		if (OPERATORS.has(token)) {
+			return (
+				<span key={i} style={{ color: T.violet }}>
+					{token}
+				</span>
+			);
+		}
+
+		// ── Comment/description separator: # ──────────────────────────
+		if (token === '#') {
+			return (
+				<span key={i} style={{ color: T.muted }}>
+					{token}
+				</span>
+			);
+		}
+
+		// ── Known command names in non-command lines (hints, output) ──
+		if (tone !== 'command' && KNOWN_COMMANDS.has(token.toLowerCase())) {
+			return (
+				<span key={i} style={{ color: T.gold }}>
+					{token}
+				</span>
+			);
+		}
+
+		// ── Quoted strings ─────────────────────────────────────────────
+		if (
+			(token.startsWith('"') && token.endsWith('"')) ||
+			(token.startsWith("'") && token.endsWith("'"))
+		) {
+			return (
+				<span key={i} style={{ color: T.green }}>
+					{token}
+				</span>
+			);
+		}
+
+		// ── Default: inherit parent color ──────────────────────────────
+		return <span key={i}>{token}</span>;
 	});
 }
 
-export default function TerminalHistory({
-	history,
-}: Readonly<{
-	history: HistoryLine[];
-}>) {
+/** Base color for each tone — applies to the <p> wrapper */
+function toneColor(tone: HistoryTone): string {
+	switch (tone) {
+		case 'command':
+			return T.green;
+		case 'error':
+			return T.red;
+		case 'system':
+			return T.amber;
+		case 'hint':
+			return T.hintDim;
+		default:
+			return T.cream; // 'output'
+	}
+}
+
+export default function TerminalHistory({ history }: Readonly<{ history: HistoryLine[] }>) {
 	return (
 		<div className="space-y-1.5">
 			{history.map((line) => (
-				<p
-					key={line.id}
-					className={
-						line.tone === 'command'
-							? 'text-emerald-700 dark:text-emerald-300'
-							: line.tone === 'error'
-								? 'text-destructive'
-								: line.tone === 'system'
-									? 'text-amber-700 dark:text-amber-200'
-									: line.tone === 'hint'
-										? 'text-muted-foreground/70'
-										: 'text-foreground'
-					}
-				>
+				<p key={line.id} style={{ color: toneColor(line.tone) }}>
 					{line.tone === 'command' ? (
 						<>
-							<span className="text-primary">{formatPrompt(line.cwd ?? ROOT)}</span>{' '}
-							{renderSegments(line.text)}
+							{/* Prompt: gold */}
+							<span style={{ color: T.gold }}>{formatPrompt(line.cwd ?? ROOT)}</span>{' '}
+							{renderTokens(line.text, line.tone, /* isCmd */ true)}
 						</>
 					) : (
-						renderSegments(line.text)
+						renderTokens(line.text, line.tone, false)
 					)}
 				</p>
 			))}

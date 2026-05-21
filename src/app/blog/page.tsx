@@ -25,7 +25,7 @@ export default function BlogPage() {
 	const allTags = getAllTags();
 
 	return (
-		<div className="mx-auto w-full max-w-2xl">
+		<div className="mx-auto w-full max-w-3xl">
 			<BlogClient posts={posts} categories={categories} allTags={allTags} />
 		</div>
 	);

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import TerminalHistory from '@/components/not-found/TerminalHistory';
 import TerminalQuickActions from '@/components/not-found/TerminalQuickActions';
+import HighlightedInput from '@/components/not-found/HighlightedInput';
 import {
 	COMMAND_HELP,
 	PROMPT_USER,
@@ -327,29 +328,43 @@ export default function NotFoundTerminal({
 
 	return (
 		<div
-			className="w-full rounded border border-border bg-card p-6 font-mono text-sm"
+			style={{
+				background: 'hsl(var(--terminal-bg))',
+				color: '#f0ead6',
+				borderColor: 'rgba(118,80,35,0.45)',
+				borderTopColor: '#fccb26',
+			}}
+			className="w-full rounded border border-t-2 p-6 font-mono text-sm shadow-lg"
 			onClick={() => inputRef.current?.focus()}
 			role="presentation"
 		>
-			<div className="mb-4 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60">
-				<span className="rounded border border-border px-2 py-0.5">404 shell</span>
+			<div
+				className="mb-4 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.2em]"
+				style={{ color: 'rgba(203,213,225,0.45)' }}
+			>
+				<span
+					className="rounded px-2 py-0.5 text-[10px]"
+					style={{ border: '1px solid rgba(118,80,35,0.45)', color: '#fccb26' }}
+				>
+					404 shell
+				</span>
 				<span>cwd {cwd}</span>
 			</div>
 
 			<TerminalHistory history={history} />
 
 			<form
-				className="mt-5 flex items-center gap-2 border-t border-border pt-4"
+				className="mt-5 flex items-center gap-2 border-t pt-4"
+				style={{ borderColor: 'rgba(118,80,35,0.35)' }}
 				onSubmit={(e) => {
 					e.preventDefault();
 					handleCommand(input);
 					setInput('');
 				}}
 			>
-				<span className="shrink-0 text-primary">{formatPrompt(cwd)}</span>
-				<input
+				<span style={{ color: '#fccb26' }}>{formatPrompt(cwd)}</span>
+				<HighlightedInput
 					ref={inputRef}
-					type="text"
 					value={input}
 					onChange={(e) => {
 						setInput(e.target.value);
@@ -408,17 +423,12 @@ export default function NotFoundTerminal({
 							}
 						}
 					}}
-					className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground/40"
 					placeholder="type a command and press enter"
-					autoComplete="off"
-					autoCapitalize="off"
-					autoCorrect="off"
-					spellCheck={false}
 				/>
 			</form>
 
 			<TerminalQuickActions onSelect={setInput} />
-			<p className="mt-3 font-mono text-[10px] text-muted-foreground/60">
+			<p className="mt-3 font-mono text-[10px]" style={{ color: 'rgba(203,213,225,0.35)' }}>
 				Tab to complete · ↑↓ command history
 			</p>
 
