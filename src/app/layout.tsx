@@ -27,14 +27,14 @@ import './globals.css';
 
 const sans = IBM_Plex_Sans({
 	subsets: ['latin'],
-	weight: ['400', '500', '600', '700'],
+	weight: ['400', '600'],
 	display: 'swap',
 	variable: '--font-sans',
 });
 
 const mono = JetBrains_Mono({
 	subsets: ['latin'],
-	weight: ['400', '500', '700'],
+	weight: ['400', '700'],
 	display: 'swap',
 	variable: '--font-mono',
 });

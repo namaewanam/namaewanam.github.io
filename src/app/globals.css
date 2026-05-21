@@ -16,7 +16,7 @@
 		--accent: 25 85% 57%; /* #f18231 orange */
 		--accent-foreground: 56 67% 95%;
 		--muted: 56 35% 87%;
-		--muted-foreground: 27 35% 48%;
+		--muted-foreground: 27 42% 38%;
 		--border: 27 20% 78%;
 		--ring: 39 96% 57%;
 		--destructive: 14 70% 49%; /* #d1622b burnt orange */
@@ -40,7 +40,7 @@
 		--accent: 25 85% 57%; /* #f18231 orange */
 		--accent-foreground: 56 67% 92%;
 		--muted: 27 35% 14%;
-		--muted-foreground: 40 25% 65%; /* boosted for WCAG AA on dark background */
+		--muted-foreground: 40 28% 72%; /* boosted for WCAG AA on dark background */
 		--border: 27 25% 22%;
 		--ring: 39 96% 57%;
 		--destructive: 14 70% 49%;
