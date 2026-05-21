@@ -14,6 +14,7 @@ import GlobalCommandPalette from '@/components/layout/GlobalCommandPalette';
 import PageTransition from '@/components/layout/PageTransition';
 import ShortcutHelp from '@/components/layout/ShortcutHelp';
 import type { CommandPaletteItem } from '@/lib/command-palette';
+import { FEED_PATHS } from '@/lib/feed-paths';
 import {
 	buildMailtoHref,
 	getFeaturedPosts,
@@ -57,7 +58,9 @@ export const metadata: Metadata = {
 	},
 	alternates: {
 		types: {
-			'application/rss+xml': '/feed.xml',
+			'application/rss+xml': FEED_PATHS.rss,
+			'application/atom+xml': FEED_PATHS.atom,
+			'application/feed+json': FEED_PATHS.json,
 		},
 	},
 };
@@ -159,7 +162,7 @@ export default function RootLayout({
 
 	return (
 		<html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable}`}>
-			<body className="font-sans antialiased">
+			<body suppressHydrationWarning className="font-sans antialiased">
 				<ThemeScript />
 				<ThemeProvider>
 					{enableWebVitals ? <WebVitals debug={debugWebVitals} /> : null}

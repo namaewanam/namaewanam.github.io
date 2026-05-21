@@ -86,6 +86,32 @@ export const STACK_GROUPS = [
 	},
 ] as const;
 
+export const INTEREST_GROUPS = [
+	{
+		title: 'systems that stay calm',
+		description:
+			'I like distributed systems that fail predictably, recover cleanly, and stay readable under pressure.',
+		items: ['resilience patterns', 'queues', 'timeouts', 'backpressure'],
+	},
+	{
+		title: 'observability with signal',
+		description:
+			'Tracing, logs, dashboards, and retention policies are more interesting to me when they reduce confusion instead of adding more noise.',
+		items: ['distributed tracing', 'logging strategy', 'alert quality', 'incident timelines'],
+	},
+	{
+		title: 'learning in public',
+		description:
+			'I enjoy turning class notes, production lessons, and backend rabbit holes into writeups that are easier to revisit later.',
+		items: [
+			'technical writing',
+			'machine learning notes',
+			'backend field notes',
+			'teaching by rewriting',
+		],
+	},
+] as const;
+
 export type MailSubjectKey = keyof typeof MAIL_SUBJECTS;
 
 export function buildMailtoHref(kind: MailSubjectKey = 'collab'): string {

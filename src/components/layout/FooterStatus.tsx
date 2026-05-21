@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import ShortcutHelpButton from '@/components/layout/ShortcutHelpButton';
+import { FEED_PATHS } from '@/lib/feed-paths';
 import { RESUME_URL, STATUS_LINE } from '@/lib/site';
+import { PRIMARY_SITEMAP_PATH } from '@/lib/sitemap';
 
 export default function FooterStatus() {
 	return (
@@ -8,11 +10,23 @@ export default function FooterStatus() {
 			<div className="flex flex-wrap items-center justify-center gap-3">
 				<span>© {new Date().getFullYear()} nam</span>
 				<span className="text-border">·</span>
-				<a href="/feed.xml" className="transition-colors hover:text-primary" aria-label="RSS Feed">
+				<a
+					href={FEED_PATHS.rss}
+					className="transition-colors hover:text-primary"
+					aria-label="RSS Feed"
+				>
 					rss
 				</a>
 				<span className="text-border">·</span>
-				<a href="/sitemap.xml" className="transition-colors hover:text-primary">
+				<a href={FEED_PATHS.atom} className="transition-colors hover:text-primary">
+					atom
+				</a>
+				<span className="text-border">·</span>
+				<a href={FEED_PATHS.json} className="transition-colors hover:text-primary">
+					json
+				</a>
+				<span className="text-border">·</span>
+				<a href={PRIMARY_SITEMAP_PATH} className="transition-colors hover:text-primary">
 					sitemap
 				</a>
 				<span className="text-border">·</span>

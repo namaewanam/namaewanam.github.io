@@ -3,6 +3,7 @@ import { buildOgImage, OG_IMAGE_SIZE } from '@/lib/og';
 export const size = OG_IMAGE_SIZE;
 export const contentType = 'image/png';
 export const alt = 'nam blog';
+export const dynamic = 'force-static';
 
 export default function OpenGraphImage() {
 	return buildOgImage({

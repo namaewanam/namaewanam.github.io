@@ -45,6 +45,9 @@ jobs:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: 1
 
+      - name: Verify feeds
+        run: pnpm check:feeds
+
       - name: Check static links
         run: pnpm check:links
 

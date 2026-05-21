@@ -8,6 +8,7 @@ import {
 	getFeaturedPosts,
 	HOME_RECRUITING_NOTE,
 	HOME_SIGNATURE,
+	INTEREST_GROUPS,
 	RESUME_URL,
 } from '@/lib/site';
 
@@ -133,6 +134,36 @@ export default function Home() {
 							</span>
 						)
 					)}
+				</div>
+			</section>
+
+			<hr className="border-border" />
+
+			{/* ── Interests ── */}
+			<section id="interests" className="space-y-4">
+				<p className="font-mono text-xs uppercase tracking-widest text-primary">interests</p>
+				<div className="grid gap-3">
+					{INTEREST_GROUPS.map((interest) => (
+						<div
+							key={interest.title}
+							className="space-y-2 rounded border border-border/70 bg-card/40 px-4 py-3"
+						>
+							<div className="space-y-1">
+								<h2 className="text-sm font-semibold text-foreground">{interest.title}</h2>
+								<p className="text-sm leading-relaxed text-foreground/75">{interest.description}</p>
+							</div>
+							<div className="flex flex-wrap gap-1.5">
+								{interest.items.map((item) => (
+									<span
+										key={item}
+										className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+									>
+										{item}
+									</span>
+								))}
+							</div>
+						</div>
+					))}
 				</div>
 			</section>
 

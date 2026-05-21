@@ -97,7 +97,7 @@ export default function NotFoundTerminal({
 				}
 
 				appendHistory(
-					Object.entries(COMMAND_HELP).map(([name, details]) => ({
+					Object.entries(COMMAND_HELP).map(([, details]) => ({
 						text: `${details.usage.padEnd(16, ' ')} ${details.summary}`,
 						tone: 'output' as const,
 					}))
