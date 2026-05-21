@@ -10,8 +10,15 @@ const config: Config = {
 	theme: {
 		extend: {
 			fontFamily: {
-				sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
-				mono: ['"JetBrains Mono"', '"Fira Code"', '"Cascadia Code"', 'Menlo', 'monospace'],
+				sans: [
+					'var(--font-sans)',
+					'-apple-system',
+					'BlinkMacSystemFont',
+					'"Segoe UI"',
+					'system-ui',
+					'sans-serif',
+				],
+				mono: ['var(--font-mono)', '"SF Mono"', '"Cascadia Code"', 'Menlo', 'monospace'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',

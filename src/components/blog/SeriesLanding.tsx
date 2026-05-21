@@ -16,6 +16,27 @@ export default function SeriesLanding({
 	seriesHtml?: string;
 }>) {
 	const totalMinutes = posts.reduce((sum, post) => sum + post.readingTimeMin, 0);
+	const normalizeReference = (reference: string) =>
+		reference
+			.replace(/\.md$/i, '')
+			.replace(/^\/+|\/+$/g, '')
+			.toLowerCase();
+	const resolveReference = (reference?: string) =>
+		reference
+			? (posts.find(
+					(post) =>
+						post.fullPath.toLowerCase() === normalizeReference(reference) ||
+						post.slug.toLowerCase() === normalizeReference(reference)
+				) ?? null)
+			: null;
+	const startHerePost = resolveReference(seriesMetadata?.startHere) ?? posts[0] ?? null;
+	const nextRecommendedPost =
+		resolveReference(seriesMetadata?.nextRecommended) ??
+		posts.find((post) => post.fullPath !== startHerePost?.fullPath) ??
+		null;
+	const prerequisites = seriesMetadata?.prerequisites ?? [];
+	const youWillUnderstand = seriesMetadata?.youWillUnderstand ?? [];
+	const useItFor = seriesMetadata?.useItFor ?? [];
 	const groupedBySubcategory = posts.reduce(
 		(acc, post) => {
 			const key = post.subcategory || 'root';
@@ -53,6 +74,114 @@ export default function SeriesLanding({
 				</span>
 				<span className="rounded border border-border px-2 py-0.5">~{totalMinutes} min total</span>
 				<span className="rounded border border-border px-2 py-0.5">/{categorySlug}</span>
+			</div>
+
+			<div className="grid gap-3 sm:grid-cols-2">
+				<div className="space-y-2 rounded border border-border/70 bg-background/40 p-3">
+					<p className="font-mono text-[10px] uppercase tracking-wider text-primary">
+						reading path
+					</p>
+					<div className="space-y-2 text-sm">
+						{startHerePost && (
+							<Link
+								href={`/blog/${categorySlug}/${startHerePost.fullPath}`}
+								className="block rounded border border-border/70 px-2.5 py-2 transition-all hover:border-primary hover:bg-card/50"
+							>
+								<span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+									start here
+								</span>
+								<span className="mt-1 block text-foreground">{startHerePost.title}</span>
+							</Link>
+						)}
+						{nextRecommendedPost && (
+							<Link
+								href={`/blog/${categorySlug}/${nextRecommendedPost.fullPath}`}
+								className="block rounded border border-border/70 px-2.5 py-2 transition-all hover:border-primary hover:bg-card/50"
+							>
+								<span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+									next recommended
+								</span>
+								<span className="mt-1 block text-foreground">{nextRecommendedPost.title}</span>
+							</Link>
+						)}
+					</div>
+				</div>
+
+				<div className="space-y-2 rounded border border-border/70 bg-background/40 p-3">
+					<p className="font-mono text-[10px] uppercase tracking-wider text-primary">on-ramp</p>
+					<div className="space-y-2 text-sm text-muted-foreground">
+						<p>
+							<span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+								difficulty
+							</span>
+							<span className="mt-1 block text-foreground">
+								{seriesMetadata?.difficulty ?? 'Approachable if you already speak the basics.'}
+							</span>
+						</p>
+						<div>
+							<p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+								prerequisites
+							</p>
+							<div className="mt-1 flex flex-wrap gap-1.5">
+								{prerequisites.length > 0 ? (
+									prerequisites.map((item) => (
+										<span
+											key={item}
+											className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-foreground/80"
+										>
+											{item}
+										</span>
+									))
+								) : (
+									<span className="text-sm text-foreground/80">
+										Basic backend instincts and a willingness to follow the thread.
+									</span>
+								)}
+							</div>
+						</div>
+						{(youWillUnderstand.length > 0 || useItFor.length > 0) && (
+							<div className="space-y-2 border-t border-border/60 pt-2">
+								<p className="font-mono text-[10px] uppercase tracking-wider text-primary">
+									estimated payoff
+								</p>
+								{youWillUnderstand.length > 0 && (
+									<div>
+										<p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+											you&apos;ll understand
+										</p>
+										<div className="mt-1 flex flex-wrap gap-1.5">
+											{youWillUnderstand.map((item) => (
+												<span
+													key={item}
+													className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-foreground/80"
+												>
+													{item}
+												</span>
+											))}
+										</div>
+									</div>
+								)}
+								{useItFor.length > 0 && (
+									<div>
+										<p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+											use it for
+										</p>
+										<div className="mt-1 flex flex-wrap gap-1.5">
+											{useItFor.map((item) => (
+												<span
+													key={item}
+													className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-foreground/80"
+												>
+													{item}
+												</span>
+											))}
+										</div>
+									</div>
+								)}
+							</div>
+						)}
+					</div>
+				</div>
 			</div>
 
 			<div className="rounded border border-border/70 bg-background/40 p-3">

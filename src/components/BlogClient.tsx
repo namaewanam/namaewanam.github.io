@@ -2,13 +2,13 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { Post, Category } from '@/lib/markdown';
+import type { BlogSearchPost, Category } from '@/lib/markdown';
 import BlogResults from '@/components/blog/BlogResults';
 import BlogRssBadge from '@/components/blog/BlogRssBadge';
 import BlogSearchInput from '@/components/blog/BlogSearchInput';
 
 interface BlogClientProps {
-	posts: Post[];
+	posts: BlogSearchPost[];
 	categories: Category[];
 	allTags: { tag: string; count: number }[];
 }
@@ -18,26 +18,10 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 	const [activeTag, setActiveTag] = useState('');
 	const searchRef = useRef<HTMLInputElement>(null);
 	const deferredQuery = useDeferredValue(query);
-	const searchablePosts = useMemo(
-		() =>
-			posts.map((post) => ({
-				post,
-				searchText: [
-					post.title,
-					post.description,
-					post.categoryName,
-					post.tags?.join(' '),
-					post.content.replace(/[`#>*_[\]-]/g, ' '),
-				]
-					.filter(Boolean)
-					.join(' ')
-					.toLowerCase(),
-			})),
-		[posts]
-	);
 
 	useEffect(() => {
 		const handleKeydown = (event: KeyboardEvent) => {
+			if (event.defaultPrevented) return;
 			const target = event.target as HTMLElement | null;
 			const isTypingField =
 				target instanceof HTMLInputElement ||
@@ -59,14 +43,12 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 		const q = deferredQuery.toLowerCase().trim();
 		const tag = activeTag.toLowerCase();
 
-		return searchablePosts
-			.filter(({ post, searchText }) => {
-				const matchTag = !tag || post.tags?.includes(tag) || post.category === tag;
-				const matchSearch = !q || searchText.includes(q);
-				return matchTag && matchSearch;
-			})
-			.map(({ post }) => post);
-	}, [activeTag, deferredQuery, searchablePosts]);
+		return posts.filter((post) => {
+			const matchTag = !tag || post.tags?.includes(tag) || post.category === tag;
+			const matchSearch = !q || post.searchText.includes(q);
+			return matchTag && matchSearch;
+		});
+	}, [activeTag, deferredQuery, posts]);
 
 	return (
 		<div className="space-y-8">
@@ -133,13 +115,17 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 				</p>
 				<div className="grid gap-2 sm:grid-cols-2">
 					{categories.map((cat) => (
-						<Link
+						<article
 							key={cat.slug}
-							href={`/blog/${cat.slug}`}
 							className="rounded border border-border bg-card/30 px-3 py-2 transition-all hover:border-accent hover:bg-card/60"
 						>
 							<div className="flex items-baseline justify-between gap-3">
-								<span className="font-mono text-[11px] text-foreground">/{cat.slug}</span>
+								<Link
+									href={`/blog/${cat.slug}`}
+									className="font-mono text-[11px] text-foreground transition-colors hover:text-primary"
+								>
+									/{cat.slug}
+								</Link>
 								<span className="font-mono text-[10px] text-muted-foreground">
 									{cat.count} {cat.count === 1 ? 'post' : 'posts'}
 								</span>
@@ -147,7 +133,15 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 							<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
 								{cat.description}
 							</p>
-						</Link>
+							{cat.startHere && (
+								<Link
+									href={`/blog/${cat.slug}/${cat.startHere.fullPath}`}
+									className="mt-2 inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+								>
+									start here →<span className="text-foreground">{cat.startHere.title}</span>
+								</Link>
+							)}
+						</article>
 					))}
 				</div>
 			</div>

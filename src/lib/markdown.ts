@@ -2,10 +2,16 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import matter from 'gray-matter';
-import { getCategoryDescription } from '@/lib/site';
+import { getCategoryDescription, getCategoryStartHerePath } from '@/lib/site';
 
 const postsDirectory = path.join(process.cwd(), 'docs');
 const SERIES_FILENAME = '_series.md';
+const postMetadataManifestPath = path.join(
+	process.cwd(),
+	'public',
+	'_content',
+	'post-metadata.json'
+);
 
 export interface Post {
 	slug: string;
@@ -29,12 +35,34 @@ export interface Category {
 	name: string;
 	count: number;
 	description: string;
+	startHere?: {
+		title: string;
+		fullPath: string;
+	};
+}
+
+export interface BlogSearchPost {
+	slug: string;
+	category: string;
+	categoryName: string;
+	title: string;
+	description?: string;
+	date?: string;
+	fullPath: string;
+	tags: string[];
+	searchText: string;
 }
 
 export interface SeriesMetadata {
 	title?: string;
 	description?: string;
 	content?: string;
+	startHere?: string;
+	nextRecommended?: string;
+	difficulty?: string;
+	prerequisites?: string[];
+	youWillUnderstand?: string[];
+	useItFor?: string[];
 }
 
 export interface AdjacentPosts {
@@ -44,6 +72,7 @@ export interface AdjacentPosts {
 
 interface ContentIndex {
 	allPosts: Post[];
+	blogSearchPosts: BlogSearchPost[];
 	categories: Category[];
 	postsByCategory: Map<string, Post[]>;
 	postByKey: Map<string, Post>;
@@ -54,6 +83,7 @@ interface ContentIndex {
 /** Words per minute for reading time calculation */
 const WPM = 200;
 let cachedContentIndex: ContentIndex | null = null;
+let cachedLastUpdatedMap: Map<string, string> | null = null;
 
 function computeReadingTime(content: string): number {
 	const words = content.trim().split(/\s+/).length;
@@ -109,6 +139,67 @@ function buildTags(posts: Post[]): { tag: string; count: number }[] {
 		.sort((a, b) => b.count - a.count);
 }
 
+function buildSearchText(post: {
+	title: string;
+	description?: string;
+	categoryName: string;
+	tags?: string[];
+	content: string;
+}) {
+	return [
+		post.title,
+		post.description,
+		post.categoryName,
+		(post.tags ?? []).join(' '),
+		post.content,
+	]
+		.filter(Boolean)
+		.join(' ')
+		.replace(/[`#>*_[\]-]/g, ' ')
+		.toLowerCase();
+}
+
+function loadLastUpdatedMap(): Map<string, string> {
+	if (cachedLastUpdatedMap) {
+		return cachedLastUpdatedMap;
+	}
+
+	try {
+		const raw = fs.readFileSync(postMetadataManifestPath, 'utf8');
+		const parsed = JSON.parse(raw) as { posts?: Record<string, { lastUpdated?: string }> };
+		cachedLastUpdatedMap = new Map(
+			Object.entries(parsed.posts ?? {})
+				.filter(([, value]) => Boolean(value?.lastUpdated))
+				.map(([key, value]) => [key, value.lastUpdated as string])
+		);
+	} catch {
+		cachedLastUpdatedMap = new Map();
+	}
+
+	return cachedLastUpdatedMap;
+}
+
+function normalizePostReference(reference: string): string {
+	return reference
+		.replace(/\.md$/i, '')
+		.replace(/^\/+|\/+$/g, '')
+		.toLowerCase();
+}
+
+function resolvePostReference(posts: Post[], reference?: string): Post | null {
+	if (!reference) return null;
+
+	const normalized = normalizePostReference(reference);
+	return (
+		posts.find(
+			(post) =>
+				post.fullPath.toLowerCase() === normalized ||
+				post.slug.toLowerCase() === normalized ||
+				`${post.category}/${post.fullPath}`.toLowerCase() === normalized
+		) ?? null
+	);
+}
+
 function readSeriesMetadata(seriesPath: string): SeriesMetadata | null {
 	if (!fs.existsSync(seriesPath)) return null;
 
@@ -120,6 +211,45 @@ function readSeriesMetadata(seriesPath: string): SeriesMetadata | null {
 
 		if (data.title) metadata.title = String(data.title);
 		if (data.description) metadata.description = String(data.description);
+		if (data.startHere) metadata.startHere = normalizePostReference(String(data.startHere));
+		if (data.nextRecommended) {
+			metadata.nextRecommended = normalizePostReference(String(data.nextRecommended));
+		}
+		if (data.difficulty) metadata.difficulty = String(data.difficulty);
+		if (data.prerequisites) {
+			if (Array.isArray(data.prerequisites)) {
+				metadata.prerequisites = data.prerequisites
+					.map((item) => String(item).trim())
+					.filter(Boolean);
+			} else if (typeof data.prerequisites === 'string') {
+				metadata.prerequisites = data.prerequisites
+					.split(',')
+					.map((item) => item.trim())
+					.filter(Boolean);
+			}
+		}
+		if (data.youWillUnderstand) {
+			if (Array.isArray(data.youWillUnderstand)) {
+				metadata.youWillUnderstand = data.youWillUnderstand
+					.map((item) => String(item).trim())
+					.filter(Boolean);
+			} else if (typeof data.youWillUnderstand === 'string') {
+				metadata.youWillUnderstand = data.youWillUnderstand
+					.split(',')
+					.map((item) => item.trim())
+					.filter(Boolean);
+			}
+		}
+		if (data.useItFor) {
+			if (Array.isArray(data.useItFor)) {
+				metadata.useItFor = data.useItFor.map((item) => String(item).trim()).filter(Boolean);
+			} else if (typeof data.useItFor === 'string') {
+				metadata.useItFor = data.useItFor
+					.split(',')
+					.map((item) => item.trim())
+					.filter(Boolean);
+			}
+		}
 		if (trimmedContent) metadata.content = trimmedContent;
 
 		return metadata;
@@ -149,6 +279,7 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 			.split(path.sep)
 			.map((part) => part.toLowerCase())
 			.join('/');
+		const postKey = `${category.toLowerCase()}/${urlPath}`;
 
 		let tags: string[] = [];
 		if (data.tags) {
@@ -164,7 +295,7 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 
 		const readingTimeMin = computeReadingTime(content);
 		const codePercent = computeCodePercent(content);
-		const lastUpdated = getGitLastUpdated(fullPath);
+		const lastUpdated = loadLastUpdatedMap().get(postKey) ?? getGitLastUpdated(fullPath);
 
 		const post: Post = {
 			category: category.toLowerCase(),
@@ -214,6 +345,23 @@ function collectPostsFromDirectory(dir: string, category: string, filesList: Pos
 	return filesList;
 }
 
+function buildCategoryStartHere(
+	posts: Post[],
+	categorySlug: string
+): Category['startHere'] | undefined {
+	const configuredPath = getCategoryStartHerePath(categorySlug);
+	const startHerePost = resolvePostReference(posts, configuredPath) ?? posts[0] ?? null;
+
+	if (!startHerePost) {
+		return undefined;
+	}
+
+	return {
+		title: startHerePost.title,
+		fullPath: startHerePost.fullPath,
+	};
+}
+
 function buildContentIndex(): ContentIndex {
 	const categoryDirs = fs
 		.readdirSync(postsDirectory)
@@ -236,11 +384,13 @@ function buildContentIndex(): ContentIndex {
 		});
 
 		if (posts.length > 0) {
+			const startHere = buildCategoryStartHere(posts, categorySlug);
 			categories.push({
 				name: categoryDir,
 				slug: categorySlug,
 				count: posts.length,
 				description: getCategoryDescription(categoryDir),
+				...(startHere ? { startHere } : {}),
 			});
 		}
 
@@ -251,9 +401,27 @@ function buildContentIndex(): ContentIndex {
 	});
 
 	const sortedPosts = sortPosts(allPosts);
+	const blogSearchPosts = sortedPosts.map((post) => ({
+		slug: post.slug,
+		category: post.category,
+		categoryName: post.categoryName,
+		title: post.title,
+		fullPath: post.fullPath,
+		tags: post.tags ?? [],
+		searchText: buildSearchText({
+			title: post.title,
+			categoryName: post.categoryName,
+			tags: post.tags ?? [],
+			content: post.content,
+			...(post.description ? { description: post.description } : {}),
+		}),
+		...(post.description ? { description: post.description } : {}),
+		...(post.date ? { date: post.date } : {}),
+	}));
 
 	return {
 		allPosts: sortedPosts,
+		blogSearchPosts,
 		categories,
 		postsByCategory,
 		postByKey,
@@ -272,6 +440,10 @@ function getContentIndex(): ContentIndex {
 
 export function getAllPosts(): Post[] {
 	return getContentIndex().allPosts;
+}
+
+export function getBlogSearchPosts(): BlogSearchPost[] {
+	return getContentIndex().blogSearchPosts;
 }
 
 export function getPostsByCategory(category: string): Post[] {

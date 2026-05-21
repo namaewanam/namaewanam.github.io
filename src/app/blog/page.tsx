@@ -1,4 +1,4 @@
-import { getAllPosts, getCategories, getAllTags } from '@/lib/markdown';
+import { getBlogSearchPosts, getCategories, getAllTags } from '@/lib/markdown';
 import BlogClient from '@/components/BlogClient';
 import type { Metadata } from 'next';
 import { SITE_NAME } from '@/lib/site';
@@ -20,9 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default function BlogPage() {
-	// Pass the full Post objects — BlogClient only reads a subset of fields.
-	// This avoids spreading optional properties that trigger exactOptionalPropertyTypes.
-	const posts = getAllPosts();
+	const posts = getBlogSearchPosts();
 	const categories = getCategories();
 	const allTags = getAllTags();
 

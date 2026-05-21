@@ -4,11 +4,11 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 
-// Import from source — tsx handles TypeScript transpilation
-import { getAllPosts, getCategories } from '../src/lib/markdown';
 import { buildOgImage } from '../src/lib/og';
 import { toPostOgSlug } from '../src/lib/site';
+import type { Category, Post } from '../src/lib/markdown';
 
 const SITE_URL = 'https://ntnam1605.github.io';
 const SITE_TITLE = 'nam · backend dev';
@@ -16,12 +16,124 @@ const SITE_DESCRIPTION = 'Notes, articles and thoughts from a backend developer'
 
 const publicDir = path.join(process.cwd(), 'public');
 const postOgDir = path.join(publicDir, 'og', 'posts');
+const postMetadataPath = path.join(publicDir, '_content', 'post-metadata.json');
+const docsDir = path.join(process.cwd(), 'docs');
+
+interface PostMetaManifest {
+	generatedAt: string;
+	posts: Record<string, { lastUpdated: string }>;
+}
+
+function getStagedMarkdownFiles(): string[] {
+	try {
+		const output = execSync('git diff --cached --name-only --diff-filter=ACMR -- docs', {
+			encoding: 'utf8',
+			stdio: ['pipe', 'pipe', 'ignore'],
+		});
+
+		return output
+			.split('\n')
+			.map((line) => line.trim())
+			.filter((line) => line.endsWith('.md') && !line.endsWith('_series.md'))
+			.map((line) => path.join(process.cwd(), line));
+	} catch {
+		return [];
+	}
+}
+
+function listMarkdownFiles(dir: string, filesList: string[] = []): string[] {
+	const files = fs.readdirSync(dir);
+
+	files.forEach((file) => {
+		const filePath = path.join(dir, file);
+		const stat = fs.statSync(filePath);
+
+		if (stat.isDirectory()) {
+			listMarkdownFiles(filePath, filesList);
+			return;
+		}
+
+		if (file.endsWith('.md') && file !== '_series.md') {
+			filesList.push(filePath);
+		}
+	});
+
+	return filesList;
+}
+
+function buildPostKeyFromFilePath(filePath: string): string {
+	const relative = path.relative(docsDir, filePath);
+	const parts = relative.split(path.sep);
+	const [category = '', ...rest] = parts;
+	const fullPath = rest.join('/').replace(/\.md$/, '').toLowerCase();
+	return `${category.toLowerCase()}/${fullPath}`;
+}
+
+function collectLastUpdatedManifest(): PostMetaManifest {
+	const now = new Date().toISOString();
+	const manifest: PostMetaManifest = {
+		generatedAt: now,
+		posts: {},
+	};
+	const allFiles = listMarkdownFiles(docsDir);
+
+	if (allFiles.length === 0) {
+		return manifest;
+	}
+
+	try {
+		const output = execSync('git log --format=__COMMIT__%cI --name-only -- docs', {
+			encoding: 'utf8',
+			stdio: ['pipe', 'pipe', 'ignore'],
+		});
+		const lines = output.split('\n');
+		let currentCommitDate = '';
+
+		lines.forEach((line) => {
+			if (!line.trim()) return;
+			if (line.startsWith('__COMMIT__')) {
+				currentCommitDate = line.replace('__COMMIT__', '').trim();
+				return;
+			}
+
+			if (!line.endsWith('.md') || line.endsWith('_series.md') || !currentCommitDate) return;
+			const absolutePath = path.join(process.cwd(), line);
+			const key = buildPostKeyFromFilePath(absolutePath);
+			if (!manifest.posts[key]) {
+				manifest.posts[key] = { lastUpdated: currentCommitDate };
+			}
+		});
+	} catch {
+		allFiles.forEach((filePath) => {
+			const stats = fs.statSync(filePath);
+			const key = buildPostKeyFromFilePath(filePath);
+			manifest.posts[key] = { lastUpdated: stats.mtime.toISOString() };
+		});
+	}
+
+	if (process.env.USE_STAGED_LAST_UPDATED === '1') {
+		const stagedFiles = getStagedMarkdownFiles();
+
+		stagedFiles.forEach((filePath) => {
+			if (!fs.existsSync(filePath)) return;
+			const key = buildPostKeyFromFilePath(filePath);
+			manifest.posts[key] = { lastUpdated: now };
+		});
+	}
+
+	return manifest;
+}
+
+function generatePostMetadata(): void {
+	const manifest = collectLastUpdatedManifest();
+	fs.mkdirSync(path.dirname(postMetadataPath), { recursive: true });
+	fs.writeFileSync(postMetadataPath, JSON.stringify(manifest, null, 2), 'utf8');
+	console.log(`✓ Generated post metadata for ${Object.keys(manifest.posts).length} post(s)`);
+}
 
 // ── Sitemap ─────────────────────────────────────────────────────────────
 
-function generateSitemap(): void {
-	const posts = getAllPosts();
-	const categories = getCategories();
+function generateSitemap(posts: Post[], categories: Category[]): void {
 	const now = new Date().toISOString();
 
 	const urls: { loc: string; lastmod: string; priority: string }[] = [
@@ -73,10 +185,10 @@ function escapeXml(str: string): string {
 		.replace(/'/g, '&apos;');
 }
 
-function generateRssFeed(): void {
-	const posts = getAllPosts().slice(0, 20); // Latest 20 posts
+function generateRssFeed(posts: Post[]): void {
+	const latestPosts = posts.slice(0, 20); // Latest 20 posts
 
-	const items = posts.map((post) => {
+	const items = latestPosts.map((post) => {
 		const pubDate = post.date ? new Date(post.date).toUTCString() : new Date().toUTCString();
 		const link = `${SITE_URL}/blog/${post.category}/${post.fullPath}`;
 
@@ -115,9 +227,7 @@ async function writeImage(filePath: string, image: Response): Promise<void> {
 	fs.writeFileSync(filePath, buffer);
 }
 
-async function generatePostOgImages(): Promise<void> {
-	const posts = getAllPosts();
-
+async function generatePostOgImages(posts: Post[]): Promise<void> {
 	await Promise.all(
 		posts.map(async (post) => {
 			const fileName = `${toPostOgSlug(post.category, post.fullPath)}.png`;
@@ -139,9 +249,13 @@ async function generatePostOgImages(): Promise<void> {
 // ── Run ─────────────────────────────────────────────────────────────────
 
 async function main() {
-	generateSitemap();
-	generateRssFeed();
-	await generatePostOgImages();
+	generatePostMetadata();
+	const { getAllPosts, getCategories } = await import('../src/lib/markdown');
+	const posts = getAllPosts();
+	const categories = getCategories();
+	generateSitemap(posts, categories);
+	generateRssFeed(posts);
+	await generatePostOgImages(posts);
 }
 
 main().catch((error) => {

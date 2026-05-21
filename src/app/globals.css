@@ -139,8 +139,7 @@
 }
 
 .code-block-wrapper pre code {
-	font-family:
-		'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+	font-family: var(--font-mono), 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
 	font-size: inherit;
 	line-height: inherit;
 	background: transparent;
@@ -153,7 +152,7 @@
 	position: absolute;
 	top: 0;
 	right: 0;
-	font-family: monospace;
+	font-family: var(--font-mono), monospace;
 	font-size: 10px;
 	letter-spacing: 0.05em;
 	text-transform: uppercase;
@@ -433,7 +432,7 @@ pre:not(.code-block-wrapper pre) {
 	display: block;
 	padding: 2px 0;
 	font-size: 11px;
-	font-family: monospace;
+	font-family: var(--font-mono), monospace;
 	color: hsl(var(--muted-foreground));
 	text-decoration: none;
 	transition: color 0.15s ease;
@@ -508,7 +507,7 @@ h3:hover .heading-anchor {
 	color: hsl(var(--foreground));
 	padding: 0.5rem 0.75rem;
 	border-radius: 0.5rem;
-	font-family: monospace;
+	font-family: var(--font-mono), monospace;
 	font-size: 11px;
 	opacity: 0;
 	transform: translateY(8px);
@@ -534,7 +533,7 @@ h3:hover .heading-anchor {
 
 .callout-title {
 	margin: 0 0 0.5rem;
-	font-family: monospace;
+	font-family: var(--font-mono), monospace;
 	font-size: 11px;
 	font-weight: 700;
 	letter-spacing: 0.14em;

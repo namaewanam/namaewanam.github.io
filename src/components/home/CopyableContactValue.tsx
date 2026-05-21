@@ -6,12 +6,18 @@ export default function CopyableContactValue({
 	displayValue,
 	copyValue,
 	href,
+	secondaryLinks,
 }: Readonly<{
 	displayValue: string;
 	copyValue: string;
 	href?: string;
+	secondaryLinks?: Array<{
+		label: string;
+		href: string;
+	}>;
 }>) {
 	const [copied, setCopied] = useState(false);
+	const statusId = `copy-status-${copyValue.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
 
 	useEffect(() => {
 		if (!copied) return;
@@ -47,9 +53,28 @@ export default function CopyableContactValue({
 				onClick={handleCopy}
 				className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
 				aria-label={`Copy ${copyValue}`}
+				aria-describedby={statusId}
 			>
 				{copied ? 'copied' : 'copy'}
 			</button>
+			{secondaryLinks && secondaryLinks.length > 0 && (
+				<div className="flex flex-wrap items-center gap-1">
+					{secondaryLinks.map((link) => (
+						<a
+							key={link.label}
+							href={link.href}
+							target={link.href.startsWith('mailto') ? undefined : '_blank'}
+							rel={link.href.startsWith('mailto') ? undefined : 'noopener noreferrer'}
+							className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+						>
+							{link.label}
+						</a>
+					))}
+				</div>
+			)}
+			<span id={statusId} className="sr-only" aria-live="polite" role="status">
+				{copied ? `${displayValue} copied to clipboard` : ''}
+			</span>
 		</div>
 	);
 }

@@ -43,6 +43,9 @@ export async function generateMetadata({
 export default async function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
 	const resolvedParams = await params;
 	const posts = getPostsByCategory(resolvedParams.category);
+	const categoryMeta = getCategories().find(
+		(category) => category.slug === resolvedParams.category
+	);
 
 	if (posts.length === 0) {
 		notFound();
@@ -91,6 +94,14 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
 					<p className="mt-2 text-sm text-muted-foreground">
 						{posts.length} {posts.length === 1 ? 'article' : 'articles'}
 					</p>
+					{categoryMeta?.startHere && (
+						<Link
+							href={`/blog/${resolvedParams.category}/${categoryMeta.startHere.fullPath}`}
+							className="mt-2 inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+						>
+							start here →<span className="text-foreground">{categoryMeta.startHere.title}</span>
+						</Link>
+					)}
 				</div>
 			</div>
 

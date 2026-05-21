@@ -2,13 +2,52 @@ import Link from 'next/link';
 import { getAllPosts, getCategories } from '@/lib/markdown';
 import FeaturedWriteups from '@/components/home/FeaturedWriteups';
 import CopyableContactValue from '@/components/home/CopyableContactValue';
-import { getFeaturedPosts, HOME_SIGNATURE } from '@/lib/site';
+import {
+	buildMailtoHref,
+	CONTACT_EMAIL,
+	getFeaturedPosts,
+	HOME_RECRUITING_NOTE,
+	HOME_SIGNATURE,
+	RESUME_URL,
+} from '@/lib/site';
 
 export default function Home() {
 	const posts = getAllPosts();
 	const categories = getCategories();
 	const recentPosts = posts.slice(0, 5);
 	const featuredPosts = getFeaturedPosts(posts);
+	const contacts: Array<{
+		label: string;
+		value: string;
+		copyValue?: string;
+		href?: string;
+		secondaryLinks?: Array<{ label: string; href: string }>;
+	}> = [
+		{
+			label: 'mail',
+			value: `<${CONTACT_EMAIL}>`,
+			copyValue: CONTACT_EMAIL,
+			href: buildMailtoHref('collab'),
+			secondaryLinks: [
+				{ label: 'recruiter', href: buildMailtoHref('recruiter') },
+				{ label: 'collab', href: buildMailtoHref('collab') },
+			],
+		},
+		{ label: 'github', value: '@ntnam1605', href: 'https://github.com/ntnam1605' },
+		{
+			label: 'linkedin',
+			value: '/in/ntnam',
+			copyValue: 'https://www.linkedin.com/in/ntnam',
+			href: 'https://www.linkedin.com/in/ntnam',
+		},
+		{
+			label: 'facebook',
+			value: '/nam.160504',
+			href: 'https://www.facebook.com/nam.160504',
+		},
+		{ label: 'discord', value: '::usbible', copyValue: 'usbible' },
+		{ label: 'liqi', value: '~/namaewanam' },
+	];
 
 	return (
 		<div className="mx-auto w-full max-w-2xl space-y-16">
@@ -26,12 +65,18 @@ export default function Home() {
 					observability, and systems that stay calm under production pressure.
 				</p>
 
+				<div className="inline-flex items-center gap-2 rounded border border-border/80 bg-card/50 px-3 py-2 font-mono text-[11px] text-foreground/85">
+					<span className="text-primary">status</span>
+					<span className="text-border">·</span>
+					<span>{HOME_RECRUITING_NOTE}</span>
+				</div>
+
 				<div className="flex flex-wrap gap-2 pt-1">
 					<a
-						href="mailto:namisme16052004@gmail.com"
+						href={buildMailtoHref('recruiter')}
 						className="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1 font-mono text-xs transition-all hover:border-primary hover:text-primary"
 					>
-						email
+						recruiter
 					</a>
 					<a
 						href="https://github.com/ntnam1605"
@@ -40,6 +85,14 @@ export default function Home() {
 						className="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1 font-mono text-xs transition-all hover:border-primary hover:text-primary"
 					>
 						github
+					</a>
+					<a
+						href={RESUME_URL}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1 font-mono text-xs transition-all hover:border-primary hover:text-primary"
+					>
+						resume ↗
 					</a>
 					<Link
 						href="/blog"
@@ -140,28 +193,7 @@ export default function Home() {
 					Ping the inbox first. The side quests live below.
 				</p>
 				<div className="space-y-1.5">
-					{[
-						{
-							label: 'mail',
-							value: '<namisme16052004@gmail.com>',
-							copyValue: 'namisme16052004@gmail.com',
-							href: 'mailto:namisme16052004@gmail.com',
-						},
-						{ label: 'github', value: '@ntnam1605', href: 'https://github.com/ntnam1605' },
-						{
-							label: 'linkedin',
-							value: '/in/ntnam',
-							copyValue: 'https://www.linkedin.com/in/ntnam',
-							href: 'https://www.linkedin.com/in/ntnam',
-						},
-						{
-							label: 'facebook',
-							value: '/nam.160504',
-							href: 'https://www.facebook.com/nam.160504',
-						},
-						{ label: 'discord', value: '::usbible', copyValue: 'usbible', href: undefined },
-						{ label: 'liqi', value: '~/namaewanam', href: undefined },
-					].map((c) => (
+					{contacts.map((c) => (
 						<div key={c.label} className="flex items-baseline gap-3 font-mono text-sm">
 							<span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
 							{c.copyValue ? (
@@ -169,6 +201,7 @@ export default function Home() {
 									displayValue={c.value}
 									copyValue={c.copyValue}
 									{...(c.href ? { href: c.href } : {})}
+									{...(c.secondaryLinks ? { secondaryLinks: c.secondaryLinks } : {})}
 								/>
 							) : c.href ? (
 								<a

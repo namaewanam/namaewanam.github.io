@@ -2,57 +2,77 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://ntnam1605.github.io/</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/csc14005</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/java</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/logging</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/machine-learning</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ntnam1605.github.io/blog/production-notes</loc>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/spring-boot</loc>
-    <lastmod>2026-05-19T18:14:11.267Z</lastmod>
+    <lastmod>2026-05-21T14:49:39.825Z</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://ntnam1605.github.io/blog/production-notes/incident-timeline-before-fix</loc>
+    <lastmod>2026-05-21T14:49:39.766Z</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ntnam1605.github.io/blog/production-notes/retries-need-a-budget</loc>
+    <lastmod>2026-05-21T14:49:39.766Z</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ntnam1605.github.io/blog/production-notes/healthy-dashboards-stay-quiet</loc>
+    <lastmod>2026-05-21T14:49:39.766Z</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://ntnam1605.github.io/blog/csc14005/ml-lecture1-guide</loc>
-    <lastmod>2025-10-18T21:37:01+07:00</lastmod>
+    <lastmod>2026-05-20T01:18:23+07:00</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/csc14005/ml-lecture2-guide</loc>
-    <lastmod>2025-10-18T22:56:13+07:00</lastmod>
+    <lastmod>2026-05-20T01:18:23+07:00</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/csc14005/ml-lecture3-guide</loc>
-    <lastmod>2025-10-18T21:37:01+07:00</lastmod>
+    <lastmod>2026-05-20T01:18:23+07:00</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://ntnam1605.github.io/blog/csc14005/ml-lecture4-guide</loc>
-    <lastmod>2025-10-18T21:37:01+07:00</lastmod>
+    <lastmod>2026-05-20T01:18:23+07:00</lastmod>
     <priority>0.8</priority>
   </url>
   <url>

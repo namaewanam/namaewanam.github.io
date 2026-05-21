@@ -1,12 +1,12 @@
 import Link from 'next/link';
-import type { Post } from '@/lib/markdown';
+import type { BlogSearchPost } from '@/lib/markdown';
 
 export default function BlogResults({
 	posts,
 	query,
 	activeTag,
 }: Readonly<{
-	posts: Post[];
+	posts: BlogSearchPost[];
 	query: string;
 	activeTag: string;
 }>) {

@@ -5,22 +5,54 @@ export const SITE_URL = 'https://ntnam1605.github.io';
 export const STATUS_LINE = 'building boring systems';
 export const SITE_DESCRIPTION = 'Notes, articles and thoughts from a backend developer';
 export const HOME_SIGNATURE = 'I build backend systems that are boring in production.';
+export const HOME_RECRUITING_NOTE = 'Open to backend, systems, and platform roles.';
+export const CONTACT_EMAIL = 'namisme16052004@gmail.com';
 
 // Replace with the public PDF share URL for the latest resume.
 export const RESUME_URL =
 	process.env.NEXT_PUBLIC_RESUME_URL ??
 	'https://drive.google.com/file/d/your-resume-id/view?usp=sharing';
 
-export const CATEGORY_DESCRIPTIONS = {
-	csc14005: 'Lecture-backed machine learning notes, rewritten to be easier to revisit later.',
-	golang: 'Go notes for small, sharp backend building blocks and concurrency instincts.',
-	java: 'Java from the backend trenches: APIs, streams, and production-friendly patterns.',
-	logging: 'Observability notes around logs, retention, and keeping signal over noise.',
-	'machine-learning':
-		'Machine learning concepts explained like systems work: assumptions, tradeoffs, behavior.',
-	oauth2: 'Auth and authorization notes without pretending the specs are simpler than they are.',
-	'spring-boot':
-		'Spring Boot guides focused on clean APIs, service boundaries, and useful defaults.',
+const MAIL_SUBJECTS = {
+	recruiter: 'Nam | Backend Engineer Opportunity',
+	collab: 'Nam | Collaboration Idea',
+} as const;
+
+const CATEGORY_GUIDES = {
+	csc14005: {
+		description: 'Lecture-backed machine learning notes, rewritten to be easier to revisit later.',
+		startHere: 'ml-lecture1-guide',
+	},
+	golang: {
+		description: 'Go notes for small, sharp backend building blocks and concurrency instincts.',
+	},
+	java: {
+		description: 'Java from the backend trenches: APIs, streams, and production-friendly patterns.',
+		startHere: 'java-streams',
+	},
+	logging: {
+		description: 'Observability notes around logs, retention, and keeping signal over noise.',
+		startHere: 'elk-ilm-strategy-guide',
+	},
+	'machine-learning': {
+		description:
+			'Machine learning concepts explained like systems work: assumptions, tradeoffs, behavior.',
+		startHere: 'the-learning-problem',
+	},
+	oauth2: {
+		description:
+			'Auth and authorization notes without pretending the specs are simpler than they are.',
+	},
+	'production-notes': {
+		description:
+			'Short field notes for incidents, retries, dashboards, and the messy edges of production.',
+		startHere: 'incident-timeline-before-fix',
+	},
+	'spring-boot': {
+		description:
+			'Spring Boot guides focused on clean APIs, service boundaries, and useful defaults.',
+		startHere: 'spring-boot-intro',
+	},
 } as const;
 
 export const FEATURED_WRITEUP_PATHS: readonly string[] = [
@@ -54,11 +86,23 @@ export const STACK_GROUPS = [
 	},
 ] as const;
 
+export type MailSubjectKey = keyof typeof MAIL_SUBJECTS;
+
+export function buildMailtoHref(kind: MailSubjectKey = 'collab'): string {
+	const params = new URLSearchParams({ subject: MAIL_SUBJECTS[kind] });
+	return `mailto:${CONTACT_EMAIL}?${params.toString()}`;
+}
+
 export function getCategoryDescription(categorySlug: string): string {
 	return (
-		CATEGORY_DESCRIPTIONS[categorySlug.toLowerCase() as keyof typeof CATEGORY_DESCRIPTIONS] ??
+		CATEGORY_GUIDES[categorySlug.toLowerCase() as keyof typeof CATEGORY_GUIDES]?.description ??
 		'Backend notes, engineering writeups, and ideas worth revisiting.'
 	);
+}
+
+export function getCategoryStartHerePath(categorySlug: string): string | undefined {
+	const guide = CATEGORY_GUIDES[categorySlug.toLowerCase() as keyof typeof CATEGORY_GUIDES];
+	return guide && 'startHere' in guide ? guide.startHere : undefined;
 }
 
 export function toPostOgSlug(category: string, fullPath: string): string {

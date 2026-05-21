@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ShortcutHelpButton from '@/components/layout/ShortcutHelpButton';
 import { RESUME_URL, STATUS_LINE } from '@/lib/site';
 
 export default function FooterStatus() {
@@ -27,6 +28,8 @@ export default function FooterStatus() {
 				>
 					resume ↗
 				</a>
+				<span className="text-border">·</span>
+				<ShortcutHelpButton />
 			</div>
 			<p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/60">
 				status: {STATUS_LINE}

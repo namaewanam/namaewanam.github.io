@@ -5,8 +5,32 @@
     <link>https://ntnam1605.github.io</link>
     <description>Notes, articles and thoughts from a backend developer</description>
     <language>en</language>
-    <lastBuildDate>Tue, 19 May 2026 18:14:11 GMT</lastBuildDate>
+    <lastBuildDate>Thu, 21 May 2026 14:49:39 GMT</lastBuildDate>
     <atom:link href="https://ntnam1605.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Build the Incident Timeline Before the Fix</title>
+      <link>https://ntnam1605.github.io/blog/production-notes/incident-timeline-before-fix</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/production-notes/incident-timeline-before-fix</guid>
+      <pubDate>Mon, 18 May 2026 00:00:00 GMT</pubDate>
+      <description>The fastest way to waste incident time is to optimize the wrong story. Write the timeline first.</description>
+      <category>Production-Notes</category>
+    </item>
+    <item>
+      <title>Retries Need a Budget</title>
+      <link>https://ntnam1605.github.io/blog/production-notes/retries-need-a-budget</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/production-notes/retries-need-a-budget</guid>
+      <pubDate>Sat, 16 May 2026 00:00:00 GMT</pubDate>
+      <description>Retries are useful right up until they become a second outage. Give them a budget, not blind optimism.</description>
+      <category>Production-Notes</category>
+    </item>
+    <item>
+      <title>Healthy Dashboards Stay Quiet</title>
+      <link>https://ntnam1605.github.io/blog/production-notes/healthy-dashboards-stay-quiet</link>
+      <guid isPermaLink="true">https://ntnam1605.github.io/blog/production-notes/healthy-dashboards-stay-quiet</guid>
+      <pubDate>Tue, 12 May 2026 00:00:00 GMT</pubDate>
+      <description>A good dashboard should narrow your search space quickly, not wallpaper the screen with permanent anxiety.</description>
+      <category>Production-Notes</category>
+    </item>
     <item>
       <title>Lecture 1 - The Learning Problem</title>
       <link>https://ntnam1605.github.io/blog/csc14005/ml-lecture1-guide</link>
