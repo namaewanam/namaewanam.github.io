@@ -91,6 +91,164 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 			wrapper.appendChild(btn);
 		});
 
+		// ── Mermaid diagrams: replace pre>code.language-mermaid ─────
+		const mermaidBlocks = container.querySelectorAll<HTMLElement>('pre:has(code.language-mermaid)');
+		if (mermaidBlocks.length > 0) {
+			// Build theme variables for a given mode
+			const getMermaidVars = (dark: boolean) =>
+				dark
+					? {
+							darkMode: true,
+							background: 'transparent',
+							primaryColor: '#3d2a18',
+							secondaryColor: '#2e1e10',
+							tertiaryColor: '#22140a',
+							mainBkg: '#3d2a18',
+							clusterBkg: '#2a1c0d',
+							primaryBorderColor: '#6b4c30',
+							nodeBorder: '#6b4c30',
+							primaryTextColor: '#f0ead6',
+							secondaryTextColor: '#f0ead6',
+							tertiaryTextColor: '#f0ead6',
+							textColor: '#f0ead6',
+							titleColor: '#fccb26',
+							lineColor: '#9c876a',
+							edgeLabelBackground: '#2a1c0d',
+							actorBkg: '#3d2a18',
+							actorTextColor: '#f0ead6',
+							actorLineColor: '#6b4c30',
+							signalColor: '#9c876a',
+							signalTextColor: '#f0ead6',
+							labelBoxBkgColor: '#2e1e10',
+							labelBoxBorderColor: '#6b4c30',
+							labelTextColor: '#f0ead6',
+							loopTextColor: '#f0ead6',
+							noteBkgColor: '#2e1e10',
+							noteBorderColor: '#fccb26',
+							noteTextColor: '#f0ead6',
+							activationBkgColor: '#2e1e10',
+							activationBorderColor: '#fccb26',
+							git0: '#fccb26',
+							git1: '#f18231',
+							git2: '#7dd3fc',
+							git3: '#86efac',
+							git4: '#c4b5fd',
+							git5: '#f87171',
+							gitBranchLabel0: '#1a0f06',
+							gitBranchLabel1: '#1a0f06',
+							gitBranchLabel2: '#1a0f06',
+							gitBranchLabel3: '#1a0f06',
+						}
+					: {
+							darkMode: false,
+							background: 'transparent',
+							primaryColor: '#fef3d8',
+							secondaryColor: '#fde8b8',
+							tertiaryColor: '#fdf5e8',
+							mainBkg: '#fef3d8',
+							primaryBorderColor: '#d48a20',
+							nodeBorder: '#d48a20',
+							primaryTextColor: '#2a1f0e',
+							secondaryTextColor: '#2a1f0e',
+							textColor: '#2a1f0e',
+							titleColor: '#c27a1a',
+							lineColor: '#6b5c44',
+							edgeLabelBackground: '#fdf5e8',
+							actorBkg: '#fef3d8',
+							actorTextColor: '#2a1f0e',
+							actorLineColor: '#d48a20',
+							signalColor: '#6b5c44',
+							signalTextColor: '#2a1f0e',
+							noteBkgColor: '#fff8e8',
+							noteBorderColor: '#d48a20',
+							noteTextColor: '#2a1f0e',
+							labelTextColor: '#2a1f0e',
+							loopTextColor: '#2a1f0e',
+							git0: '#d48a20',
+							git1: '#c27a1a',
+							git2: '#2563eb',
+							git3: '#059669',
+							git4: '#7c3aed',
+							git5: '#dc2626',
+						};
+
+			// Re-render all .mermaid-diagram wrappers using stored source
+			let renderCounter = 0;
+			const reRenderAll = async (dark: boolean) => {
+				try {
+					const mermaid = (await import('mermaid')).default;
+					mermaid.initialize({
+						startOnLoad: false,
+						theme: 'base',
+						themeVariables: getMermaidVars(dark),
+						securityLevel: 'loose',
+					});
+					const wrappers = container.querySelectorAll<HTMLElement>('.mermaid-diagram[data-src]');
+					for (const wrapper of wrappers) {
+						const src = wrapper.getAttribute('data-src');
+						if (!src) continue;
+						const uid = `mermaid-rc-${++renderCounter}`;
+						try {
+							const { svg } = await mermaid.render(uid, src);
+							wrapper.innerHTML = svg;
+						} catch (err) {
+							console.warn('Mermaid re-render failed:', err);
+						}
+					}
+				} catch (err) {
+					console.warn('Mermaid not available:', err);
+				}
+			};
+
+			// Initial render — replace pre blocks with wrappers that store src
+			void (async () => {
+				try {
+					const mermaid = (await import('mermaid')).default;
+					const isDark = document.documentElement.classList.contains('dark');
+					mermaid.initialize({
+						startOnLoad: false,
+						theme: 'base',
+						themeVariables: getMermaidVars(isDark),
+						securityLevel: 'loose',
+					});
+
+					let idx = 0;
+					for (const pre of mermaidBlocks) {
+						const code = pre.querySelector<HTMLElement>('code.language-mermaid');
+						if (!code) continue;
+						const diagram = code.textContent ?? '';
+						const uid = `mermaid-init-${idx++}`;
+						try {
+							const { svg } = await mermaid.render(uid, diagram);
+							const wrapper = document.createElement('div');
+							wrapper.className =
+								'mermaid-diagram my-6 flex justify-center overflow-x-auto rounded border border-border bg-card/40 p-4';
+							wrapper.setAttribute('role', 'img');
+							wrapper.setAttribute('aria-label', 'Diagram');
+							// Store source so we can re-render on theme change
+							wrapper.setAttribute('data-src', diagram);
+							wrapper.innerHTML = svg;
+							pre.replaceWith(wrapper);
+						} catch (err) {
+							console.warn('Mermaid render failed:', err);
+						}
+					}
+				} catch (err) {
+					console.warn('Mermaid not available:', err);
+				}
+			})();
+
+			// Re-render diagrams when site theme toggles
+			const themeObserver = new MutationObserver(() => {
+				const dark = document.documentElement.classList.contains('dark');
+				void reRenderAll(dark);
+			});
+			themeObserver.observe(document.documentElement, {
+				attributes: true,
+				attributeFilter: ['class'],
+			});
+		}
+
 		// ── Heading anchors: add # link to h2/h3 ────────────────────
 		const headings = container.querySelectorAll('h2[id], h3[id]');
 		headings.forEach((heading) => {

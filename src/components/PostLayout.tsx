@@ -2,6 +2,7 @@ import Link from 'next/link';
 import MarkdownContent from '@/components/MarkdownContent';
 import TableOfContents from '@/components/TableOfContents';
 import RelatedPosts from '@/components/blog/RelatedPosts';
+import GiscusComments from '@/components/GiscusComments';
 import type { Post, AdjacentPosts } from '@/lib/markdown';
 import type { Heading } from '@/lib/mdx';
 
@@ -136,6 +137,19 @@ export default function PostLayout({
 								</span>
 							</>
 						)}
+						{post.difficulty && (
+							<>
+								<span className="text-border">·</span>
+								<span className="difficulty-badge" data-level={post.difficulty}>
+									{post.difficulty === 'beginner'
+										? '○'
+										: post.difficulty === 'intermediate'
+											? '◑'
+											: '●'}{' '}
+									{post.difficulty}
+								</span>
+							</>
+						)}
 					</div>
 
 					<h1 className="text-xl font-bold leading-tight text-foreground sm:text-2xl">
@@ -222,6 +236,20 @@ export default function PostLayout({
 						← back to {post.categoryName.replace(/-/g, ' ').toLowerCase()}
 					</Link>
 				</div>
+
+				{/* Giscus comments — powered by GitHub Discussions */}
+				<GiscusComments
+					repo="namaewanam/namaewanam.github.io"
+					repoId="R_kgDOQCxDSQ"
+					category="Announcements"
+					categoryId="DIC_kwDOQCxDSc4C9rol"
+					mapping="pathname"
+					strict="0"
+					reactionsEnabled="1"
+					emitMetadata="0"
+					inputPosition="bottom"
+					lang="en"
+				/>
 			</div>
 
 			{hasTableOfContents && (

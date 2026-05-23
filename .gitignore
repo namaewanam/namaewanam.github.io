@@ -39,3 +39,7 @@ next-env.d.ts
 
 # Generated content manifests
 public/_content/post-metadata.json
+
+# Environment variables
+.env.local
+.env*.local

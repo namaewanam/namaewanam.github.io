@@ -28,6 +28,8 @@ export interface Post {
 	readingTimeMin: number;
 	codePercent: number;
 	lastUpdated?: string;
+	difficulty?: 'beginner' | 'intermediate' | 'advanced';
+	featured?: boolean;
 }
 
 export interface Category {
@@ -314,6 +316,13 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 		if (data.description) post.description = String(data.description);
 		if (data.order !== undefined) post.order = Number(data.order);
 		if (lastUpdated) post.lastUpdated = lastUpdated;
+		if (
+			data.difficulty &&
+			['beginner', 'intermediate', 'advanced'].includes(String(data.difficulty))
+		) {
+			post.difficulty = String(data.difficulty) as 'beginner' | 'intermediate' | 'advanced';
+		}
+		if (data.featured) post.featured = Boolean(data.featured);
 
 		return post;
 	} catch (error) {

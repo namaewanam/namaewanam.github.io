@@ -8,7 +8,7 @@ import { KNOWN_COMMANDS } from '@/lib/not-found-terminal';
  */
 const C = {
 	gold: '#fccb26', // prompt (in parent), directories
-	cmd: '#f5f4d5', // known command name — Shank cream, clearly lighter than gold
+	cmd: '#6ee7b7', // known command name — emerald, fish-shell "valid cmd" style
 	orange: '#f18231', // flags --flag -n
 	sky: '#7dd3fc', // paths, URLs
 	cyan: '#67e8f9', // numbers

@@ -1,0 +1,25 @@
+/*
+ * Giscus light theme override — minimal, on top of Giscus's "light" base.
+ * Only adjust the accent color to match Shank primary (warm orange).
+ * All other styling uses Giscus's well-polished "light" defaults.
+ *
+ * Giscus fetches this via: ?theme=<url>
+ * It applies on top of the built-in "light" theme.
+ */
+
+/* Import Giscus's own light base — we build on top of it */
+@import url('https://giscus.app/themes/light.css');
+
+:root {
+	/* Shank orange as the accent — replaces GitHub blue */
+	--color-accent-fg: #c27a1a;
+	--color-accent-emphasis: #d48a20;
+	--color-accent-subtle: rgba(212, 138, 32, 0.08);
+
+	--color-btn-primary-bg: #d48a20;
+	--color-btn-primary-hover-bg: #c27a1a;
+	--color-btn-primary-border: rgba(0, 0, 0, 0.15);
+	--color-btn-primary-text: #fff;
+
+	--color-reactions-button-bg-hover: rgba(212, 138, 32, 0.08);
+}

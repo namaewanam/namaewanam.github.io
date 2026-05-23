@@ -610,6 +610,172 @@ h3:hover .heading-anchor {
 	color: hsl(var(--accent));
 }
 
+.callout-caution {
+	border-left-color: #c0392b;
+}
+.callout-caution .callout-title {
+	color: #c0392b;
+}
+
+/* ── Backend-specific callout types ─────────────────────────── */
+
+.callout-architecture {
+	border-left-color: #7c3aed; /* violet */
+}
+.callout-architecture .callout-title {
+	color: #7c3aed;
+}
+
+.callout-gotcha {
+	border-left-color: #d97706; /* amber */
+}
+.callout-gotcha .callout-title {
+	color: #d97706;
+}
+
+.callout-tradeoff {
+	border-left-color: #0891b2; /* cyan */
+}
+.callout-tradeoff .callout-title {
+	color: #0891b2;
+}
+
+.callout-production {
+	border-left-color: #059669; /* emerald */
+}
+.callout-production .callout-title {
+	color: #059669;
+}
+
+.callout-deep-dive {
+	border-left-color: #2563eb; /* blue */
+}
+.callout-deep-dive .callout-title {
+	color: #2563eb;
+}
+
+.dark .callout-architecture .callout-title {
+	color: #a78bfa;
+}
+.dark .callout-gotcha .callout-title {
+	color: #fbbf24;
+}
+.dark .callout-tradeoff .callout-title {
+	color: #22d3ee;
+}
+.dark .callout-production .callout-title {
+	color: #34d399;
+}
+.dark .callout-deep-dive .callout-title {
+	color: #60a5fa;
+}
+.dark .callout-caution .callout-title {
+	color: #f87171;
+}
+
+.dark .callout-architecture {
+	border-left-color: #a78bfa;
+}
+.dark .callout-gotcha {
+	border-left-color: #fbbf24;
+}
+.dark .callout-tradeoff {
+	border-left-color: #22d3ee;
+}
+.dark .callout-production {
+	border-left-color: #34d399;
+}
+.dark .callout-deep-dive {
+	border-left-color: #60a5fa;
+}
+.dark .callout-caution {
+	border-left-color: #f87171;
+}
+
+.callout-icon {
+	margin-right: 0.4em;
+	font-style: normal;
+}
+
+/* ── Code diff view: +/- line highlighting ──────────────────── */
+/* Works automatically with rehype-highlight on ```diff blocks   */
+
+.hljs-addition,
+.prose .hljs-addition {
+	background: rgba(16, 185, 129, 0.12);
+	display: inline-block;
+	width: 100%;
+	border-left: 2px solid #10b981;
+	padding-left: 0.5em;
+	margin-left: -0.5em;
+}
+
+.hljs-deletion,
+.prose .hljs-deletion {
+	background: rgba(239, 68, 68, 0.12);
+	display: inline-block;
+	width: 100%;
+	border-left: 2px solid #ef4444;
+	padding-left: 0.5em;
+	margin-left: -0.5em;
+}
+
+.dark .hljs-addition {
+	background: rgba(52, 211, 153, 0.1);
+}
+.dark .hljs-deletion {
+	background: rgba(248, 113, 113, 0.1);
+}
+
+/* ── Difficulty badge ───────────────────────────────────────── */
+
+.difficulty-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3em;
+	padding: 0.15em 0.65em;
+	border-radius: 9999px;
+	font-family: var(--font-mono), monospace;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	border: 1px solid;
+}
+
+.difficulty-badge[data-level='beginner'] {
+	color: #059669;
+	border-color: #059669;
+	background: rgba(5, 150, 105, 0.08);
+}
+
+.difficulty-badge[data-level='intermediate'] {
+	color: #d97706;
+	border-color: #d97706;
+	background: rgba(217, 119, 6, 0.08);
+}
+
+.difficulty-badge[data-level='advanced'] {
+	color: #dc2626;
+	border-color: #dc2626;
+	background: rgba(220, 38, 38, 0.08);
+}
+
+.dark .difficulty-badge[data-level='beginner'] {
+	color: #34d399;
+	border-color: #34d399;
+	background: rgba(52, 211, 153, 0.1);
+}
+.dark .difficulty-badge[data-level='intermediate'] {
+	color: #fbbf24;
+	border-color: #fbbf24;
+	background: rgba(251, 191, 36, 0.1);
+}
+.dark .difficulty-badge[data-level='advanced'] {
+	color: #f87171;
+	border-color: #f87171;
+	background: rgba(248, 113, 113, 0.1);
+}
+
 /* Scroll margin for sticky header clearance */
 h2[id],
 h3[id] {

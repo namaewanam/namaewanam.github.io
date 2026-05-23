@@ -17,7 +17,7 @@ const T = {
 	cream: '#f0ead6', //     default output text
 	hintDim: 'rgba(240,234,214,0.45)', // dim hint text
 	gold: '#fccb26', //      prompt, directories
-	cmd: '#f5f4d5', //       known command name (brighter than gold, Shank cream)
+	cmd: '#6ee7b7', //       known command name — emerald (fish-shell style "valid cmd")
 	orange: '#f18231', //    flags/options (-n, --flag), Shank orange
 	green: '#86efac', //     command typed by user (base)
 	red: '#f87171', //       errors, unknown commands

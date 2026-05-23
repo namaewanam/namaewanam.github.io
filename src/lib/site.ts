@@ -1,17 +1,16 @@
 import type { Post } from '@/lib/markdown';
 
 export const SITE_NAME = 'nam';
-export const SITE_URL = 'https://ntnam1605.github.io';
+export const SITE_URL = 'https://namaewanam.github.io';
 export const STATUS_LINE = 'building boring systems';
 export const SITE_DESCRIPTION = 'Notes, articles and thoughts from a backend developer';
 export const HOME_SIGNATURE = 'I build backend systems that are boring in production.';
 export const HOME_RECRUITING_NOTE = 'Open to backend, systems, and platform roles.';
 export const CONTACT_EMAIL = 'namisme16052004@gmail.com';
 
-// Replace with the public PDF share URL for the latest resume.
-export const RESUME_URL =
-	process.env.NEXT_PUBLIC_RESUME_URL ??
-	'https://drive.google.com/file/d/your-resume-id/view?usp=sharing';
+// Local CV PDF served from /public. Override with NEXT_PUBLIC_RESUME_URL env var
+// to point to a Google Drive share link in production.
+export const RESUME_URL = process.env.NEXT_PUBLIC_RESUME_URL ?? '/cv.pdf';
 
 const MAIL_SUBJECTS = {
 	recruiter: 'Nam | Backend Engineer Opportunity',
@@ -64,24 +63,23 @@ export const FEATURED_WRITEUP_PATHS: readonly string[] = [
 export const STACK_GROUPS = [
 	{
 		title: 'reach for',
-		description:
-			'The tools I default to when I want boring delivery and clear operational behavior.',
-		items: ['Go', 'Java', 'Spring Boot', 'PostgreSQL', 'Redis', 'Docker'],
+		description: 'The tools I default to when I need reliable, maintainable backend systems.',
+		items: ['Java', 'Spring Boot', 'PostgreSQL', 'Redis', 'Docker', 'Linux'],
 	},
 	{
 		title: 'comfortable with',
-		description: 'Things I can move quickly with once the problem calls for them.',
-		items: ['Kafka', 'REST APIs', 'Event-driven systems', 'CQRS / ES', 'Kubernetes', 'Tracing'],
+		description: 'Tools I can move quickly with once the problem calls for them.',
+		items: ['Python', 'FastAPI', 'Apache Kafka', 'Keycloak / OAuth2', 'Jenkins CI/CD', 'GitLab CI'],
 	},
 	{
 		title: 'exploring now',
 		description:
 			'Current rabbit holes: sharpening system design instincts, not collecting buzzwords.',
 		items: [
-			'Axon Framework',
+			'Event sourcing / CQRS',
 			'Distributed tracing',
-			'Elasticsearch retention',
-			'TypeScript ergonomics',
+			'Observability patterns',
+			'Microservices resilience',
 		],
 	},
 ] as const;

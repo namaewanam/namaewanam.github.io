@@ -57,7 +57,9 @@ export default function Home() {
 				<div className="space-y-1">
 					<p className="font-mono text-xs uppercase tracking-widest text-primary">whoami</p>
 					<h1 className="text-2xl font-bold leading-tight text-foreground sm:text-3xl">Nam</h1>
-					<p className="font-mono text-sm text-muted-foreground">backend engineer · vietnam</p>
+					<p className="font-mono text-sm text-muted-foreground">
+						junior backend engineer · ho chi minh city
+					</p>
 				</div>
 				<p className="font-mono text-sm text-foreground sm:text-base">{HOME_SIGNATURE}</p>
 
@@ -113,27 +115,33 @@ export default function Home() {
 					<p>
 						I&apos;m a backend developer who loves designing systems that are boring in the best way
 						— predictable, observable, and maintainable. My stack leans toward{' '}
-						<span className="font-medium text-foreground">Go</span>,{' '}
 						<span className="font-medium text-foreground">Java / Spring Boot</span>, and whatever
 						database fits the problem.
 					</p>
 					<p>
-						Currently exploring event-driven architectures, CQRS/ES with Axon Framework, and
-						squeezing more signal out of distributed tracing.
+						Currently working on high-throughput payment microservices at Endava Vietnam,
+						implementing structured logging, CI/CD pipelines, and distributed observability.
 					</p>
 				</div>
 
 				<div className="flex flex-wrap gap-1.5 pt-1">
-					{['Go', 'Java', 'Spring Boot', 'PostgreSQL', 'Redis', 'Kafka', 'Docker', 'K8s'].map(
-						(t) => (
-							<span
-								key={t}
-								className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
-							>
-								{t}
-							</span>
-						)
-					)}
+					{[
+						'Java',
+						'Spring Boot',
+						'Python',
+						'PostgreSQL',
+						'Redis',
+						'Kafka',
+						'Docker',
+						'Keycloak',
+					].map((t) => (
+						<span
+							key={t}
+							className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+						>
+							{t}
+						</span>
+					))}
 				</div>
 			</section>
 
@@ -176,27 +184,27 @@ export default function Home() {
 				<div className="space-y-5">
 					{[
 						{
-							role: 'Software Engineer',
+							role: 'Junior Software Engineer',
 							org: 'Endava Vietnam',
 							period: 'Feb 2026 – Present',
-							desc: 'Working on a banking platform using Spring Boot 3 and Axon Framework for event-driven microservices. Built an audit-safe payment service with CQRS and event sourcing.',
+							desc: 'Developing and maintaining MPGS (Mastercard Payment Gateway Services) microservices. Spring Boot + PostgreSQL, Jenkins CI/CD on Linux, structured logging and monitoring for production observability.',
 						},
 						{
-							role: 'Java Software Engineer Intern',
+							role: 'Java Software Developer Intern',
 							org: 'Endava Vietnam',
 							period: 'Nov 2025 – Jan 2026',
-							desc: 'REST APIs and internal tooling in Spring Boot. Java 21, Axon Framework.',
+							desc: 'Internal financial management system with Spring Boot, Keycloak, Apache POI, PostgreSQL. Docker Compose + GitLab CI/CD pipelines.',
 						},
 						{
-							role: 'Student',
+							role: 'B.Sc. Information Technology · CPA 3.57/4.0',
 							org: 'VNUHCM — University of Science',
 							period: 'Oct 2022 – Oct 2026',
-							desc: 'Major in Software Engineering. Learning fundamentals in systems, algorithms, and distributed computing.',
+							desc: 'Software Engineering major. Coursework: Software Architecture, Data Structures & Algorithms, Database Systems, DevOps Fundamentals.',
 						},
 					].map((exp) => (
 						<div
 							key={exp.role}
-							className="grid grid-cols-1 gap-1 sm:grid-cols-[140px_1fr] sm:gap-4"
+							className="grid grid-cols-1 gap-1 sm:grid-cols-[160px_1fr] sm:gap-4"
 						>
 							<span className="shrink-0 font-mono text-[11px] text-foreground/60">
 								{exp.period}
@@ -212,6 +220,51 @@ export default function Home() {
 							</div>
 						</div>
 					))}
+				</div>
+			</section>
+
+			<hr className="border-border" />
+
+			{/* ── Projects ── */}
+			<section id="projects" className="space-y-5">
+				<p className="font-mono text-xs uppercase tracking-widest text-primary">projects</p>
+				<div className="space-y-3 rounded border border-border/70 bg-card/40 px-5 py-4">
+					<div className="flex flex-wrap items-start justify-between gap-2">
+						<div>
+							<h2 className="text-sm font-semibold text-foreground">
+								Bainansu — Financial Analysis Platform
+							</h2>
+							<p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+								Lead Backend Developer · Jul 2025 – Sep 2025
+							</p>
+						</div>
+						<a
+							href="https://github.com/ntnam1605/bainansu"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="font-mono text-xs text-muted-foreground transition-colors hover:text-primary"
+						>
+							github ↗
+						</a>
+					</div>
+					<p className="text-xs leading-relaxed text-foreground/70 sm:text-sm">
+						8+ microservices (Spring Boot + FastAPI) with real-time financial data delivery via
+						Apache Kafka + WebSocket connected to the Binance API. Celery + RabbitMQ + Redis async
+						task queue. Full auth (Keycloak), payments (VNPay, Stripe), and Docker Compose
+						infrastructure.
+					</p>
+					<div className="flex flex-wrap gap-1.5 pt-1">
+						{['Spring Boot', 'FastAPI', 'Kafka', 'WebSocket', 'Redis', 'Keycloak', 'Docker'].map(
+							(t) => (
+								<span
+									key={t}
+									className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+								>
+									{t}
+								</span>
+							)
+						)}
+					</div>
 				</div>
 			</section>
 

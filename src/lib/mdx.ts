@@ -24,15 +24,29 @@ const processor = unified()
 	.use(rehypeHighlight, { detect: true, ignoreMissing: true })
 	.use(rehypeStringify);
 
+const CALLOUT_ICONS: Record<string, string> = {
+	note: '📝',
+	tip: '💡',
+	warning: '⚠️',
+	important: '🔔',
+	caution: '🚨',
+	architecture: '🏗️',
+	gotcha: '🪤',
+	tradeoff: '⚖️',
+	production: '🚀',
+	'deep-dive': '🔬',
+};
+
 function transformCallouts(html: string): string {
-	return html.replace(
-		/<blockquote>\s*<p>\[!(NOTE|TIP|WARNING|IMPORTANT)\]([\s\S]*?)<\/p>\s*<\/blockquote>/gi,
-		(_, rawType: string, rawBody: string) => {
-			const type = rawType.toLowerCase();
-			const body = rawBody.trim();
-			return `<aside class="callout callout-${type}"><p class="callout-title">${type}</p><div class="callout-body">${body}</div></aside>`;
-		}
-	);
+	const pattern =
+		/\u003cblockquote\u003e\s*\u003cp\u003e\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION|ARCHITECTURE|GOTCHA|TRADEOFF|PRODUCTION|DEEP-DIVE)\]([\s\S]*?)\u003c\/p\u003e\s*\u003c\/blockquote\u003e/gi;
+
+	return html.replace(pattern, (_, rawType: string, rawBody: string) => {
+		const type = rawType.toLowerCase();
+		const icon = CALLOUT_ICONS[type] ?? '';
+		const body = rawBody.trim();
+		return `<aside class="callout callout-${type}"><p class="callout-title"><span class="callout-icon" aria-hidden="true">${icon}</span>${type.replace('-', '\u2011')}</p><div class="callout-body">${body}</div></aside>`;
+	});
 }
 
 export async function renderMarkdown(content: string): Promise<string> {

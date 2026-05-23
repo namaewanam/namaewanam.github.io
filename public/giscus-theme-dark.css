@@ -1,0 +1,24 @@
+/*
+ * Giscus dark theme override — minimal, on top of Giscus's "dark_dimmed" base.
+ * Only adjust accent + make background transparent so site bg shows through.
+ *
+ * transparent_dark makes the iframe bg transparent — the site's card/bg color
+ * shows through, giving natural integration without fighting the palette.
+ */
+
+/* Import Giscus's transparent_dark base — bg is transparent, adapts to site */
+@import url('https://giscus.app/themes/transparent_dark.css');
+
+:root {
+	/* Shank gold as the accent — replaces GitHub blue */
+	--color-accent-fg: #fccb26;
+	--color-accent-emphasis: #e8b820;
+	--color-accent-subtle: rgba(252, 203, 38, 0.1);
+
+	--color-btn-primary-bg: #d48a20;
+	--color-btn-primary-hover-bg: #c27a1a;
+	--color-btn-primary-border: rgba(0, 0, 0, 0.2);
+	--color-btn-primary-text: #f0ead6;
+
+	--color-reactions-button-bg-hover: rgba(252, 203, 38, 0.1);
+}

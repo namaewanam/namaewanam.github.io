@@ -142,7 +142,7 @@ export function buildOgImage({
 						}}
 					>
 						<div style={{ display: 'flex' }}>{path}</div>
-						<div style={{ display: 'flex' }}>ntnam1605.github.io</div>
+						<div style={{ display: 'flex' }}>namaewanam.github.io</div>
 					</div>
 				</div>
 			</div>
