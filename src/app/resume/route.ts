@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-static';
+
 const RESUME_TEXT = `
 \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
 \u2502  Nguyen Thanh Nam \u2014 Backend Engineer            \u2502
@@ -77,15 +79,6 @@ LINKS
 `.trim();
 
 export function GET(request: Request) {
-	const ua = request.headers.get('user-agent') ?? '';
-	// If not a browser, return plain text (curl, wget, httpie, etc.)
-	const isBrowser = /mozilla|chrome|safari|opera|edge/i.test(ua);
-
-	if (isBrowser) {
-		// Redirect browsers to the PDF
-		return NextResponse.redirect(new URL('/cv.pdf', request.url));
-	}
-
 	return new NextResponse(RESUME_TEXT + '\n', {
 		headers: {
 			'Content-Type': 'text/plain; charset=utf-8',
