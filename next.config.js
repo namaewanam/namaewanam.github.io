@@ -4,13 +4,13 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 });
 
 const nextConfig = {
-	// ── Output ──────────────────────────────────────────────────────────────
+	// Output
 	// Static HTML export for GitHub Pages CDN hosting.
 	// Keep dev mode on the normal Next.js server so invalid dynamic params
 	// can fall through to the app's not-found handling instead of hard errors.
 	output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
 
-	// ── Performance ─────────────────────────────────────────────────────────
+	// Performance
 	compress: true,
 	reactStrictMode: true,
 	productionBrowserSourceMaps: false,

@@ -4,7 +4,7 @@
 
 @layer base {
 	:root {
-		/* ── Shank Color Palette — Light Mode ─────────────────────────────── */
+		/* Shank Color Palette — Light Mode */
 		--background: 56 67% 90%; /* #f5f4d5 cream */
 		--foreground: 27 54% 30%; /* #765023 dark brown */
 		--card: 56 55% 93%;
@@ -28,7 +28,7 @@
 	}
 
 	.dark {
-		/* ── Shank Color Palette — Dark Mode ──────────────────────────────── */
+		/* Shank Color Palette — Dark Mode */
 		--background: 27 50% 8%;
 		--foreground: 56 50% 88%; /* #f5f4d5 cream toned */
 		--card: 27 42% 12%;
@@ -84,7 +84,7 @@
 	}
 }
 
-/* ── Scrollbar ───────────────────────────────────────────────────────── */
+/* Scrollbar */
 ::-webkit-scrollbar {
 	width: 5px;
 	height: 5px;
@@ -99,13 +99,13 @@
 	@apply bg-primary/60;
 }
 
-/* ── Selection ───────────────────────────────────────────────────────── */
+/* Selection */
 ::selection {
 	background: hsl(var(--primary) / 0.3);
 	color: hsl(var(--foreground));
 }
 
-/* ── Page Transitions ────────────────────────────────────────────────── */
+/* Page Transitions */
 @keyframes page-enter {
 	from {
 		opacity: 0;
@@ -125,7 +125,7 @@
    Code blocks — optimized for backend-developer readability
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Code block wrapper (injected by CodeCopyInjector) ─── */
+/* Code block wrapper (injected by CodeCopyInjector) */
 .code-block-wrapper {
 	position: relative;
 	margin: 1.5rem 0;
@@ -215,14 +215,14 @@ pre:not(.code-block-wrapper pre) {
 	line-height: 1.7;
 }
 
-/* ── Base hljs ─── */
+/* Base hljs */
 .hljs {
 	background: transparent !important;
 	color: hsl(var(--foreground) / 0.9) !important;
 	font-size: inherit;
 }
 
-/* ── Light mode tokens ─── */
+/* Light mode tokens */
 :root .hljs-keyword,
 :root .hljs-selector-tag,
 :root .hljs-type {
@@ -294,7 +294,7 @@ pre:not(.code-block-wrapper pre) {
 	color: hsl(var(--foreground) / 0.7);
 }
 
-/* ── Dark mode tokens ─── */
+/* Dark mode tokens */
 .dark .hljs-keyword,
 .dark .hljs-selector-tag,
 .dark .hljs-type {
@@ -617,7 +617,7 @@ h3:hover .heading-anchor {
 	color: #c0392b;
 }
 
-/* ── Backend-specific callout types ─────────────────────────── */
+/* Backend-specific callout types */
 
 .callout-architecture {
 	border-left-color: #7c3aed; /* violet */
@@ -697,7 +697,7 @@ h3:hover .heading-anchor {
 	font-style: normal;
 }
 
-/* ── Code diff view: +/- line highlighting ──────────────────── */
+/* Code diff view: +/- line highlighting */
 /* Works automatically with rehype-highlight on ```diff blocks   */
 
 .hljs-addition,
@@ -727,7 +727,7 @@ h3:hover .heading-anchor {
 	background: rgba(248, 113, 113, 0.1);
 }
 
-/* ── Difficulty badge ───────────────────────────────────────── */
+/* Difficulty badge */
 
 .difficulty-badge {
 	display: inline-flex;
@@ -780,4 +780,149 @@ h3:hover .heading-anchor {
 h2[id],
 h3[id] {
 	scroll-margin-top: 5rem;
+}
+
+/* Footnotes */
+
+.footnotes {
+	margin-top: 3rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid hsl(var(--border));
+	font-size: 0.8125rem;
+	color: hsl(var(--muted-foreground));
+	line-height: 1.7;
+}
+
+.footnotes > ol {
+	padding-left: 1.25rem;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.footnotes p {
+	margin: 0;
+	display: inline;
+}
+
+/* Back-ref "↩" link */
+.footnotes a[data-footnote-backref] {
+	font-family: var(--font-mono), monospace;
+	font-size: 0.7rem;
+	margin-left: 0.3em;
+	color: hsl(var(--primary));
+	text-decoration: none;
+	opacity: 0.7;
+	transition: opacity 0.15s;
+}
+.footnotes a[data-footnote-backref]:hover {
+	opacity: 1;
+}
+
+/* Inline footnote ref "[1]" superscript */
+a[data-footnote-ref] {
+	font-family: var(--font-mono), monospace;
+	font-size: 0.65rem;
+	color: hsl(var(--primary));
+	text-decoration: none;
+	vertical-align: super;
+	line-height: 0;
+	padding: 0 0.1em;
+	border-bottom: 1px solid hsl(var(--primary) / 0.4);
+	transition:
+		color 0.15s,
+		border-color 0.15s;
+}
+a[data-footnote-ref]:hover {
+	color: hsl(var(--accent));
+	border-color: hsl(var(--accent));
+}
+
+/* Highlight target footnote when jumped to */
+:target {
+	background: hsl(var(--primary) / 0.08);
+	border-radius: 4px;
+	outline: none;
+}
+
+/* Image / Diagram Lightbox */
+
+.lightbox-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	background: hsl(var(--background) / 0.95);
+	backdrop-filter: blur(6px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: zoom-out;
+	animation: lightbox-in 0.18s ease;
+}
+
+@keyframes lightbox-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.lightbox-overlay img,
+.lightbox-overlay svg {
+	max-width: 92vw;
+	max-height: 88vh;
+	border-radius: 6px;
+	box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+	cursor: default;
+	pointer-events: none;
+}
+
+.lightbox-close {
+	position: fixed;
+	top: 1.25rem;
+	right: 1.5rem;
+	color: hsl(var(--foreground));
+	font-size: 1.75rem;
+	line-height: 1;
+	background: none;
+	border: none;
+	cursor: pointer;
+	opacity: 0.7;
+	transition: opacity 0.15s;
+	font-family: var(--font-mono), monospace;
+}
+.lightbox-close:hover {
+	opacity: 1;
+}
+
+/* Make zoomable images look clickable */
+.prose img,
+.mermaid-diagram {
+	cursor: zoom-in;
+}
+
+/* Mermaid diagram action bar */
+
+.mermaid-diagram {
+	position: relative;
+	flex-direction: column;
+	cursor: default;
+}
+
+.mermaid-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.4rem;
+	padding-top: 0.5rem;
+	border-top: 1px solid hsl(var(--border) / 0.5);
+	margin-top: 0.75rem;
+	width: 100%;
+}
+
+.mermaid-actions button:hover {
+	color: hsl(var(--foreground));
+	border-color: hsl(var(--primary) / 0.5);
 }

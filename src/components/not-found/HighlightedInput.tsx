@@ -41,7 +41,7 @@ function highlightTokens(value: string): React.ReactNode[] {
 			return <span key={i}>{part}</span>;
 		}
 
-		// ── First word = command name ──────────────────────────────────
+		// First word = command name
 		if (isFirstWord) {
 			isFirstWord = false;
 			const isKnown = KNOWN_COMMANDS.has(part.toLowerCase());
@@ -52,7 +52,7 @@ function highlightTokens(value: string): React.ReactNode[] {
 			);
 		}
 
-		// ── Paths / URLs ───────────────────────────────────────────────
+		// Paths / URLs
 		if (part.startsWith('/') || part.startsWith('http') || part.startsWith('mailto:')) {
 			return (
 				<span key={i} style={{ color: C.sky }}>
@@ -61,7 +61,7 @@ function highlightTokens(value: string): React.ReactNode[] {
 			);
 		}
 
-		// ── Flags (--flag or -n) ────────────────────────────────────────
+		// Flags (--flag or -n)
 		if (/^--?[a-zA-Z]/.test(part)) {
 			return (
 				<span key={i} style={{ color: C.orange }}>
@@ -70,7 +70,7 @@ function highlightTokens(value: string): React.ReactNode[] {
 			);
 		}
 
-		// ── Numbers ────────────────────────────────────────────────────
+		// Numbers
 		if (/^\d+(\.\d+)?$/.test(part)) {
 			return (
 				<span key={i} style={{ color: C.cyan }}>
@@ -79,7 +79,7 @@ function highlightTokens(value: string): React.ReactNode[] {
 			);
 		}
 
-		// ── Default ────────────────────────────────────────────────────
+		// Default
 		return (
 			<span key={i} style={{ color: C.cream }}>
 				{part}

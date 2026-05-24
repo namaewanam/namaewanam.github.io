@@ -48,7 +48,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			return <span key={i}>{token}</span>;
 		}
 
-		// ── First word of a typed command → gold command name ──────────
+		// First word of a typed command → gold command name
 		if (isFirstWord) {
 			isFirstWord = false;
 			const isKnown = KNOWN_COMMANDS.has(token.toLowerCase());
@@ -59,7 +59,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Paths and URLs → sky blue ──────────────────────────────────
+		// Paths and URLs → sky blue
 		if (token.startsWith('/') || token.startsWith('http') || token.startsWith('mailto:')) {
 			return (
 				<span key={i} style={{ color: T.sky }}>
@@ -68,7 +68,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Directory token (word ending with /) → gold ────────────────
+		// Directory token (word ending with /) → gold
 		if (token.endsWith('/') && token.length > 1) {
 			return (
 				<span key={i} style={{ color: T.gold }}>
@@ -77,7 +77,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Bracket tags: [warn] [info] [error] [debug] ───────────────
+		// Bracket tags: [warn] [info] [error] [debug]
 		if (/^\[warn\]$/.test(token))
 			return (
 				<span key={i} style={{ color: T.amber }}>
@@ -103,7 +103,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 				</span>
 			);
 
-		// ── Flags and options: -n --flag ───────────────────────────────
+		// Flags and options: -n --flag
 		if (/^--?[a-zA-Z]/.test(token)) {
 			return (
 				<span key={i} style={{ color: T.orange }}>
@@ -112,7 +112,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Standalone numbers ─────────────────────────────────────────
+		// Standalone numbers
 		if (/^\d+(\.\d+)?$/.test(token)) {
 			return (
 				<span key={i} style={{ color: T.cyan }}>
@@ -121,7 +121,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Operators ─────────────────────────────────────────────────
+		// Operators
 		if (OPERATORS.has(token)) {
 			return (
 				<span key={i} style={{ color: T.violet }}>
@@ -130,7 +130,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Comment/description separator: # ──────────────────────────
+		// Comment/description separator
 		if (token === '#') {
 			return (
 				<span key={i} style={{ color: T.muted }}>
@@ -139,7 +139,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Known command names in non-command lines (hints, output) ──
+		// Known command names in non-command lines (hints, output)
 		if (tone !== 'command' && KNOWN_COMMANDS.has(token.toLowerCase())) {
 			return (
 				<span key={i} style={{ color: T.gold }}>
@@ -148,7 +148,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Quoted strings ─────────────────────────────────────────────
+		// Quoted strings
 		if (
 			(token.startsWith('"') && token.endsWith('"')) ||
 			(token.startsWith("'") && token.endsWith("'"))
@@ -160,7 +160,7 @@ function renderTokens(text: string, tone: HistoryTone, isCmd = false): React.Rea
 			);
 		}
 
-		// ── Default: inherit parent color ──────────────────────────────
+		// Default: inherit parent color
 		return <span key={i}>{token}</span>;
 	});
 }

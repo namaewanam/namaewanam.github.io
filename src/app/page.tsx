@@ -52,7 +52,7 @@ export default function Home() {
 
 	return (
 		<div className="mx-auto w-full max-w-3xl space-y-16">
-			{/* ── Who Am I ── */}
+			{/* Who Am I */}
 			<section id="home" className="space-y-4">
 				<div className="space-y-1">
 					<p className="font-mono text-xs uppercase tracking-widest text-primary">whoami</p>
@@ -108,7 +108,7 @@ export default function Home() {
 
 			<hr className="border-border" />
 
-			{/* ── About Me ── */}
+			{/* About Me */}
 			<section id="about" className="space-y-4">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">about</p>
 				<div className="space-y-3 text-sm leading-relaxed text-foreground/80 sm:text-base">
@@ -147,7 +147,7 @@ export default function Home() {
 
 			<hr className="border-border" />
 
-			{/* ── Interests ── */}
+			{/* Interests */}
 			<section id="interests" className="space-y-4">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">interests</p>
 				<div className="grid gap-3">
@@ -177,7 +177,7 @@ export default function Home() {
 
 			<hr className="border-border" />
 
-			{/* ── Experience ── */}
+			{/* Experience */}
 			<section id="experience" className="space-y-5">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">experience</p>
 
@@ -225,7 +225,7 @@ export default function Home() {
 
 			<hr className="border-border" />
 
-			{/* ── Projects ── */}
+			{/* Projects */}
 			<section id="projects" className="space-y-5">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">projects</p>
 				<div className="space-y-3 rounded border border-border/70 bg-card/40 px-5 py-4">
@@ -270,7 +270,7 @@ export default function Home() {
 
 			<hr className="border-border" />
 
-			{/* ── Contact ── */}
+			{/* Contact */}
 			<section id="contact" className="space-y-4">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">contact</p>
 				<p className="text-sm leading-relaxed text-foreground/80">
@@ -306,7 +306,7 @@ export default function Home() {
 
 			<hr className="border-border" />
 
-			{/* ── Recent Posts ── */}
+			{/* Recent Posts */}
 			<section className="space-y-4">
 				<FeaturedWriteups posts={featuredPosts} />
 			</section>

@@ -129,7 +129,7 @@ function generatePostMetadata(): void {
 	console.log(`✓ Generated post metadata for ${Object.keys(manifest.posts).length} post(s)`);
 }
 
-// ── OG Images ───────────────────────────────────────────────────────────
+// OG Images
 
 async function writeImage(filePath: string, image: Response): Promise<void> {
 	const buffer = Buffer.from(await image.arrayBuffer());
@@ -156,7 +156,7 @@ async function generatePostOgImages(posts: Post[]): Promise<void> {
 	console.log(`✓ Generated ${posts.length} post OG image(s)`);
 }
 
-// ── Run ─────────────────────────────────────────────────────────────────
+// Run
 
 async function main() {
 	generatePostMetadata();
