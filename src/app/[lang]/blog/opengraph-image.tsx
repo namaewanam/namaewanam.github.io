@@ -15,3 +15,7 @@ export default function OpenGraphImage() {
 		path: '~/blog',
 	});
 }
+
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}

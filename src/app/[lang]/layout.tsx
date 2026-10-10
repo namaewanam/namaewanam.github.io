@@ -1,3 +1,4 @@
+import { Locale } from '@/lib/i18n/translations';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
