@@ -31,7 +31,15 @@ export default function BookmarkButton({ slug, size = 'sm' }: Readonly<BookmarkB
 					? 'border-primary text-primary'
 					: 'border-border text-muted-foreground hover:border-primary hover:text-foreground'
 			}`}
-			aria-label={active ? 'Remove bookmark' : 'Add bookmark'}
+			aria-label={
+				active
+					? size === 'md'
+						? 'Remove saved bookmark'
+						: 'Remove bookmark'
+					: size === 'md'
+						? 'Add save bookmark'
+						: 'Add bookmark'
+			}
 		>
 			<Icon className={sizeClasses} />
 			{size === 'md' && (active ? 'saved' : 'save')}
