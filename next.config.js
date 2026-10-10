@@ -26,6 +26,7 @@ const nextConfig = {
 	// The Next.js headers() API does NOT apply to static exports and was
 	// breaking dev mode (unsafe-eval needed for HMR). Removed intentionally.
 	turbopack: {},
+	trailingSlash: true,
 };
 
 module.exports = withBundleAnalyzer(nextConfig);

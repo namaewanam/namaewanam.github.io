@@ -4,9 +4,9 @@
 			"numberOfRuns": 1,
 			"staticDistDir": "./out",
 			"url": [
-				"http://localhost/en.html",
-				"http://localhost/en/blog.html",
-				"http://localhost/en/blog/logging/elk-ilm-strategy-guide.html"
+				"http://localhost/en/",
+				"http://localhost/en/blog/",
+				"http://localhost/en/blog/logging/elk-ilm-strategy-guide/"
 			]
 		},
 		"assert": {
