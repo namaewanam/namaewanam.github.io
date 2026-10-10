@@ -13,7 +13,7 @@ import {
 	getFeaturedPosts,
 	HOME_RECRUITING_NOTE,
 	HOME_SIGNATURE,
-	INTEREST_GROUPS,
+	getInterestGroups,
 	RESUME_URL,
 } from '@/lib/site';
 
@@ -66,24 +66,21 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 			<section id="home" className="space-y-4">
 				<div className="space-y-1">
 					<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
-						whoami
+						{t('home.whoami')}
 					</p>
 					<h1 className="text-2xl font-bold leading-tight text-foreground sm:text-3xl">Nam</h1>
-					<p className="font-mono text-sm text-muted-foreground">
-						junior backend engineer · ho chi minh city
-					</p>
+					<p className="font-mono text-sm text-muted-foreground">{t('home.subtitle')}</p>
 				</div>
-				<p className="font-mono text-sm text-foreground sm:text-base">{HOME_SIGNATURE}</p>
+				<p className="font-mono text-sm text-foreground sm:text-base">{t('home.signature')}</p>
 
 				<p className="max-w-xl text-sm leading-relaxed text-foreground/80 sm:text-base">
-					Mostly APIs, distributed services, and infra tooling. I care about clean architecture,
-					observability, and systems that stay calm under production pressure.
+					{t('home.aboutP3')}
 				</p>
 
 				<div className="inline-flex items-center gap-2 rounded border border-border/80 bg-card/50 px-3 py-2 font-mono text-[11px] text-foreground/85">
-					<span className="text-primary">status</span>
+					<span className="text-primary">{t('footer.status')}</span>
 					<span className="text-border">·</span>
-					<span>{HOME_RECRUITING_NOTE}</span>
+					<span>{t('home.status')}</span>
 				</div>
 
 				<div className="flex flex-wrap gap-2 pt-1">
@@ -113,7 +110,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 						href="/blog"
 						className="inline-flex items-center gap-1.5 rounded bg-primary px-2.5 py-1 font-mono text-xs text-primary-foreground transition-all hover:bg-primary/90"
 					>
-						blog →
+						{t('nav.blog')} →
 					</Link>
 				</div>
 			</section>
@@ -123,19 +120,15 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 			{/* About Me */}
 			<section id="about" className="space-y-4">
 				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
-					about
+					{t('home.about')}
 				</p>
 				<div className="space-y-3 text-sm leading-relaxed text-foreground/80 sm:text-base">
 					<p>
-						I&apos;m a backend developer who loves designing systems that are boring in the best way
-						— predictable, observable, and maintainable. My stack leans toward{' '}
-						<span className="font-medium text-foreground">Java / Spring Boot</span>, and whatever
-						database fits the problem.
+						{t('home.aboutP1').split('Java / Spring Boot')[0]}
+						<span className="font-medium text-foreground">Java / Spring Boot</span>
+						{t('home.aboutP1').split('Java / Spring Boot')[1]}
 					</p>
-					<p>
-						Currently working on high-throughput payment microservices at Endava Vietnam,
-						implementing structured logging, CI/CD pipelines, and distributed observability.
-					</p>
+					<p>{t('home.aboutP2')}</p>
 				</div>
 
 				<div className="flex flex-wrap gap-1.5 pt-1">
@@ -167,7 +160,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 					{t('home.interests')}
 				</p>
 				<div className="grid gap-3">
-					{INTEREST_GROUPS.map((interest) => (
+					{getInterestGroups(lang).map((interest) => (
 						<div
 							key={interest.title}
 							className="space-y-2 rounded border border-border/70 bg-card/40 px-4 py-3"
@@ -202,22 +195,38 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 				<div className="space-y-5">
 					{[
 						{
-							role: 'Junior Software Engineer',
+							role: lang === 'vi' ? 'Kỹ sư Phần mềm' : 'Junior Software Engineer',
 							org: 'Endava Vietnam',
-							period: 'Feb 2026 – Present',
-							desc: 'Developing and maintaining MPGS (Mastercard Payment Gateway Services) microservices. Spring Boot + PostgreSQL, Jenkins CI/CD on Linux, structured logging and monitoring for production observability.',
+							period: lang === 'vi' ? 'Tháng 2, 2026 – Hiện tại' : 'Feb 2026 – Present',
+							desc:
+								lang === 'vi'
+									? 'Phát triển và bảo trì các microservices MPGS (Mastercard Payment Gateway Services). Spring Boot + PostgreSQL, Jenkins CI/CD trên Linux, structured logging và monitoring để giám sát production.'
+									: 'Developing and maintaining MPGS (Mastercard Payment Gateway Services) microservices. Spring Boot + PostgreSQL, Jenkins CI/CD on Linux, structured logging and monitoring for production observability.',
 						},
 						{
-							role: 'Java Software Developer Intern',
+							role:
+								lang === 'vi' ? 'Thực tập sinh Lập trình Java' : 'Java Software Developer Intern',
 							org: 'Endava Vietnam',
-							period: 'Nov 2025 – Jan 2026',
-							desc: 'Internal financial management system with Spring Boot, Keycloak, Apache POI, PostgreSQL. Docker Compose + GitLab CI/CD pipelines.',
+							period: lang === 'vi' ? 'Tháng 11, 2025 – Tháng 1, 2026' : 'Nov 2025 – Jan 2026',
+							desc:
+								lang === 'vi'
+									? 'Hệ thống quản lý tài chính nội bộ với Spring Boot, Keycloak, Apache POI, PostgreSQL. Thiết lập Docker Compose + GitLab CI/CD.'
+									: 'Internal financial management system with Spring Boot, Keycloak, Apache POI, PostgreSQL. Docker Compose + GitLab CI/CD pipelines.',
 						},
 						{
-							role: 'B.Sc. Information Technology · CPA 3.6/4.0',
-							org: 'VNUHCM — University of Science',
-							period: 'Oct 2022 – Oct 2026',
-							desc: 'Software Engineering major. Coursework: Software Architecture, Data Structures & Algorithms, Database Systems, DevOps Fundamentals.',
+							role:
+								lang === 'vi'
+									? 'Cử nhân CNTT · CPA 3.6/4.0'
+									: 'B.Sc. Information Technology · CPA 3.6/4.0',
+							org:
+								lang === 'vi'
+									? 'Trường Đại học Khoa học Tự nhiên, ĐHQG-HCM'
+									: 'VNUHCM — University of Science',
+							period: lang === 'vi' ? 'Tháng 10, 2022 – Tháng 10, 2026' : 'Oct 2022 – Oct 2026',
+							desc:
+								lang === 'vi'
+									? 'Chuyên ngành Công nghệ Phần mềm. Môn học tiêu biểu: Kiến trúc Phần mềm, Cấu trúc Dữ liệu & Giải thuật, Hệ quản trị Cơ sở dữ liệu, Nhập môn DevOps.'
+									: 'Software Engineering major. Coursework: Software Architecture, Data Structures & Algorithms, Database Systems, DevOps Fundamentals.',
 						},
 					].map((exp) => (
 						<div
@@ -252,10 +261,11 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 					<div className="flex flex-wrap items-start justify-between gap-2">
 						<div>
 							<h2 className="text-sm font-semibold text-foreground">
-								Bainansu — Financial Analysis Platform
+								Bainansu —{' '}
+								{lang === 'vi' ? 'Nền tảng Phân tích Tài chính' : 'Financial Analysis Platform'}
 							</h2>
 							<p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-								Lead Backend Developer · Jul 2025 – Sep 2025
+								{lang === 'vi' ? 'Kỹ sư Backend' : 'Lead Backend Developer'} · Jul 2025 – Sep 2025
 							</p>
 						</div>
 						<a
@@ -268,10 +278,9 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 						</a>
 					</div>
 					<p className="text-xs leading-relaxed text-foreground/70 sm:text-sm">
-						8+ microservices (Spring Boot + FastAPI) with real-time financial data delivery via
-						Apache Kafka + WebSocket connected to the Binance API. Celery + RabbitMQ + Redis async
-						task queue. Full auth (Keycloak), payments (VNPay, Stripe), and Docker Compose
-						infrastructure.
+						{lang === 'vi'
+							? 'Hơn 8 microservices (Spring Boot + FastAPI) cung cấp dữ liệu tài chính real-time qua Apache Kafka + WebSocket kết nối với Binance API. Hàng đợi tác vụ bất đồng bộ bằng Celery + RabbitMQ + Redis. Đầy đủ tính năng xác thực (Keycloak), thanh toán (VNPay, Stripe) trên hạ tầng Docker Compose.'
+							: '8+ microservices (Spring Boot + FastAPI) with real-time financial data delivery via Apache Kafka + WebSocket connected to the Binance API. Celery + RabbitMQ + Redis async task queue. Full auth (Keycloak), payments (VNPay, Stripe), and Docker Compose infrastructure.'}
 					</p>
 					<div className="flex flex-wrap gap-1.5 pt-1">
 						{['Spring Boot', 'FastAPI', 'Kafka', 'WebSocket', 'Redis', 'Keycloak', 'Docker'].map(
@@ -295,9 +304,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
 					{t('home.contact')}
 				</p>
-				<p className="text-sm leading-relaxed text-foreground/80">
-					Ping the inbox first. The side quests live below.
-				</p>
+				<p className="text-sm leading-relaxed text-foreground/80">{t('home.contactDesc')}</p>
 				<div className="space-y-1.5">
 					{contacts.map((c) => (
 						<div key={c.label} className="flex items-baseline gap-3 font-mono text-sm">

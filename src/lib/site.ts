@@ -84,31 +84,51 @@ export const STACK_GROUPS = [
 	},
 ] as const;
 
-export const INTEREST_GROUPS = [
+export const getInterestGroups = (lang: string) => [
 	{
-		title: 'systems that stay calm',
+		title: lang === 'vi' ? 'Hệ thống vận hành êm ái' : 'systems that stay calm',
 		description:
-			'I like distributed systems that fail predictably, recover cleanly, and stay readable under pressure.',
-		items: ['resilience patterns', 'queues', 'timeouts', 'backpressure'],
+			lang === 'vi'
+				? 'Tôi thích các hệ thống phân tán có khả năng dự đoán trước lỗi, tự phục hồi rõ ràng và dễ dàng nắm bắt kể cả dưới áp lực lớn.'
+				: 'I like distributed systems that fail predictably, recover cleanly, and stay readable under pressure.',
+		items:
+			lang === 'vi'
+				? ['mô hình phục hồi', 'hàng đợi', 'thời gian chờ (timeouts)', 'backpressure']
+				: ['resilience patterns', 'queues', 'timeouts', 'backpressure'],
 	},
 	{
-		title: 'observability with signal',
+		title: lang === 'vi' ? 'Khả năng quan sát (observability)' : 'observability with signal',
 		description:
-			'Tracing, logs, dashboards, and retention policies are more interesting to me when they reduce confusion instead of adding more noise.',
-		items: ['distributed tracing', 'logging strategy', 'alert quality', 'incident timelines'],
+			lang === 'vi'
+				? 'Tracing, logs, dashboards, và các chính sách lưu trữ sẽ thú vị hơn khi chúng giảm bớt sự nhầm lẫn thay vì tạo thêm tiếng ồn.'
+				: 'Tracing, logs, dashboards, and retention policies are more interesting to me when they reduce confusion instead of adding more noise.',
+		items:
+			lang === 'vi'
+				? ['distributed tracing', 'chiến lược logging', 'chất lượng cảnh báo', 'incident timelines']
+				: ['distributed tracing', 'logging strategy', 'alert quality', 'incident timelines'],
 	},
 	{
-		title: 'learning in public',
+		title: lang === 'vi' ? 'Học hỏi công khai' : 'learning in public',
 		description:
-			'I enjoy turning class notes, production lessons, and backend rabbit holes into writeups that are easier to revisit later.',
-		items: [
-			'technical writing',
-			'machine learning notes',
-			'backend field notes',
-			'teaching by rewriting',
-		],
+			lang === 'vi'
+				? 'Tôi thích chuyển các ghi chép trên lớp, bài học từ production và các nghiên cứu sâu về backend thành các bài viết dễ tra cứu lại sau này.'
+				: 'I enjoy turning class notes, production lessons, and backend rabbit holes into writeups that are easier to revisit later.',
+		items:
+			lang === 'vi'
+				? [
+						'viết kỹ thuật',
+						'ghi chép machine learning',
+						'ghi chép backend',
+						'dạy thông qua viết lại',
+					]
+				: [
+						'technical writing',
+						'machine learning notes',
+						'backend field notes',
+						'teaching by rewriting',
+					],
 	},
-] as const;
+];
 
 export type MailSubjectKey = keyof typeof MAIL_SUBJECTS;
 

@@ -19,6 +19,14 @@ export const translations = {
 		'home.signature': 'I build backend systems that are boring in production.',
 		'home.status': 'Open to backend, systems, and platform roles.',
 		'home.viewAll': 'all →',
+		'home.subtitle': 'junior backend engineer · ho chi minh city',
+		'home.aboutP1':
+			"I'm a backend developer who loves designing systems that are boring in the best way — predictable, observable, and maintainable. My stack leans toward Java / Spring Boot, and whatever else gets the job done.",
+		'home.aboutP2':
+			'Currently working on high-throughput payment microservices at Endava Vietnam, implementing structured logging, CI/CD pipelines, and distributed observability.',
+		'home.aboutP3':
+			'Mostly APIs, distributed services, and infra tooling. I care about clean architecture, observability, and systems that stay calm under production pressure.',
+		'home.contactDesc': 'Ping the inbox first. The side quests live below.',
 		// Blog
 		'blog.title': 'Writing',
 		'blog.tags': '#tags',
@@ -81,6 +89,14 @@ export const translations = {
 		'home.signature': 'Tôi xây dựng hệ thống backend ổn định trong production.',
 		'home.status': 'Đang tìm kiếm cơ hội backend, systems, và platform.',
 		'home.viewAll': 'tất cả →',
+		'home.subtitle': 'kỹ sư backend · hồ chí minh',
+		'home.aboutP1':
+			'Tôi là kỹ sư backend, thích thiết kế hệ thống ổn định và dễ dự đoán — khả năng quan sát tốt và dễ bảo trì. Ngôn ngữ chính của tôi là Java / Spring Boot, nhưng tôi sẵn sàng học công cụ mới để hoàn thành công việc.',
+		'home.aboutP2':
+			'Hiện đang xây dựng các microservice thanh toán hiệu năng cao tại Endava Việt Nam, triển khai structured logging, CI/CD pipeline, và distributed observability.',
+		'home.aboutP3':
+			'Chủ yếu làm về APIs, dịch vụ phân tán, và công cụ hạ tầng. Tôi đặc biệt quan tâm tới kiến trúc sạch, tính quan sát được, và độ ổn định dưới áp lực cao.',
+		'home.contactDesc': 'Hãy gửi email cho tôi trước. Mạng xã hội thì ở phía dưới.',
 		'blog.title': 'Bài viết',
 		'blog.tags': '#thẻ',
 		'blog.directories': 'danh mục',
