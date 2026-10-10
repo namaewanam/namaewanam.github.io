@@ -65,7 +65,9 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 			{/* Who Am I */}
 			<section id="home" className="space-y-4">
 				<div className="space-y-1">
-					<p className="font-mono text-xs uppercase tracking-widest text-primary">whoami</p>
+					<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
+						whoami
+					</p>
 					<h1 className="text-2xl font-bold leading-tight text-foreground sm:text-3xl">Nam</h1>
 					<p className="font-mono text-sm text-muted-foreground">
 						junior backend engineer · ho chi minh city
@@ -120,7 +122,9 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 
 			{/* About Me */}
 			<section id="about" className="space-y-4">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">about</p>
+				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
+					about
+				</p>
 				<div className="space-y-3 text-sm leading-relaxed text-foreground/80 sm:text-base">
 					<p>
 						I&apos;m a backend developer who loves designing systems that are boring in the best way
@@ -159,7 +163,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 
 			{/* Interests */}
 			<section id="interests" className="space-y-4">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
 					{t('home.interests')}
 				</p>
 				<div className="grid gap-3">
@@ -191,7 +195,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 
 			{/* Experience */}
 			<section id="experience" className="space-y-5">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
 					{t('home.experience')}
 				</p>
 
@@ -241,7 +245,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 
 			{/* Projects */}
 			<section id="projects" className="space-y-5">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
 					{t('home.projects')}
 				</p>
 				<div className="space-y-3 rounded border border-border/70 bg-card/40 px-5 py-4">
@@ -288,7 +292,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 
 			{/* Contact */}
 			<section id="contact" className="space-y-4">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+				<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
 					{t('home.contact')}
 				</p>
 				<p className="text-sm leading-relaxed text-foreground/80">
@@ -342,7 +346,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 
 			<section className="space-y-4">
 				<div className="flex items-baseline justify-between">
-					<p className="font-mono text-xs uppercase tracking-widest text-primary">
+					<p className="font-mono text-sm font-semibold uppercase tracking-widest text-primary">
 						{t('home.recentPosts')}
 					</p>
 					<Link
