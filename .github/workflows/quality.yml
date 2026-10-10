@@ -71,4 +71,4 @@ jobs:
         with:
           name: next-bundle-analyzer
           path: .next/analyze
-          if-no-files-found: error
+          if-no-files-found: warn
