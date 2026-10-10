@@ -8,6 +8,9 @@ export const metadata: Metadata = {
 	description: 'Your bookmarked posts for later reading.',
 };
 
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 export default function ReadingListPage() {
 	const posts = getAllPosts().map((p) => ({
 		slug: p.slug,

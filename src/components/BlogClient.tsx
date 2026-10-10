@@ -1,7 +1,7 @@
 'use client';
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import type { BlogSearchPost, Category } from '@/lib/markdown';
 import BlogResults from '@/components/blog/BlogResults';
 import BlogRssBadge from '@/components/blog/BlogRssBadge';

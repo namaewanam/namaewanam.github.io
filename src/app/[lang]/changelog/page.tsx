@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { SITE_NAME } from '@/lib/site';
 import { getChangelog } from '@/lib/changelog';
 
@@ -8,6 +8,9 @@ export const metadata: Metadata = {
 	description: 'Recent updates and changes to this site.',
 };
 
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 export default function ChangelogPage() {
 	const changelogGroups = getChangelog();
 

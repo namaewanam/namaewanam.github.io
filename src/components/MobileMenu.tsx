@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { Menu, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import type { Category } from '@/lib/markdown';

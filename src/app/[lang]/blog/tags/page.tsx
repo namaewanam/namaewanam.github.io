@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { SITE_NAME } from '@/lib/site';
 import { getAllPosts, getAllTags } from '@/lib/markdown';
 
@@ -8,6 +8,9 @@ export const metadata: Metadata = {
 	description: 'Browse all blog posts by tags.',
 };
 
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 export default function TagsPage() {
 	const tags = getAllTags();
 	const posts = getAllPosts();

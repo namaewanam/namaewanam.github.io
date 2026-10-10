@@ -1,8 +1,7 @@
-import { LanguageProvider } from '@/lib/i18n/context';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { getAllPosts, getCategories } from '@/lib/markdown';
 import { ThemeProvider, ThemeScript } from '@/components/ThemeProvider';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -26,7 +25,7 @@ import {
 	SITE_NAME,
 	SITE_URL,
 } from '@/lib/site';
-import './globals.css';
+import '../globals.css';
 
 const sans = IBM_Plex_Sans({
 	subsets: ['latin'],
@@ -68,11 +67,19 @@ export const metadata: Metadata = {
 	},
 };
 
-export default function RootLayout({
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
+
+export default async function RootLayout({
 	children,
+	params,
 }: Readonly<{
 	children: React.ReactNode;
+	params: Promise<{ lang: string }>;
 }>) {
+	const resolvedParams = await params;
+	const lang = resolvedParams?.lang || 'en';
 	const posts = getAllPosts();
 	const categories = getCategories();
 	const featuredPosts = getFeaturedPosts(posts);
@@ -221,75 +228,78 @@ export default function RootLayout({
 	];
 
 	return (
-		<html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable}`}>
+		<html
+			lang={resolvedParams?.lang || 'en'}
+			suppressHydrationWarning
+			className={`${sans.variable} ${mono.variable} antialiased`}
+		>
 			<body suppressHydrationWarning className="font-sans antialiased">
 				<ThemeScript />
-				<LanguageProvider>
-					<ThemeProvider>
-						{enableWebVitals ? <WebVitals debug={debugWebVitals} /> : null}
-						{features.commandPalette && <GlobalCommandPalette items={commandPaletteItems} />}
-						{features.shortcutHelp && <ShortcutHelp />}
-						{features.readingProgress && <ReadingProgress />}
-						<div className="flex min-h-screen flex-col">
-							{/* Header */}
-							<header className="sticky top-0 z-50 border-b border-border bg-card/70 backdrop-blur-md">
-								<div className="mx-auto max-w-3xl px-4 py-3 sm:px-6">
-									<div className="flex items-center justify-between">
-										{/* Logo */}
-										<Link
-											href="/"
-											className="font-mono text-sm font-bold tracking-tight text-foreground transition-colors hover:text-primary"
-										>
-											<span className="text-primary">~/</span>nam
-										</Link>
 
-										{/* Desktop Navigation */}
-										<div className="hidden items-center gap-6 md:flex">
-											<nav className="flex gap-5">
-												<Link
-													href="/"
-													className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-												>
-													home
-												</Link>
-												<Link
-													href="/blog"
-													className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-												>
-													blog
-												</Link>
-											</nav>
-											{features.commandPalette && <CommandPaletteButton />}
-											<ThemeToggle />
-											{features.i18n && <LanguageSwitcher />}
-										</div>
+				<ThemeProvider>
+					{enableWebVitals ? <WebVitals debug={debugWebVitals} /> : null}
+					{features.commandPalette && <GlobalCommandPalette items={commandPaletteItems} />}
+					{features.shortcutHelp && <ShortcutHelp />}
+					{features.readingProgress && <ReadingProgress />}
+					<div className="flex min-h-screen flex-col">
+						{/* Header */}
+						<header className="sticky top-0 z-50 border-b border-border bg-card/70 backdrop-blur-md">
+							<div className="mx-auto max-w-3xl px-4 py-3 sm:px-6">
+								<div className="flex items-center justify-between">
+									{/* Logo */}
+									<Link
+										href="/"
+										className="font-mono text-sm font-bold tracking-tight text-foreground transition-colors hover:text-primary"
+									>
+										<span className="text-primary">~/</span>nam
+									</Link>
 
-										{/* Mobile Navigation */}
-										<div className="flex items-center gap-2 md:hidden">
-											{features.i18n && <LanguageSwitcher />}
-											<ThemeToggle />
-											{features.commandPalette && <CommandPaletteButton shortLabel />}
-											<MobileMenu categories={categories} />
-										</div>
+									{/* Desktop Navigation */}
+									<div className="hidden items-center gap-6 md:flex">
+										<nav className="flex gap-5">
+											<Link
+												href="/"
+												className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+											>
+												home
+											</Link>
+											<Link
+												href="/blog"
+												className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+											>
+												blog
+											</Link>
+										</nav>
+										{features.commandPalette && <CommandPaletteButton />}
+										<ThemeToggle />
+										{features.i18n && <LanguageSwitcher />}
+									</div>
+
+									{/* Mobile Navigation */}
+									<div className="flex items-center gap-2 md:hidden">
+										{features.i18n && <LanguageSwitcher />}
+										<ThemeToggle />
+										{features.commandPalette && <CommandPaletteButton shortLabel />}
+										<MobileMenu categories={categories} />
 									</div>
 								</div>
-							</header>
+							</div>
+						</header>
 
-							{/* Main Content */}
-							<main className="w-full flex-1 px-4 py-8 sm:px-6 md:py-12">
-								<PageTransition>{children}</PageTransition>
-							</main>
+						{/* Main Content */}
+						<main className="w-full flex-1 px-4 py-8 sm:px-6 md:py-12">
+							<PageTransition>{children}</PageTransition>
+						</main>
 
-							{/* Footer */}
-							<footer className="mt-auto border-t border-border">
-								<div className="mx-auto max-w-3xl px-4 py-5 text-center font-mono text-xs text-muted-foreground sm:px-6">
-									<FooterStatus />
-								</div>
-							</footer>
-						</div>
-						{features.backToTop && <BackToTop />}
-					</ThemeProvider>
-				</LanguageProvider>
+						{/* Footer */}
+						<footer className="mt-auto border-t border-border">
+							<div className="mx-auto max-w-3xl px-4 py-5 text-center font-mono text-xs text-muted-foreground sm:px-6">
+								<FooterStatus lang={lang as Locale} />
+							</div>
+						</footer>
+					</div>
+					{features.backToTop && <BackToTop />}
+				</ThemeProvider>
 			</body>
 		</html>
 	);

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import type { Post } from '@/lib/markdown';
 
 export default function RelatedPosts({

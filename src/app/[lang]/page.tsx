@@ -1,10 +1,12 @@
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { getAllPosts, getCategories } from '@/lib/markdown';
 import FeaturedWriteups from '@/components/home/FeaturedWriteups';
 import CopyableContactValue from '@/components/home/CopyableContactValue';
 import PostStats from '@/components/home/PostStats';
 import NewsletterForm from '@/components/layout/NewsletterForm';
 import { features } from '@/lib/features';
+import { getDictionary } from '@/lib/i18n/server';
+import { Locale } from '@/lib/i18n/translations';
 import {
 	buildMailtoHref,
 	CONTACT_EMAIL,
@@ -15,7 +17,12 @@ import {
 	RESUME_URL,
 } from '@/lib/site';
 
-export default function Home() {
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
+export default async function Home({ params }: { params: Promise<{ lang: Locale }> }) {
+	const { lang } = await params;
+	const t = getDictionary(lang);
 	const posts = getAllPosts();
 	const categories = getCategories();
 	const recentPosts = posts.slice(0, 5);
@@ -152,7 +159,9 @@ export default function Home() {
 
 			{/* Interests */}
 			<section id="interests" className="space-y-4">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">interests</p>
+				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+					{t('home.interests')}
+				</p>
 				<div className="grid gap-3">
 					{INTEREST_GROUPS.map((interest) => (
 						<div
@@ -182,7 +191,9 @@ export default function Home() {
 
 			{/* Experience */}
 			<section id="experience" className="space-y-5">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">experience</p>
+				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+					{t('home.experience')}
+				</p>
 
 				<div className="space-y-5">
 					{[
@@ -230,7 +241,9 @@ export default function Home() {
 
 			{/* Projects */}
 			<section id="projects" className="space-y-5">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">projects</p>
+				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+					{t('home.projects')}
+				</p>
 				<div className="space-y-3 rounded border border-border/70 bg-card/40 px-5 py-4">
 					<div className="flex flex-wrap items-start justify-between gap-2">
 						<div>
@@ -275,7 +288,9 @@ export default function Home() {
 
 			{/* Contact */}
 			<section id="contact" className="space-y-4">
-				<p className="font-mono text-xs uppercase tracking-widest text-primary">contact</p>
+				<p className="font-mono text-xs uppercase tracking-widest text-primary">
+					{t('home.contact')}
+				</p>
 				<p className="text-sm leading-relaxed text-foreground/80">
 					Ping the inbox first. The side quests live below.
 				</p>
@@ -327,7 +342,9 @@ export default function Home() {
 
 			<section className="space-y-4">
 				<div className="flex items-baseline justify-between">
-					<p className="font-mono text-xs uppercase tracking-widest text-primary">recent posts</p>
+					<p className="font-mono text-xs uppercase tracking-widest text-primary">
+						{t('home.recentPosts')}
+					</p>
 					<Link
 						href="/blog"
 						className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"

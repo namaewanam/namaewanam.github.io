@@ -19,6 +19,9 @@ export const metadata: Metadata = {
 	},
 };
 
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 export default function BlogPage() {
 	const posts = getBlogSearchPosts();
 	const categories = getCategories();

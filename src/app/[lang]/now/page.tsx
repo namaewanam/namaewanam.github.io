@@ -6,6 +6,9 @@ export const metadata: Metadata = {
 	description: 'What I am doing right now.',
 };
 
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 export default function NowPage() {
 	return (
 		<div className="mx-auto w-full max-w-2xl space-y-12">

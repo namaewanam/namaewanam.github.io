@@ -4,7 +4,7 @@ import matter from 'gray-matter';
 import { renderMarkdown } from '@/lib/mdx';
 import type { Metadata } from 'next';
 import { SITE_NAME } from '@/lib/site';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 
 export const metadata: Metadata = {
 	title: `ADR · ${SITE_NAME}`,

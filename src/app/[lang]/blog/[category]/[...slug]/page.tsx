@@ -15,16 +15,14 @@ export const dynamicParams = false;
 
 export async function generateStaticParams() {
 	const categories = getCategories();
-	const params: { category: string; slug: string[] }[] = [];
+	const params: { lang: string; category: string; slug: string[] }[] = [];
 
 	categories.forEach((category) => {
 		const posts = getPostsByCategory(category.slug);
 		posts.forEach((post) => {
 			const slugParts = post.fullPath.split('/');
-			params.push({
-				category: category.slug,
-				slug: slugParts,
-			});
+			params.push({ lang: 'en', category: category.slug, slug: slugParts });
+			params.push({ lang: 'vi', category: category.slug, slug: slugParts });
 		});
 	});
 

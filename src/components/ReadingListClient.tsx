@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { Bookmark, X } from 'lucide-react';
 import { useReadingList } from '@/lib/useReadingList';
 

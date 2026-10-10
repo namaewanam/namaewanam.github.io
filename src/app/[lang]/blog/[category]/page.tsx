@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import { getPostsByCategory, getCategories, getSeriesMetadata } from '@/lib/markdown';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -10,9 +10,10 @@ export const dynamicParams = false;
 
 export async function generateStaticParams() {
 	const categories = getCategories();
-	return categories.map((category) => ({
-		category: category.slug,
-	}));
+	return categories.flatMap((category) => [
+		{ lang: 'en', category: category.slug },
+		{ lang: 'vi', category: category.slug },
+	]);
 }
 
 export async function generateMetadata({

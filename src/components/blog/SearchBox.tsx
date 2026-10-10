@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Fuse from 'fuse.js';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import type { BlogSearchPost } from '@/lib/markdown';
 
 interface SearchBoxProps {

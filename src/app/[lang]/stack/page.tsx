@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import StackGroup from '@/components/stack/StackGroup';
 import { STACK_GROUPS, SITE_NAME } from '@/lib/site';
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 
 export const metadata: Metadata = {
 	title: `Stack · ${SITE_NAME}`,
@@ -255,6 +255,9 @@ const QUADRANTS: { id: Quadrant; label: string; icon: string }[] = [
 	{ id: 'practices', label: 'Practices & Patterns', icon: '📐' },
 ];
 
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 export default function StackPage() {
 	return (
 		<div className="mx-auto w-full max-w-4xl space-y-14">

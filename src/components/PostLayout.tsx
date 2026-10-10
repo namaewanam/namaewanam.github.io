@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import MarkdownContent from '@/components/MarkdownContent';
 import TableOfContents from '@/components/TableOfContents';
 import BookmarkButton from '@/components/blog/BookmarkButton';

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/LocalizedLink';
 import ShortcutHelpButton from '@/components/layout/ShortcutHelpButton';
 import { features } from '@/lib/features';
 import { FEED_PATHS } from '@/lib/feed-paths';
@@ -10,7 +10,10 @@ function Dot() {
 	return <span className="text-border">·</span>;
 }
 
-export default function FooterStatus() {
+import { Locale } from '@/lib/i18n/translations';
+import { getDictionary } from '@/lib/i18n/server';
+export default function FooterStatus({ lang }: { lang: Locale }) {
+	const t = getDictionary(lang);
 	return (
 		<div className="space-y-2">
 			<div className="flex flex-wrap items-center justify-center gap-3">
@@ -84,7 +87,7 @@ export default function FooterStatus() {
 				)}
 			</div>
 			<p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/60">
-				status: {STATUS_LINE}
+				{t('footer.status')}: {STATUS_LINE}
 			</p>
 		</div>
 	);
