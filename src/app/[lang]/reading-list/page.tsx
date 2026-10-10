@@ -11,8 +11,9 @@ export const metadata: Metadata = {
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default function ReadingListPage() {
-	const posts = getAllPosts().map((p) => ({
+export default async function ReadingListPage({ params }: { params: Promise<{ lang: string }> }) {
+	const resolvedParams = await params;
+	const posts = getAllPosts(resolvedParams.lang).map((p) => ({
 		slug: p.slug,
 		title: p.title,
 		category: p.category,

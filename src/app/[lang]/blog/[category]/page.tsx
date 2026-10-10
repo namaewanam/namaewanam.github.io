@@ -41,9 +41,13 @@ export async function generateMetadata({
 	};
 }
 
-export default async function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
+export default async function CategoryPage({
+	params,
+}: {
+	params: Promise<{ lang: string; category: string }>;
+}) {
 	const resolvedParams = await params;
-	const posts = getPostsByCategory(resolvedParams.category);
+	const posts = getPostsByCategory(resolvedParams.category, resolvedParams.lang);
 	const categoryMeta = getCategories().find(
 		(category) => category.slug === resolvedParams.category
 	);

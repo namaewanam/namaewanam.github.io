@@ -4,8 +4,8 @@ import { getAllPosts } from '@/lib/markdown';
  * Post stats dashboard — displays blog statistics as a compact card.
  * Server component that reads post data at build time.
  */
-export default function PostStats() {
-	const posts = getAllPosts();
+export default function PostStats({ lang = 'en' }: { lang?: string }) {
+	const posts = getAllPosts(lang);
 
 	const totalPosts = posts.length;
 	const uniqueCategories = new Set(posts.map((p) => p.category)).size;

@@ -30,6 +30,7 @@ export interface Post {
 	lastUpdated?: string;
 	difficulty?: 'beginner' | 'intermediate' | 'advanced';
 	featured?: boolean;
+	lang: string;
 }
 
 export interface Category {
@@ -53,6 +54,7 @@ export interface BlogSearchPost {
 	fullPath: string;
 	tags: string[];
 	searchText: string;
+	lang: string;
 }
 
 export interface SeriesMetadata {
@@ -283,10 +285,14 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 		const fileContents = fs.readFileSync(fullPath, 'utf8');
 		const { data, content } = matter(fileContents);
 
-		const pathParts = relativePath.replace(/\.md$/, '').split(path.sep);
+		const langMatch = relativePath.match(/\.(en|vi)\.md$/);
+		const lang = (langMatch ? langMatch[1] : 'en') || 'en';
+		const cleanRelativePath = relativePath.replace(/\.(en|vi)\.md$/, '.md');
+
+		const pathParts = cleanRelativePath.replace(/\.md$/, '').split(path.sep);
 		const slug = pathParts[pathParts.length - 1] ?? '';
 		const subcategory = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
-		const urlPath = relativePath
+		const urlPath = cleanRelativePath
 			.replace(/\.md$/, '')
 			.split(path.sep)
 			.map((part) => part.toLowerCase())
@@ -319,6 +325,7 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 			tags,
 			readingTimeMin,
 			codePercent,
+			lang,
 		};
 
 		if (subcategory !== undefined) post.subcategory = subcategory;
@@ -399,7 +406,7 @@ function buildContentIndex(): ContentIndex {
 		postsByCategory.set(categorySlug, posts);
 		posts.forEach((post) => {
 			allPosts.push(post);
-			postByKey.set(`${post.category}/${post.fullPath}`, post);
+			postByKey.set(`${post.lang}/${post.category}/${post.fullPath}`, post);
 		});
 
 		if (posts.length > 0) {
@@ -427,6 +434,7 @@ function buildContentIndex(): ContentIndex {
 		title: post.title,
 		fullPath: post.fullPath,
 		tags: post.tags ?? [],
+		lang: post.lang,
 		searchText: buildSearchText({
 			title: post.title,
 			categoryName: post.categoryName,
@@ -461,28 +469,66 @@ function getContentIndex(): ContentIndex {
 	return cachedContentIndex;
 }
 
-export function getAllPosts(): Post[] {
-	return getContentIndex().allPosts;
+export function getAllPosts(lang: string = 'en'): Post[] {
+	const all = getContentIndex().allPosts;
+	const result: Post[] = [];
+	for (const p of all) {
+		if (p.lang === lang) {
+			result.push(p);
+		} else if (p.lang === 'en' && lang !== 'en') {
+			const hasRequestedLang = all.some(
+				(other) => other.fullPath === p.fullPath && other.lang === lang
+			);
+			if (!hasRequestedLang) {
+				result.push(p);
+			}
+		}
+	}
+	return sortPosts(result);
 }
 
-export function getBlogSearchPosts(): BlogSearchPost[] {
-	return getContentIndex().blogSearchPosts;
+export function getBlogSearchPosts(lang: string = 'en'): BlogSearchPost[] {
+	const all = getContentIndex().blogSearchPosts;
+	const result: BlogSearchPost[] = [];
+	for (const p of all) {
+		if (p.lang === lang) {
+			result.push(p);
+		} else if (p.lang === 'en' && lang !== 'en') {
+			const hasRequestedLang = all.some(
+				(other) => other.fullPath === p.fullPath && other.lang === lang
+			);
+			if (!hasRequestedLang) {
+				result.push(p);
+			}
+		}
+	}
+	return result;
 }
 
-export function getPostsByCategory(category: string): Post[] {
-	return getContentIndex().postsByCategory.get(category.toLowerCase()) ?? [];
+export function getPostsByCategory(category: string, lang: string = 'en'): Post[] {
+	return getAllPosts(lang).filter((p) => p.category === category.toLowerCase());
 }
 
 export function getSeriesMetadata(category: string): SeriesMetadata | null {
 	return getContentIndex().seriesByCategory.get(category.toLowerCase()) ?? null;
 }
 
-export function getPostBySlug(category: string, slug: string): Post | null {
-	return getContentIndex().postByKey.get(`${category.toLowerCase()}/${slug.toLowerCase()}`) ?? null;
+export function getPostBySlug(category: string, slug: string, lang: string = 'en'): Post | null {
+	const index = getContentIndex();
+	const post = index.postByKey.get(`${lang}/${category.toLowerCase()}/${slug.toLowerCase()}`);
+	if (post) return post;
+	if (lang !== 'en') {
+		return index.postByKey.get(`en/${category.toLowerCase()}/${slug.toLowerCase()}`) ?? null;
+	}
+	return null;
 }
 
-export function getAdjacentPosts(category: string, currentPost: Post): AdjacentPosts {
-	const posts = getPostsByCategory(category);
+export function getAdjacentPosts(
+	category: string,
+	currentPost: Post,
+	lang: string = 'en'
+): AdjacentPosts {
+	const posts = getPostsByCategory(category, lang);
 	const relevantPosts = currentPost.subcategory
 		? posts.filter((p) => p.subcategory === currentPost.subcategory)
 		: posts;
@@ -503,8 +549,8 @@ export function getCategories(): Category[] {
 	return getContentIndex().categories;
 }
 
-export function getRelatedPosts(currentPost: Post, limit = 3): Post[] {
-	const allPosts = getAllPosts().filter(
+export function getRelatedPosts(currentPost: Post, limit = 3, lang: string = 'en'): Post[] {
+	const allPosts = getAllPosts(lang).filter(
 		(post) => !(post.category === currentPost.category && post.fullPath === currentPost.fullPath)
 	);
 
@@ -554,12 +600,13 @@ export function getRelatedPosts(currentPost: Post, limit = 3): Post[] {
 	return [...ranked, ...fallback].slice(0, limit);
 }
 
-export function getAllTags(): { tag: string; count: number }[] {
-	return getContentIndex().allTags;
+export function getAllTags(lang: string = 'en'): { tag: string; count: number }[] {
+	// Recompute tags for the specific language
+	return buildTags(getAllPosts(lang));
 }
 
-export function searchPosts(query: string): Post[] {
-	const posts = getAllPosts();
+export function searchPosts(query: string, lang: string = 'en'): Post[] {
+	const posts = getAllPosts(lang);
 	const q = query.toLowerCase().trim();
 	if (!q) return posts;
 
@@ -572,8 +619,8 @@ export function searchPosts(query: string): Post[] {
 	});
 }
 
-export function getPostsByTag(tag: string): Post[] {
-	const posts = getAllPosts();
+export function getPostsByTag(tag: string, lang: string = 'en'): Post[] {
+	const posts = getAllPosts(lang);
 	const t = tag.toLowerCase();
 	return posts.filter((post) => post.tags?.includes(t) || post.category === t);
 }

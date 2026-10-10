@@ -23,7 +23,7 @@ export function generateStaticParams() {
 export default async function Home({ params }: { params: Promise<{ lang: Locale }> }) {
 	const { lang } = await params;
 	const t = getDictionary(lang);
-	const posts = getAllPosts();
+	const posts = getAllPosts(lang);
 	const categories = getCategories();
 	const recentPosts = posts.slice(0, 5);
 	const featuredPosts = getFeaturedPosts(posts);
@@ -339,7 +339,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 			{features.postStats && (
 				<>
 					<section className="space-y-4">
-						<PostStats />
+						<PostStats lang={lang} />
 					</section>
 					<hr className="border-border" />
 				</>

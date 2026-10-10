@@ -32,11 +32,11 @@ export async function generateStaticParams() {
 export async function generateMetadata({
 	params,
 }: {
-	params: Promise<{ category: string; slug: string[] }>;
+	params: Promise<{ lang: string; category: string; slug: string[] }>;
 }): Promise<Metadata> {
 	const resolvedParams = await params;
 	const fullSlug = resolvedParams.slug.join('/');
-	const post = getPostBySlug(resolvedParams.category, fullSlug);
+	const post = getPostBySlug(resolvedParams.category, fullSlug, resolvedParams.lang);
 
 	if (!post) {
 		return { title: 'Not Found · nam' };
@@ -78,11 +78,11 @@ export async function generateMetadata({
 export default async function PostPage({
 	params,
 }: {
-	params: Promise<{ category: string; slug: string[] }>;
+	params: Promise<{ lang: string; category: string; slug: string[] }>;
 }) {
 	const resolvedParams = await params;
 	const fullSlug = resolvedParams.slug.join('/');
-	const post = getPostBySlug(resolvedParams.category, fullSlug);
+	const post = getPostBySlug(resolvedParams.category, fullSlug, resolvedParams.lang);
 
 	if (!post) {
 		notFound();
@@ -93,11 +93,11 @@ export default async function PostPage({
 	const headings = extractHeadings(html);
 
 	// Adjacent posts for prev/next navigation
-	const adjacentPosts = getAdjacentPosts(resolvedParams.category, post);
-	const relatedPosts = getRelatedPosts(post);
+	const adjacentPosts = getAdjacentPosts(resolvedParams.category, post, resolvedParams.lang);
+	const relatedPosts = getRelatedPosts(post, 3, resolvedParams.lang);
 
 	// Series info: all posts in same category for "Part X of Y" nav
-	const categoryPosts = getPostsByCategory(resolvedParams.category);
+	const categoryPosts = getPostsByCategory(resolvedParams.category, resolvedParams.lang);
 	const currentIndex = categoryPosts.findIndex((p) => p.fullPath === post.fullPath);
 	const seriesInfo =
 		categoryPosts.length > 1 && currentIndex !== -1

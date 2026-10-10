@@ -11,9 +11,10 @@ export const metadata: Metadata = {
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default function TagsPage() {
-	const tags = getAllTags();
-	const posts = getAllPosts();
+export default async function TagsPage({ params }: { params: Promise<{ lang: string }> }) {
+	const resolvedParams = await params;
+	const tags = getAllTags(resolvedParams.lang);
+	const posts = getAllPosts(resolvedParams.lang);
 
 	// Build a map of tag -> posts
 	const postsByTag = new Map<string, typeof posts>();

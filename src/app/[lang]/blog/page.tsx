@@ -22,10 +22,11 @@ export const metadata: Metadata = {
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default function BlogPage() {
-	const posts = getBlogSearchPosts();
+export default async function BlogPage({ params }: { params: Promise<{ lang: string }> }) {
+	const resolvedParams = await params;
+	const posts = getBlogSearchPosts(resolvedParams.lang);
 	const categories = getCategories();
-	const allTags = getAllTags();
+	const allTags = getAllTags(resolvedParams.lang);
 
 	return (
 		<div className="mx-auto w-full max-w-3xl">

@@ -81,7 +81,7 @@ export default async function RootLayout({
 }>) {
 	const resolvedParams = await params;
 	const lang = resolvedParams?.lang || 'en';
-	const posts = getAllPosts();
+	const posts = getAllPosts(lang);
 	const categories = getCategories();
 	const featuredPosts = getFeaturedPosts(posts);
 	const debugWebVitals = process.env.NEXT_PUBLIC_DEBUG_WEB_VITALS === '1';
