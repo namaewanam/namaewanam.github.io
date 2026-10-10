@@ -87,6 +87,10 @@ const WPM = 200;
 let cachedContentIndex: ContentIndex | null = null;
 let cachedLastUpdatedMap: Map<string, string> | null = null;
 
+function shouldUseInMemoryCache(): boolean {
+	return process.env.NODE_ENV === 'production';
+}
+
 function computeReadingTime(content: string): number {
 	const words = content.trim().split(/\s+/).length;
 	return Math.max(1, Math.ceil(words / WPM));
@@ -162,23 +166,29 @@ function buildSearchText(post: {
 }
 
 function loadLastUpdatedMap(): Map<string, string> {
-	if (cachedLastUpdatedMap) {
+	if (shouldUseInMemoryCache() && cachedLastUpdatedMap) {
 		return cachedLastUpdatedMap;
 	}
+
+	let nextMap: Map<string, string>;
 
 	try {
 		const raw = fs.readFileSync(postMetadataManifestPath, 'utf8');
 		const parsed = JSON.parse(raw) as { posts?: Record<string, { lastUpdated?: string }> };
-		cachedLastUpdatedMap = new Map(
+		nextMap = new Map(
 			Object.entries(parsed.posts ?? {})
 				.filter(([, value]) => Boolean(value?.lastUpdated))
 				.map(([key, value]) => [key, value.lastUpdated as string])
 		);
 	} catch {
-		cachedLastUpdatedMap = new Map();
+		nextMap = new Map();
 	}
 
-	return cachedLastUpdatedMap;
+	if (shouldUseInMemoryCache()) {
+		cachedLastUpdatedMap = nextMap;
+	}
+
+	return nextMap;
 }
 
 function normalizePostReference(reference: string): string {
@@ -440,6 +450,10 @@ function buildContentIndex(): ContentIndex {
 }
 
 function getContentIndex(): ContentIndex {
+	if (!shouldUseInMemoryCache()) {
+		return buildContentIndex();
+	}
+
 	if (!cachedContentIndex) {
 		cachedContentIndex = buildContentIndex();
 	}

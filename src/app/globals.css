@@ -203,6 +203,12 @@
 	color: hsl(var(--primary));
 	opacity: 1;
 }
+.code-try-btn {
+	right: 2.75rem;
+}
+.code-lang-label ~ .code-try-btn {
+	top: 1.75rem;
+}
 
 /* Standalone <pre> not wrapped */
 pre:not(.code-block-wrapper pre) {
@@ -900,19 +906,21 @@ a[data-footnote-ref]:hover {
 
 /* Make zoomable images look clickable */
 .prose img,
-.mermaid-diagram {
+.mermaid-diagram,
+.plantuml-diagram {
 	cursor: zoom-in;
 }
 
-/* Mermaid diagram action bar */
+/* Diagram action bar */
 
-.mermaid-diagram {
+.mermaid-diagram,
+.plantuml-diagram {
 	position: relative;
 	flex-direction: column;
 	cursor: default;
 }
 
-.mermaid-actions {
+.diagram-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: 0.4rem;
@@ -922,7 +930,8 @@ a[data-footnote-ref]:hover {
 	width: 100%;
 }
 
-.mermaid-actions button:hover {
+.diagram-actions button:hover,
+.diagram-actions a:hover {
 	color: hsl(var(--foreground));
 	border-color: hsl(var(--primary) / 0.5);
 }

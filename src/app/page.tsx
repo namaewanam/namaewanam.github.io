@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { getAllPosts, getCategories } from '@/lib/markdown';
 import FeaturedWriteups from '@/components/home/FeaturedWriteups';
 import CopyableContactValue from '@/components/home/CopyableContactValue';
+import PostStats from '@/components/home/PostStats';
+import NewsletterForm from '@/components/layout/NewsletterForm';
+import { features } from '@/lib/features';
 import {
 	buildMailtoHref,
 	CONTACT_EMAIL,
@@ -196,7 +199,7 @@ export default function Home() {
 							desc: 'Internal financial management system with Spring Boot, Keycloak, Apache POI, PostgreSQL. Docker Compose + GitLab CI/CD pipelines.',
 						},
 						{
-							role: 'B.Sc. Information Technology · CPA 3.57/4.0',
+							role: 'B.Sc. Information Technology · CPA 3.6/4.0',
 							org: 'VNUHCM — University of Science',
 							period: 'Oct 2022 – Oct 2026',
 							desc: 'Software Engineering major. Coursework: Software Architecture, Data Structures & Algorithms, Database Systems, DevOps Fundamentals.',
@@ -307,6 +310,15 @@ export default function Home() {
 			<hr className="border-border" />
 
 			{/* Recent Posts */}
+			{features.postStats && (
+				<>
+					<section className="space-y-4">
+						<PostStats />
+					</section>
+					<hr className="border-border" />
+				</>
+			)}
+
 			<section className="space-y-4">
 				<FeaturedWriteups posts={featuredPosts} />
 			</section>
@@ -359,6 +371,15 @@ export default function Home() {
 					))}
 				</div>
 			</section>
+
+			{features.newsletter && (
+				<>
+					<hr className="border-border" />
+					<section className="space-y-4">
+						<NewsletterForm />
+					</section>
+				</>
+			)}
 		</div>
 	);
 }

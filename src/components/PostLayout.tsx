@@ -1,8 +1,12 @@
 import Link from 'next/link';
 import MarkdownContent from '@/components/MarkdownContent';
 import TableOfContents from '@/components/TableOfContents';
+import BookmarkButton from '@/components/blog/BookmarkButton';
+import PostReactions from '@/components/blog/PostReactions';
 import RelatedPosts from '@/components/blog/RelatedPosts';
+import ShareButtons from '@/components/blog/ShareButtons';
 import GiscusComments from '@/components/GiscusComments';
+import { features } from '@/lib/features';
 import type { Post, AdjacentPosts } from '@/lib/markdown';
 import type { Heading } from '@/lib/mdx';
 
@@ -165,6 +169,17 @@ export default function PostLayout({
 					<MarkdownContent html={html} />
 				</article>
 
+				{/* Post Interactions: share, reactions, bookmark */}
+				{(features.shareButtons || features.postReactions || features.readingList) && (
+					<div className="flex flex-wrap items-center gap-4 border-t border-border pt-5">
+						{features.shareButtons && <ShareButtons title={post.title} />}
+						{features.postReactions && <PostReactions slug={`${post.category}/${post.fullPath}`} />}
+						{features.readingList && (
+							<BookmarkButton slug={`${post.category}/${post.fullPath}`} size="md" />
+						)}
+					</div>
+				)}
+
 				{relatedPosts && relatedPosts.length > 0 && <RelatedPosts posts={relatedPosts} />}
 
 				{/* Navigation: Previous/Next */}
@@ -238,18 +253,20 @@ export default function PostLayout({
 				</div>
 
 				{/* Giscus comments — powered by GitHub Discussions */}
-				<GiscusComments
-					repo="namaewanam/namaewanam.github.io"
-					repoId="R_kgDOQCxDSQ"
-					category="Announcements"
-					categoryId="DIC_kwDOQCxDSc4C9rol"
-					mapping="pathname"
-					strict="0"
-					reactionsEnabled="1"
-					emitMetadata="0"
-					inputPosition="bottom"
-					lang="en"
-				/>
+				{features.comments && (
+					<GiscusComments
+						repo="namaewanam/namaewanam.github.io"
+						repoId="R_kgDOQCxDSQ"
+						category="Announcements"
+						categoryId="DIC_kwDOQCxDSc4C9rol"
+						mapping="pathname"
+						strict="0"
+						reactionsEnabled="1"
+						emitMetadata="0"
+						inputPosition="bottom"
+						lang="en"
+					/>
+				)}
 			</div>
 
 			{hasTableOfContents && (

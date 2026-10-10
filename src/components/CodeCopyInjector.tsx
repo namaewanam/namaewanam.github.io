@@ -1,14 +1,86 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { getPlantUmlSvgUrl } from '@/lib/plantuml';
+
+const COPY_ICON =
+	'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const COPY_ICON_SMALL =
+	'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_ICON =
+	'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const CHECK_ICON_SMALL =
+	'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const DOWNLOAD_ICON =
+	'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+const ACTION_BUTTON_STYLE =
+	'display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.55rem;border-radius:0.25rem;background:hsl(var(--card));border:1px solid hsl(var(--border));color:hsl(var(--muted-foreground));cursor:pointer;font-size:11px;font-family:var(--font-mono),monospace;transition:color 0.15s,border-color 0.15s;text-decoration:none;';
+
+const PLAY_ICON =
+	'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+
+/** Playground URLs for supported languages. */
+const PLAYGROUND_URLS: Record<string, string> = {
+	java: 'https://www.jdoodle.com/online-java-compiler/',
+	python: 'https://www.programiz.com/python-programming/online-compiler/',
+	javascript: 'https://playcode.io/new',
+	js: 'https://playcode.io/new',
+	typescript: 'https://www.typescriptlang.org/play',
+	ts: 'https://www.typescriptlang.org/play',
+	go: 'https://go.dev/play/',
+	golang: 'https://go.dev/play/',
+	rust: 'https://play.rust-lang.org/',
+	sql: 'https://www.db-fiddle.com/',
+	bash: 'https://www.onlinegdb.com/online_bash_shell',
+	shell: 'https://www.onlinegdb.com/online_bash_shell',
+	sh: 'https://www.onlinegdb.com/online_bash_shell',
+	c: 'https://www.onlinegdb.com/online_c_compiler',
+	cpp: 'https://www.onlinegdb.com/online_c++_compiler',
+	'c++': 'https://www.onlinegdb.com/online_c++_compiler',
+};
+
+function createActionButton(icon: string, label: string, ariaLabel: string): HTMLButtonElement {
+	const button = document.createElement('button');
+	button.type = 'button';
+	button.style.cssText = ACTION_BUTTON_STYLE;
+	button.setAttribute('aria-label', ariaLabel);
+	button.innerHTML = `${icon} ${label}`;
+	return button;
+}
+
+function createActionLink(
+	icon: string,
+	label: string,
+	ariaLabel: string,
+	href: string
+): HTMLAnchorElement {
+	const link = document.createElement('a');
+	link.href = href;
+	link.target = '_blank';
+	link.rel = 'noopener noreferrer';
+	link.style.cssText = ACTION_BUTTON_STYLE;
+	link.setAttribute('aria-label', ariaLabel);
+	link.innerHTML = `${icon} ${label}`;
+	return link;
+}
 
 /**
- * Client-side component (~2 kB) that enhances server-rendered HTML:
- * 1. Wraps <pre> blocks with copy button + language label
- * 2. Adds line numbers to code blocks
+ * Client-side component that enhances server-rendered HTML:
+ * 1. Wraps code blocks with copy button + language label
+ * 2. Renders Mermaid and PlantUML blocks as diagrams
  * 3. Adds copyable anchor links to h2/h3 headings
  */
-export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
+export interface PostMetaPreview {
+	url: string;
+	title: string;
+	description?: string | undefined;
+	readingTimeMin: number;
+}
+
+export default function CodeCopyInjector({
+	html,
+	postsMeta,
+}: Readonly<{ html: string; postsMeta?: PostMetaPreview[] }>) {
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -34,24 +106,243 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 			}, 1400);
 		};
 
+		const openLightbox = (content: HTMLElement | SVGElement) => {
+			const overlay = document.createElement('div');
+			overlay.className = 'lightbox-overlay';
+			overlay.setAttribute('role', 'dialog');
+			overlay.setAttribute('aria-modal', 'true');
+			overlay.setAttribute('aria-label', 'Image enlarged');
+
+			const close = document.createElement('button');
+			close.className = 'lightbox-close';
+			close.textContent = '×';
+			close.setAttribute('aria-label', 'Close');
+
+			const dismiss = () => {
+				overlay.remove();
+				document.removeEventListener('keydown', onKey);
+			};
+			const onKey = (event: KeyboardEvent) => {
+				if (event.key === 'Escape') dismiss();
+			};
+
+			overlay.addEventListener('click', dismiss);
+			close.addEventListener('click', (event) => {
+				event.stopPropagation();
+				dismiss();
+			});
+			overlay.appendChild(close);
+			document.addEventListener('keydown', onKey);
+			document.body.appendChild(overlay);
+
+			const buildSvgWrap = (svgEl: SVGSVGElement) => {
+				// Read natural dimensions before removing attributes
+				const naturalW =
+					parseFloat(svgEl.getAttribute('width') ?? '0') || svgEl.viewBox?.baseVal?.width || 800;
+				const naturalH =
+					parseFloat(svgEl.getAttribute('height') ?? '0') || svgEl.viewBox?.baseVal?.height || 600;
+
+				// Ensure viewBox is set so the browser can scale correctly
+				if (!svgEl.getAttribute('viewBox')) {
+					svgEl.setAttribute('viewBox', `0 0 ${naturalW} ${naturalH}`);
+				}
+				svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+				// Compute scale to fit within 88vh × 92vw, with a minimum scale of 1
+				// so small diagrams display at least at their natural size
+				const maxW = window.innerWidth * 0.86;
+				const maxH = window.innerHeight * 0.82;
+				const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
+				const displayW = Math.round(naturalW * scale);
+				const displayH = Math.round(naturalH * scale);
+
+				svgEl.setAttribute('width', String(displayW));
+				svgEl.setAttribute('height', String(displayH));
+				svgEl.style.cssText = 'display:block;max-width:100%;';
+
+				const wrap = document.createElement('div');
+				wrap.style.cssText =
+					'display:flex;align-items:center;justify-content:center;' +
+					'background:hsl(var(--card) / 0.4);padding:2rem;border-radius:8px;' +
+					'border:1px solid hsl(var(--border));overflow:auto;' +
+					`max-width:92vw;max-height:88vh;`;
+				wrap.appendChild(svgEl);
+				wrap.addEventListener('click', (e) => e.stopPropagation());
+				overlay.insertBefore(wrap, close);
+			};
+
+			if (content instanceof HTMLImageElement) {
+				// PlantUML diagrams are <img src="…/plantuml/svg/…">
+				// Fetch and inline the SVG so it scales to fill the lightbox.
+				const isPlantUml = !!content.closest('.plantuml-diagram');
+				if (isPlantUml && content.src) {
+					const placeholder = document.createElement('div');
+					placeholder.style.cssText =
+						'color:hsl(var(--muted-foreground));font-size:13px;' +
+						'font-family:var(--font-mono),monospace;padding:2rem;';
+					placeholder.textContent = 'Loading…';
+					overlay.insertBefore(placeholder, close);
+
+					fetch(content.src)
+						.then((r) => r.text())
+						.then((svgText) => {
+							const parser = new DOMParser();
+							const doc = parser.parseFromString(svgText, 'image/svg+xml');
+							const svgEl = doc.querySelector('svg');
+							if (!svgEl) throw new Error('no svg');
+							const imported = document.importNode(svgEl, true) as SVGSVGElement;
+							placeholder.remove();
+							buildSvgWrap(imported);
+						})
+						.catch(() => {
+							placeholder.remove();
+							const img = document.createElement('img');
+							img.src = content.src;
+							img.alt = content.alt;
+							img.style.cssText =
+								'max-width:92vw;max-height:88vh;border-radius:6px;display:block;' +
+								'box-shadow:0 25px 60px rgba(0,0,0,0.4);';
+							img.addEventListener('click', (e) => e.stopPropagation());
+							overlay.insertBefore(img, close);
+						});
+					return;
+				}
+
+				// Regular inline image
+				const img = document.createElement('img');
+				img.src = content.src;
+				img.alt = content.alt;
+				img.style.cssText =
+					'max-width:92vw;max-height:88vh;border-radius:6px;display:block;' +
+					'box-shadow:0 25px 60px rgba(0,0,0,0.4);';
+				img.addEventListener('click', (e) => e.stopPropagation());
+				overlay.insertBefore(img, close);
+				return;
+			}
+
+			// SVGElement — Mermaid diagrams (already inline SVG)
+			const clone = content.cloneNode(true) as SVGSVGElement;
+			buildSvgWrap(clone);
+		};
+
+		const reRenderPlantUml = (dark: boolean) => {
+			container.querySelectorAll<HTMLElement>('.plantuml-diagram[data-src]').forEach((wrapper) => {
+				const source = wrapper.getAttribute('data-src');
+				if (!source) return;
+
+				const img = wrapper.querySelector<HTMLImageElement>('img');
+				const svgLink = wrapper.querySelector<HTMLAnchorElement>('a[aria-label="Open SVG"]');
+				const fallback = wrapper.querySelector<HTMLElement>('figcaption');
+				const nextUrl = getPlantUmlSvgUrl(source, dark);
+
+				if (img) {
+					img.src = nextUrl;
+				}
+
+				if (svgLink) {
+					svgLink.href = nextUrl;
+				}
+
+				if (fallback) {
+					fallback.classList.add('hidden');
+				}
+			});
+		};
+
+		// PlantUML diagrams: replace pre>code.language-plantuml / puml
+		const plantUmlBlocks = container.querySelectorAll<HTMLElement>(
+			'pre:has(code.language-plantuml), pre:has(code.language-puml)'
+		);
+		plantUmlBlocks.forEach((pre) => {
+			const code = pre.querySelector<HTMLElement>('code.language-plantuml, code.language-puml');
+			if (!code) return;
+
+			const diagram = code.textContent?.trim() ?? '';
+			if (!diagram) return;
+
+			const wrapper = document.createElement('figure');
+			wrapper.className =
+				'plantuml-diagram relative group my-6 overflow-hidden rounded border border-border bg-card/40 p-4';
+			wrapper.setAttribute('data-src', diagram);
+
+			const langLabel = document.createElement('span');
+			langLabel.className = 'code-lang-label';
+			langLabel.textContent = code.classList.contains('language-puml') ? 'puml' : 'plantuml';
+			wrapper.appendChild(langLabel);
+
+			const img = document.createElement('img');
+			img.src = getPlantUmlSvgUrl(diagram, document.documentElement.classList.contains('dark'));
+			img.alt = 'PlantUML diagram';
+			img.loading = 'lazy';
+			img.decoding = 'async';
+			img.className = 'mx-auto block h-auto max-w-full rounded';
+
+			const fallback = document.createElement('figcaption');
+			fallback.className =
+				'mt-3 hidden rounded border border-destructive/30 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive';
+			fallback.textContent =
+				'PlantUML render failed. Check syntax or configure NEXT_PUBLIC_PLANTUML_SERVER_URL.';
+
+			img.addEventListener('error', () => {
+				fallback.classList.remove('hidden');
+			});
+
+			wrapper.appendChild(img);
+			wrapper.appendChild(fallback);
+
+			const actions = document.createElement('div');
+			actions.className = 'diagram-actions';
+
+			const copyBtn = createActionButton(COPY_ICON_SMALL, 'copy', 'Copy PlantUML source');
+			copyBtn.addEventListener('click', (event) => {
+				event.stopPropagation();
+				void navigator.clipboard.writeText(diagram).then(() => {
+					copyBtn.innerHTML = `${CHECK_ICON_SMALL} copied`;
+					showToast('copied source');
+					setTimeout(() => {
+						copyBtn.innerHTML = `${COPY_ICON_SMALL} copy`;
+					}, 2000);
+				});
+			});
+
+			const svgLink = createActionLink(DOWNLOAD_ICON, 'svg', 'Open SVG', img.src);
+			svgLink.addEventListener('click', (event) => event.stopPropagation());
+
+			actions.appendChild(copyBtn);
+			actions.appendChild(svgLink);
+			wrapper.appendChild(actions);
+
+			pre.replaceWith(wrapper);
+		});
+
+		if (plantUmlBlocks.length > 0) {
+			const plantUmlThemeObserver = new MutationObserver(() => {
+				reRenderPlantUml(document.documentElement.classList.contains('dark'));
+			});
+			plantUmlThemeObserver.observe(document.documentElement, {
+				attributes: true,
+				attributeFilter: ['class'],
+			});
+		}
+
 		// Code blocks: wrap, label, copy, line numbers
 		const preBlocks = container.querySelectorAll('pre');
 		preBlocks.forEach((pre) => {
 			if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
-			// Mermaid blocks are handled separately — skip here
 			if (pre.querySelector('code.language-mermaid')) return;
+			if (pre.querySelector('code.language-plantuml, code.language-puml')) return;
 
 			const code = pre.querySelector('code');
-			const langClass = Array.from(code?.classList ?? []).find((c) => c.startsWith('language-'));
+			const langClass = Array.from(code?.classList ?? []).find((className) =>
+				className.startsWith('language-')
+			);
 			const lang = langClass?.replace('language-', '') ?? '';
 
-			// Wrap <pre>
 			const wrapper = document.createElement('div');
 			wrapper.className = 'code-block-wrapper relative group';
 			pre.parentNode?.insertBefore(wrapper, pre);
 			wrapper.appendChild(pre);
 
-			// Language label
 			if (lang) {
 				const label = document.createElement('span');
 				label.className = 'code-lang-label';
@@ -59,10 +350,8 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 				wrapper.appendChild(label);
 			}
 
-			// Line numbers: wrap each line in a span
 			if (code) {
 				const lines = code.innerHTML.split('\n');
-				// Remove trailing empty line (common in code blocks)
 				if (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
 					lines.pop();
 				}
@@ -70,33 +359,46 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 				code.classList.add('code-numbered');
 			}
 
-			// Copy button
-			const copyIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-			const checkIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-
-			const btn = document.createElement('button');
-			btn.className = 'code-copy-btn';
-			btn.setAttribute('aria-label', 'Copy code');
-			btn.innerHTML = copyIcon;
-			btn.addEventListener('click', () => {
+			const button = document.createElement('button');
+			button.className = 'code-copy-btn';
+			button.setAttribute('aria-label', 'Copy code');
+			button.innerHTML = COPY_ICON;
+			button.addEventListener('click', () => {
 				const text = code?.textContent ?? pre.textContent ?? '';
 				navigator.clipboard.writeText(text).then(() => {
-					btn.innerHTML = checkIcon;
-					btn.classList.add('copied');
+					button.innerHTML = CHECK_ICON;
+					button.classList.add('copied');
 					showToast('copied code');
 					setTimeout(() => {
-						btn.innerHTML = copyIcon;
-						btn.classList.remove('copied');
+						button.innerHTML = COPY_ICON;
+						button.classList.remove('copied');
 					}, 2000);
 				});
 			});
-			wrapper.appendChild(btn);
+			wrapper.appendChild(button);
+
+			// Interactive code: add "try it" button for supported languages
+			const playgroundUrl = lang ? PLAYGROUND_URLS[lang.toLowerCase()] : undefined;
+			if (playgroundUrl) {
+				const tryBtn = document.createElement('button');
+				tryBtn.className = 'code-copy-btn code-try-btn';
+				tryBtn.setAttribute('aria-label', `Try ${lang} code in playground`);
+				tryBtn.innerHTML = PLAY_ICON;
+				tryBtn.style.cssText = 'right:2.75rem;';
+				tryBtn.addEventListener('click', () => {
+					const text = code?.textContent ?? pre.textContent ?? '';
+					navigator.clipboard.writeText(text).then(() => {
+						showToast('code copied — paste in playground');
+						window.open(playgroundUrl, '_blank', 'noopener,noreferrer');
+					});
+				});
+				wrapper.appendChild(tryBtn);
+			}
 		});
 
 		// Mermaid diagrams: replace pre>code.language-mermaid
 		const mermaidBlocks = container.querySelectorAll<HTMLElement>('pre:has(code.language-mermaid)');
 		if (mermaidBlocks.length > 0) {
-			// Build theme variables for a given mode
 			const getMermaidVars = (dark: boolean) =>
 				dark
 					? {
@@ -174,8 +476,8 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 							git5: '#dc2626',
 						};
 
-			// Re-render all .mermaid-diagram wrappers using stored source
 			let renderCounter = 0;
+
 			const reRenderAll = async (dark: boolean) => {
 				try {
 					const mermaid = (await import('mermaid')).default;
@@ -185,13 +487,15 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 						themeVariables: getMermaidVars(dark),
 						securityLevel: 'loose',
 					});
+
 					const wrappers = container.querySelectorAll<HTMLElement>('.mermaid-diagram[data-src]');
 					for (const wrapper of wrappers) {
-						const src = wrapper.getAttribute('data-src');
-						if (!src) continue;
+						const source = wrapper.getAttribute('data-src');
+						if (!source) continue;
 						const uid = `mermaid-rc-${++renderCounter}`;
+
 						try {
-							const { svg } = await mermaid.render(uid, src);
+							const { svg } = await mermaid.render(uid, source);
 							const oldSvg = wrapper.querySelector('svg');
 							if (oldSvg) {
 								const temp = document.createElement('div');
@@ -202,19 +506,16 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 									newSvg.addEventListener('click', () => openLightbox(newSvg));
 									oldSvg.replaceWith(newSvg);
 								}
-							} else {
-								wrapper.innerHTML = svg;
 							}
-						} catch (err) {
-							console.warn('Mermaid re-render failed:', err);
+						} catch (error) {
+							console.warn('Mermaid re-render failed:', error);
 						}
 					}
-				} catch (err) {
-					console.warn('Mermaid not available:', err);
+				} catch (error) {
+					console.warn('Mermaid not available:', error);
 				}
 			};
 
-			// Initial render — replace pre blocks with wrappers that store src
 			void (async () => {
 				try {
 					const mermaid = (await import('mermaid')).default;
@@ -232,6 +533,7 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 						if (!code) continue;
 						const diagram = code.textContent ?? '';
 						const uid = `mermaid-init-${idx++}`;
+
 						try {
 							const { svg } = await mermaid.render(uid, diagram);
 							const wrapper = document.createElement('div');
@@ -242,83 +544,68 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 							wrapper.setAttribute('data-src', diagram);
 							wrapper.innerHTML = svg;
 
-							// Language label — top right, same style as code blocks
 							const langLabel = document.createElement('span');
 							langLabel.className = 'code-lang-label';
 							langLabel.textContent = 'mermaid';
 							wrapper.appendChild(langLabel);
 
-							// Lightbox: click SVG area to zoom (attach inline, after async render)
-							const svgEl = wrapper.querySelector('svg');
-							if (svgEl) {
-								svgEl.style.cursor = 'zoom-in';
-								svgEl.addEventListener('click', () => openLightbox(svgEl));
+							const svgElement = wrapper.querySelector('svg');
+							if (svgElement) {
+								svgElement.style.cursor = 'zoom-in';
+								svgElement.addEventListener('click', () => openLightbox(svgElement));
 							}
 
-							// Action buttons: download SVG + copy source (bottom-right)
 							const actions = document.createElement('div');
-							actions.className = 'mermaid-actions';
-							const aBtnStyle =
-								'display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.55rem;border-radius:0.25rem;background:hsl(var(--card));border:1px solid hsl(var(--border));color:hsl(var(--muted-foreground));cursor:pointer;font-size:11px;font-family:var(--font-mono),monospace;transition:color 0.15s,border-color 0.15s;';
-							const cpIcon =
-								'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-							const dlIcon =
-								'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
-							const ckIcon =
-								'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+							actions.className = 'diagram-actions';
 
-							// Copy source
-							const srcBtn = document.createElement('button');
-							srcBtn.style.cssText = aBtnStyle;
-							srcBtn.setAttribute('aria-label', 'Copy Mermaid source');
-							srcBtn.innerHTML = cpIcon + ' copy';
-							srcBtn.addEventListener('click', (e) => {
-								e.stopPropagation();
+							const sourceButton = createActionButton(
+								COPY_ICON_SMALL,
+								'copy',
+								'Copy Mermaid source'
+							);
+							sourceButton.addEventListener('click', (event) => {
+								event.stopPropagation();
 								void navigator.clipboard.writeText(diagram).then(() => {
-									srcBtn.innerHTML = ckIcon + ' copied';
+									sourceButton.innerHTML = `${CHECK_ICON_SMALL} copied`;
 									showToast('copied source');
 									setTimeout(() => {
-										srcBtn.innerHTML = cpIcon + ' copy';
+										sourceButton.innerHTML = `${COPY_ICON_SMALL} copy`;
 									}, 2000);
 								});
 							});
 
-							// Download SVG
-							const dlBtn = document.createElement('button');
-							dlBtn.style.cssText = aBtnStyle;
-							dlBtn.setAttribute('aria-label', 'Download SVG');
-							dlBtn.innerHTML = dlIcon + ' svg';
-							dlBtn.addEventListener('click', (e) => {
-								e.stopPropagation();
-								const s = wrapper.querySelector('svg');
-								if (!s) return;
-								const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', s.outerHTML], {
-									type: 'image/svg+xml',
-								});
+							const downloadButton = createActionButton(DOWNLOAD_ICON, 'svg', 'Download SVG');
+							downloadButton.addEventListener('click', (event) => {
+								event.stopPropagation();
+								const svgNode = wrapper.querySelector('svg');
+								if (!svgNode) return;
+								const blob = new Blob(
+									['<?xml version="1.0" encoding="UTF-8"?>\n', svgNode.outerHTML],
+									{ type: 'image/svg+xml' }
+								);
 								const url = URL.createObjectURL(blob);
-								const a = document.createElement('a');
-								a.href = url;
-								a.download = `diagram-${uid}.svg`;
-								a.click();
+								const anchor = document.createElement('a');
+								anchor.href = url;
+								anchor.download = `diagram-${uid}.svg`;
+								anchor.click();
 								URL.revokeObjectURL(url);
 								showToast('downloaded SVG');
 							});
 
-							actions.appendChild(srcBtn);
-							actions.appendChild(dlBtn);
+							actions.appendChild(sourceButton);
+							actions.appendChild(downloadButton);
 							wrapper.appendChild(actions);
 
 							pre.replaceWith(wrapper);
-						} catch (err) {
-							console.warn('Mermaid render failed:', err);
+						} catch (error) {
+							console.warn('Mermaid render failed:', error);
 						}
 					}
-				} catch (err) {
-					console.warn('Mermaid not available:', err);
+				} catch (error) {
+					console.warn('Mermaid not available:', error);
 				}
 			})();
 
-			// Re-render diagrams when site theme toggles
 			const themeObserver = new MutationObserver(() => {
 				const dark = document.documentElement.classList.contains('dark');
 				void reRenderAll(dark);
@@ -329,7 +616,6 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 			});
 		}
 
-		// Heading anchors: add # link to h2/h3
 		const headings = container.querySelectorAll('h2[id], h3[id]');
 		headings.forEach((heading) => {
 			if (heading.querySelector('.heading-anchor')) return;
@@ -339,8 +625,8 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 			anchor.href = `#${heading.id}`;
 			anchor.textContent = '#';
 			anchor.setAttribute('aria-label', `Link to ${heading.textContent}`);
-			anchor.addEventListener('click', (e) => {
-				e.preventDefault();
+			anchor.addEventListener('click', (event) => {
+				event.preventDefault();
 				const url = `${window.location.origin}${window.location.pathname}#${heading.id}`;
 				navigator.clipboard.writeText(url);
 				heading.scrollIntoView({ behavior: 'smooth' });
@@ -350,67 +636,85 @@ export default function CodeCopyInjector({ html }: Readonly<{ html: string }>) {
 			heading.appendChild(anchor);
 		});
 
-		// Image / Mermaid lightbox
-		const openLightbox = (content: HTMLElement | SVGElement) => {
-			const overlay = document.createElement('div');
-			overlay.className = 'lightbox-overlay';
-			overlay.setAttribute('role', 'dialog');
-			overlay.setAttribute('aria-modal', 'true');
-			overlay.setAttribute('aria-label', 'Image enlarged');
-
-			const close = document.createElement('button');
-			close.className = 'lightbox-close';
-			close.textContent = '×';
-			close.setAttribute('aria-label', 'Close');
-
-			let inner: HTMLElement;
-			if (content instanceof HTMLImageElement) {
-				const img = document.createElement('img');
-				img.src = content.src;
-				img.alt = content.alt;
-				inner = img;
-			} else {
-				// SVG clone for mermaid diagrams
-				const clone = content.cloneNode(true) as SVGElement;
-				// Remove inline dimensions so it scales up
-				clone.removeAttribute('width');
-				clone.removeAttribute('height');
-				clone.style.width = '100%';
-				clone.style.height = 'auto';
-				clone.style.maxWidth = 'none';
-
-				const wrap = document.createElement('div');
-				wrap.style.cssText =
-					'display:flex;align-items:center;justify-content:center;background:hsl(var(--card) / 0.4);padding:2rem;border-radius:8px;border:1px solid hsl(var(--border));max-width:92vw;max-height:88vh;overflow:auto;width:min(1200px, 92vw);';
-				wrap.appendChild(clone);
-				inner = wrap;
-			}
-
-			const dismiss = () => {
-				overlay.remove();
-				document.removeEventListener('keydown', onKey);
-			};
-			const onKey = (e: KeyboardEvent) => {
-				if (e.key === 'Escape') dismiss();
-			};
-			overlay.addEventListener('click', dismiss);
-			close.addEventListener('click', (e) => {
-				e.stopPropagation();
-				dismiss();
-			});
-			inner.addEventListener('click', (e) => e.stopPropagation());
-			document.addEventListener('keydown', onKey);
-
-			overlay.appendChild(inner);
-			overlay.appendChild(close);
-			document.body.appendChild(overlay);
-		};
-
-		// Zoomable images
-		container.querySelectorAll<HTMLImageElement>('.prose img').forEach((img) => {
+		container.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+			if (img.closest('.lightbox-overlay')) return;
+			if (img.dataset.zoomBound === 'true') return;
+			img.dataset.zoomBound = 'true';
 			img.style.cursor = 'zoom-in';
 			img.addEventListener('click', () => openLightbox(img));
 		});
+
+		// Wikipedia-style Link Previews
+		if (postsMeta && postsMeta.length > 0) {
+			const internalLinks = container.querySelectorAll<HTMLAnchorElement>('a[href^="/blog/"]');
+
+			let popover = document.getElementById('wiki-link-preview');
+			if (!popover) {
+				popover = document.createElement('div');
+				popover.id = 'wiki-link-preview';
+				popover.className =
+					'absolute z-50 w-72 rounded-lg border border-border bg-card p-4 shadow-xl opacity-0 pointer-events-none transition-opacity duration-200';
+				document.body.appendChild(popover);
+			}
+
+			// Use a global variable on the window to track the hide timeout across renders
+			// so that fast hovering doesn't glitch.
+			const w = window as any;
+
+			internalLinks.forEach((link) => {
+				const href = link.getAttribute('href');
+				if (!href) return;
+
+				// Extract the base URL without hashes
+				const baseUrl = href.split('#')[0];
+				if (!baseUrl) return;
+
+				const post = postsMeta.find(
+					(p) => baseUrl.toLowerCase().replace(/\/$/, '') === p.url.toLowerCase().replace(/\/$/, '')
+				);
+				if (!post) return;
+
+				link.addEventListener('mouseenter', () => {
+					clearTimeout(w.__wikiPreviewTimeout);
+
+					popover!.innerHTML = `
+						<div class="space-y-2">
+							<h4 class="font-semibold text-sm leading-tight text-foreground">${post.title}</h4>
+							${post.description ? `<p class="text-xs text-muted-foreground line-clamp-3">${post.description}</p>` : ''}
+							<div class="flex items-center gap-1.5 text-[10px] font-mono text-primary">
+								<span>~${post.readingTimeMin} min read</span>
+							</div>
+						</div>
+					`;
+
+					popover!.style.display = 'block';
+
+					const rect = link.getBoundingClientRect();
+					let top = rect.top + window.scrollY - popover!.offsetHeight - 10;
+
+					// Place below if not enough space above
+					if (rect.top - popover!.offsetHeight < 60) {
+						top = rect.bottom + window.scrollY + 10;
+					}
+
+					let left = rect.left + window.scrollX + rect.width / 2 - popover!.offsetWidth / 2;
+					if (left < 10) left = 10;
+					if (left + popover!.offsetWidth > window.innerWidth - 10) {
+						left = window.innerWidth - popover!.offsetWidth - 10;
+					}
+
+					popover!.style.top = `${top}px`;
+					popover!.style.left = `${left}px`;
+					popover!.style.opacity = '1';
+				});
+
+				link.addEventListener('mouseleave', () => {
+					w.__wikiPreviewTimeout = setTimeout(() => {
+						popover!.style.opacity = '0';
+					}, 150);
+				});
+			});
+		}
 	}, [html]);
 
 	return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
