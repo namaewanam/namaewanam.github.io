@@ -30,7 +30,11 @@ const INITIAL_METADATA: PostMetadata = {
 	lang: 'en',
 };
 
-export default function EditorView() {
+interface EditorViewProps {
+	initialCategories?: string[];
+}
+
+export default function EditorView({ initialCategories = [] }: Readonly<EditorViewProps>) {
 	const [token, setToken] = useState<string | null>(null);
 	const [user, setUser] = useState<GitHubUser | null>(null);
 	const [docsTree, setDocsTree] = useState<string[]>([]);
@@ -214,6 +218,12 @@ export default function EditorView() {
 		}
 	};
 
+	const treeCategories = docsTree
+		.map((p) => p.replace(/^docs\//, '').split('/')[0])
+		.filter((c): c is string => typeof c === 'string' && c.length > 0 && !c.endsWith('.md'));
+
+	const categories = Array.from(new Set([...initialCategories, ...treeCategories])).sort();
+
 	return (
 		<div className="space-y-6">
 			{/* Token Manager */}
@@ -261,6 +271,7 @@ export default function EditorView() {
 				onSlugChange={setSlug}
 				onFileLoad={handleFileLoad}
 				docsTree={docsTree}
+				categories={categories}
 				currentPath={currentPath}
 				isNew={isNew}
 				setIsNew={(val) => {

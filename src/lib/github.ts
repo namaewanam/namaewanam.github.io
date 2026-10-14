@@ -1,10 +1,13 @@
+import { Octokit } from 'octokit';
+
 export interface GitHubUser {
 	login: string;
 	avatar_url: string;
 	name: string;
 }
 
-export const DEFAULT_REPO = 'namaewanam/namaewanam.github.io';
+export const DEFAULT_OWNER = 'namaewanam';
+export const DEFAULT_REPO = 'namaewanam.github.io';
 
 /**
  * Safely converts any UTF-8 string (including Vietnamese and emojis) to base64.
@@ -32,60 +35,54 @@ export function fromBase64Unicode(base64: string): string {
 }
 
 /**
- * Verifies a GitHub PAT by checking user identity and repository push access.
+ * Returns an authenticated Octokit instance.
  */
-export async function verifyGitHubToken(
-	token: string,
-	repo: string = DEFAULT_REPO
-): Promise<{ user: GitHubUser; canPush: boolean }> {
-	const headers = {
-		Authorization: `Bearer ${token.trim()}`,
-		Accept: 'application/vnd.github+json',
-	};
-
-	const userRes = await fetch('https://api.github.com/user', { headers });
-	if (!userRes.ok) {
-		throw new Error(
-			userRes.status === 401
-				? 'Invalid Personal Access Token.'
-				: `Failed to authenticate: ${userRes.statusText}`
-		);
-	}
-	const user = (await userRes.json()) as GitHubUser;
-
-	const repoRes = await fetch(`https://api.github.com/repos/${repo}`, { headers });
-	if (!repoRes.ok) {
-		throw new Error(
-			`Cannot access repository ${repo} (${repoRes.status}): verify token repository scope.`
-		);
-	}
-	const repoData = (await repoRes.json()) as {
-		permissions?: { push?: boolean; admin?: boolean };
-	};
-	const canPush = Boolean(repoData.permissions?.push) || Boolean(repoData.permissions?.admin);
-
-	return { user, canPush };
+function getOctokit(token: string): Octokit {
+	return new Octokit({ auth: token.trim() });
 }
 
 /**
- * Fetches all markdown file paths under docs/ on the main branch.
+ * Verifies a GitHub PAT using official Octokit REST client.
  */
-export async function fetchDocsTree(token: string, repo: string = DEFAULT_REPO): Promise<string[]> {
-	const headers = {
-		Authorization: `Bearer ${token.trim()}`,
-		Accept: 'application/vnd.github+json',
-	};
+export async function verifyGitHubToken(
+	token: string,
+	owner: string = DEFAULT_OWNER,
+	repo: string = DEFAULT_REPO
+): Promise<{ user: GitHubUser; canPush: boolean }> {
+	const octokit = getOctokit(token);
 
-	const res = await fetch(`https://api.github.com/repos/${repo}/git/trees/main?recursive=1`, {
-		headers,
+	const { data: user } = await octokit.rest.users.getAuthenticated();
+	const { data: repoData } = await octokit.rest.repos.get({ owner, repo });
+
+	const canPush = Boolean(repoData.permissions?.push) || Boolean(repoData.permissions?.admin);
+
+	return {
+		user: {
+			login: user.login,
+			avatar_url: user.avatar_url,
+			name: user.name || user.login,
+		},
+		canPush,
+	};
+}
+
+/**
+ * Fetches all markdown file paths under docs/ on the main branch via Octokit.
+ */
+export async function fetchDocsTree(
+	token: string,
+	owner: string = DEFAULT_OWNER,
+	repo: string = DEFAULT_REPO
+): Promise<string[]> {
+	const octokit = getOctokit(token);
+
+	const { data } = await octokit.rest.git.getTree({
+		owner,
+		repo,
+		tree_sha: 'main',
+		recursive: '1',
 	});
-	if (!res.ok) {
-		throw new Error(`Failed to fetch file tree: ${res.statusText}`);
-	}
 
-	const data = (await res.json()) as {
-		tree?: Array<{ path?: string; type?: string }>;
-	};
 	if (!Array.isArray(data.tree)) return [];
 
 	return data.tree
@@ -97,37 +94,36 @@ export async function fetchDocsTree(token: string, repo: string = DEFAULT_REPO):
 }
 
 /**
- * Fetches content and sha for an existing file in the repository.
+ * Fetches content and sha for an existing file in the repository via Octokit.
  */
 export async function fetchFileContent(
 	token: string,
 	path: string,
+	owner: string = DEFAULT_OWNER,
 	repo: string = DEFAULT_REPO
 ): Promise<{ content: string; sha: string }> {
-	const headers = {
-		Authorization: `Bearer ${token.trim()}`,
-		Accept: 'application/vnd.github+json',
-	};
+	const octokit = getOctokit(token);
 
-	const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-		headers,
+	const { data } = await octokit.rest.repos.getContent({
+		owner,
+		repo,
+		path,
 	});
-	if (!res.ok) {
-		throw new Error(`Failed to fetch ${path}: ${res.statusText}`);
+
+	if ('content' in data && typeof data.content === 'string') {
+		const cleanBase64 = data.content.replace(/\s+/g, '');
+		const content = fromBase64Unicode(cleanBase64);
+		return {
+			content,
+			sha: data.sha,
+		};
 	}
 
-	const data = (await res.json()) as { content?: string; sha?: string };
-	const cleanBase64 = (data.content || '').replace(/\s+/g, '');
-	const content = fromBase64Unicode(cleanBase64);
-
-	return {
-		content,
-		sha: data.sha || '',
-	};
+	throw new Error(`File at ${path} has unexpected content structure.`);
 }
 
 /**
- * Commits a file creation or update to the main branch via the GitHub contents API.
+ * Commits a file creation or update to the main branch via Octokit.
  */
 export async function commitFile(
 	token: string,
@@ -135,39 +131,24 @@ export async function commitFile(
 	content: string,
 	message: string,
 	sha?: string,
+	owner: string = DEFAULT_OWNER,
 	repo: string = DEFAULT_REPO
 ): Promise<{ commitSha: string; commitUrl: string }> {
-	const headers = {
-		Authorization: `Bearer ${token.trim()}`,
-		Accept: 'application/vnd.github+json',
-		'Content-Type': 'application/json',
-	};
+	const octokit = getOctokit(token);
 
-	const body: Record<string, unknown> = {
+	const { data } = await octokit.rest.repos.createOrUpdateFileContents({
+		owner,
+		repo,
+		path,
 		message,
 		content: toBase64Unicode(content),
 		branch: 'main',
-	};
-	if (sha) {
-		body.sha = sha;
-	}
-
-	const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-		method: 'PUT',
-		headers,
-		body: JSON.stringify(body),
+		...(sha ? { sha } : {}),
 	});
 
-	if (!res.ok) {
-		const errJson = (await res.json().catch(() => ({}))) as { message?: string };
-		throw new Error(errJson.message || `Failed to commit ${path}: ${res.statusText}`);
-	}
-
-	const data = (await res.json()) as {
-		commit?: { sha?: string; html_url?: string };
-	};
-	const commitSha = data.commit?.sha || '';
-	const commitUrl = data.commit?.html_url || `https://github.com/${repo}/commit/${commitSha}`;
+	const commitSha = data.commit.sha || '';
+	const commitUrl =
+		data.commit.html_url || `https://github.com/${owner}/${repo}/commit/${commitSha}`;
 
 	return { commitSha, commitUrl };
 }

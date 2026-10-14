@@ -12,18 +12,6 @@ export interface PostMetadata {
 	order?: number | undefined;
 }
 
-export const KNOWN_CATEGORIES = [
-	'Backend',
-	'Java',
-	'Spring-Boot',
-	'Logging',
-	'Production-Notes',
-	'Database-Internals-Book-Notes',
-	'CSC14005',
-	'Machine-Learning',
-	'adr',
-];
-
 /**
  * Converts a string into a clean, URL-safe slug.
  * Handles Vietnamese characters and accents properly.

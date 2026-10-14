@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { SITE_NAME } from '@/lib/site';
+import { getCategories } from '@/lib/markdown';
 import EditorView from '@/components/editor/EditorView';
 
 export const metadata: Metadata = {
@@ -16,6 +17,10 @@ export function generateStaticParams() {
 }
 
 export default function EditorPage() {
+	const initialCategories = getCategories()
+		.map((c) => c.name)
+		.sort();
+
 	return (
 		<div className="mx-auto w-full max-w-4xl space-y-6">
 			<div className="space-y-1 border-b border-border pb-4">
@@ -27,7 +32,7 @@ export default function EditorPage() {
 				</p>
 			</div>
 
-			<EditorView />
+			<EditorView initialCategories={initialCategories} />
 		</div>
 	);
 }

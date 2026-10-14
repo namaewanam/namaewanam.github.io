@@ -1,13 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-	PostMetadata,
-	KNOWN_CATEGORIES,
-	slugify,
-	buildPostPath,
-	parsePost,
-} from '@/lib/editor-utils';
+import { PostMetadata, slugify, buildPostPath, parsePost } from '@/lib/editor-utils';
 import { fetchFileContent } from '@/lib/github';
 import { PlusCircle, FileText, Search, Loader2 } from 'lucide-react';
 
@@ -24,6 +18,7 @@ interface PostFormProps {
 		path: string;
 	}) => void;
 	docsTree: string[];
+	categories: string[];
 	currentPath: string;
 	isNew: boolean;
 	setIsNew: (isNew: boolean) => void;
@@ -37,6 +32,7 @@ export default function PostForm({
 	onSlugChange,
 	onFileLoad,
 	docsTree,
+	categories,
 	currentPath,
 	isNew,
 	setIsNew,
@@ -44,7 +40,7 @@ export default function PostForm({
 	const [searchFilter, setSearchFilter] = useState('');
 	const [isLoadingFile, setIsLoadingFile] = useState(false);
 	const [isCustomCategory, setIsCustomCategory] = useState(
-		!KNOWN_CATEGORIES.includes(metadata.category) && metadata.category !== ''
+		!categories.includes(metadata.category) && metadata.category !== ''
 	);
 
 	const handleTitleChange = (val: string) => {
@@ -222,13 +218,11 @@ export default function PostForm({
 					) : (
 						<select
 							id="post-category"
-							value={
-								KNOWN_CATEGORIES.includes(metadata.category) ? metadata.category : '__custom__'
-							}
+							value={categories.includes(metadata.category) ? metadata.category : '__custom__'}
 							onChange={(e) => handleCategoryChange(e.target.value)}
 							className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
 						>
-							{KNOWN_CATEGORIES.map((cat) => (
+							{categories.map((cat) => (
 								<option key={cat} value={cat}>
 									{cat}
 								</option>
