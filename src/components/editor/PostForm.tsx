@@ -187,7 +187,7 @@ export default function PostForm({
 			{/* Post Metadata Inputs */}
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				{/* Title */}
-				<div className="sm:col-span-2">
+				<div className="min-w-0 sm:col-span-2">
 					<label htmlFor="post-title" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.postTitle', 'Post Title')}
 					</label>
@@ -201,12 +201,12 @@ export default function PostForm({
 							'e.g. Understanding Distributed Locks in Go'
 						)}
 						required
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
 
 				{/* Category */}
-				<div>
+				<div className="min-w-0">
 					<label htmlFor="post-category" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.category', 'Category')}
 					</label>
@@ -218,12 +218,12 @@ export default function PostForm({
 								value={metadata.category}
 								onChange={(e) => onMetadataChange({ ...metadata, category: e.target.value })}
 								placeholder={tr('editor.categoryPlaceholder', 'Category name')}
-								className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
+								className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
 							/>
 							<button
 								type="button"
 								onClick={() => setIsCustomCategory(false)}
-								className="rounded border border-border px-2 text-xs text-muted-foreground hover:text-foreground"
+								className="shrink-0 rounded border border-border px-2 text-xs text-muted-foreground hover:text-foreground"
 							>
 								{tr('editor.list', 'List')}
 							</button>
@@ -233,7 +233,7 @@ export default function PostForm({
 							id="post-category"
 							value={categories.includes(metadata.category) ? metadata.category : '__custom__'}
 							onChange={(e) => handleCategoryChange(e.target.value)}
-							className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
+							className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
 						>
 							{categories.map((cat) => (
 								<option key={cat} value={cat}>
@@ -248,7 +248,7 @@ export default function PostForm({
 				</div>
 
 				{/* Language */}
-				<div>
+				<div className="min-w-0">
 					<label htmlFor="post-lang" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.language', 'Language')}
 					</label>
@@ -256,7 +256,7 @@ export default function PostForm({
 						<button
 							type="button"
 							onClick={() => onMetadataChange({ ...metadata, lang: 'en' })}
-							className={`rounded-md border py-1.5 text-xs font-medium transition ${
+							className={`truncate rounded-md border py-1.5 text-xs font-medium transition ${
 								metadata.lang === 'en'
 									? 'border-primary bg-primary/10 text-primary'
 									: 'border-border text-muted-foreground hover:text-foreground'
@@ -267,7 +267,7 @@ export default function PostForm({
 						<button
 							type="button"
 							onClick={() => onMetadataChange({ ...metadata, lang: 'vi' })}
-							className={`rounded-md border py-1.5 text-xs font-medium transition ${
+							className={`truncate rounded-md border py-1.5 text-xs font-medium transition ${
 								metadata.lang === 'vi'
 									? 'border-primary bg-primary/10 text-primary'
 									: 'border-border text-muted-foreground hover:text-foreground'
@@ -279,7 +279,7 @@ export default function PostForm({
 				</div>
 
 				{/* Slug */}
-				<div>
+				<div className="min-w-0">
 					<label htmlFor="post-slug" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.slug', 'Slug / Filename')}
 					</label>
@@ -289,12 +289,12 @@ export default function PostForm({
 						value={slug}
 						onChange={(e) => onSlugChange(slugify(e.target.value))}
 						placeholder="slug-name"
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
 
 				{/* Date */}
-				<div>
+				<div className="min-w-0">
 					<label htmlFor="post-date" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.date', 'Date')}
 					</label>
@@ -303,12 +303,12 @@ export default function PostForm({
 						type="date"
 						value={metadata.date}
 						onChange={(e) => onMetadataChange({ ...metadata, date: e.target.value })}
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
 
 				{/* Tags */}
-				<div className="sm:col-span-2">
+				<div className="min-w-0 sm:col-span-2">
 					<label htmlFor="post-tags" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.tags', 'Tags (comma-separated)')}
 					</label>
@@ -326,12 +326,12 @@ export default function PostForm({
 							})
 						}
 						placeholder={tr('editor.tagsPlaceholder', 'backend, redis, distributed-systems')}
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
 
 				{/* Description */}
-				<div className="sm:col-span-2">
+				<div className="min-w-0 sm:col-span-2">
 					<label htmlFor="post-desc" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.description', 'Description / Summary')}
 					</label>
@@ -344,15 +344,17 @@ export default function PostForm({
 							'editor.descriptionPlaceholder',
 							'Brief summary shown on post cards and SEO'
 						)}
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
 			</div>
 
 			{/* Target File Path Preview */}
-			<div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-[11px] sm:text-xs">
-				<span className="text-muted-foreground">{tr('editor.targetPath', 'Target path:')}</span>
-				<span className="max-w-[280px] truncate font-mono font-medium text-foreground sm:max-w-md">
+			<div className="flex flex-wrap items-center justify-between gap-1.5 rounded-md bg-muted/50 px-3 py-2 text-[11px] sm:text-xs">
+				<span className="shrink-0 text-muted-foreground">
+					{tr('editor.targetPath', 'Target path:')}
+				</span>
+				<span className="min-w-0 max-w-full break-all font-mono font-medium text-foreground">
 					{targetPath}
 				</span>
 			</div>

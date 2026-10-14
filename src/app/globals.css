@@ -936,11 +936,19 @@ a[data-footnote-ref]:hover {
 	border-color: hsl(var(--primary) / 0.5);
 }
 
-/* High-contrast native calendar picker indicator for date inputs */
+/* Responsive date input and high-contrast native calendar picker indicator */
+input[type='date'] {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
 input[type='date']::-webkit-calendar-picker-indicator {
 	cursor: pointer;
 	border-radius: 4px;
-	margin-right: 2px;
+	margin-right: 0;
 	opacity: 0.85;
 	transition:
 		opacity 0.2s ease,
