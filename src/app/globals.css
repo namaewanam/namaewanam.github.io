@@ -936,36 +936,21 @@ a[data-footnote-ref]:hover {
 	border-color: hsl(var(--primary) / 0.5);
 }
 
-/* Date input calendar picker customization */
-.date-picker-wrapper {
-	position: relative;
-	display: flex;
-	align-items: center;
-}
-
-.date-picker-wrapper input[type='date'] {
-	position: relative;
-	color-scheme: light;
-}
-
-.dark .date-picker-wrapper input[type='date'] {
-	color-scheme: dark;
-}
-
-.date-picker-wrapper input[type='date']::-webkit-calendar-picker-indicator {
-	position: absolute;
-	right: 0;
-	top: 0;
-	width: 2.5rem;
-	height: 100%;
-	opacity: 0;
+/* High-contrast native calendar picker indicator for date inputs */
+input[type='date']::-webkit-calendar-picker-indicator {
 	cursor: pointer;
-	z-index: 10;
+	border-radius: 4px;
+	margin-right: 2px;
+	opacity: 0.85;
+	transition:
+		opacity 0.2s ease,
+		filter 0.2s ease;
 }
 
-/* Fallback for native indicator if rendered alone */
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+	opacity: 1;
+}
+
 .dark input[type='date']::-webkit-calendar-picker-indicator {
-	filter: invert(1) brightness(1.3);
-	opacity: 0.9;
-	cursor: pointer;
+	filter: invert(0.88) brightness(1.2);
 }
