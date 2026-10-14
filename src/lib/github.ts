@@ -152,3 +152,32 @@ export async function commitFile(
 
 	return { commitSha, commitUrl };
 }
+
+/**
+ * Deletes an existing file on the main branch via Octokit.
+ */
+export async function deleteFile(
+	token: string,
+	path: string,
+	message: string,
+	sha: string,
+	owner: string = DEFAULT_OWNER,
+	repo: string = DEFAULT_REPO
+): Promise<{ commitSha: string; commitUrl: string }> {
+	const octokit = getOctokit(token);
+
+	const { data } = await octokit.rest.repos.deleteFile({
+		owner,
+		repo,
+		path,
+		message,
+		sha,
+		branch: 'main',
+	});
+
+	const commitSha = data.commit.sha || '';
+	const commitUrl =
+		data.commit.html_url || `https://github.com/${owner}/${repo}/commit/${commitSha}`;
+
+	return { commitSha, commitUrl };
+}

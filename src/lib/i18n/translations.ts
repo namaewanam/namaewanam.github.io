@@ -133,6 +133,14 @@ export const translations = {
 		'editor.commitMessage': 'Commit Message',
 		'editor.noContent': 'No content yet.',
 		'editor.untitled': 'Untitled Post',
+		'editor.delete': 'Delete Post',
+		'editor.deleteTitle': 'Delete Post from GitHub',
+		'editor.deleteWarning':
+			'Are you sure you want to delete this document? This will commit a file deletion to the main branch.',
+		'editor.deleteBtn': 'Delete Permanently',
+		'editor.deleting': 'Deleting...',
+		'editor.deleteSuccessTitle': 'Successfully Deleted!',
+		'editor.deleteSuccessDesc': 'The document has been removed from GitHub repository.',
 	},
 	vi: {
 		'nav.home': 'trang chủ',
@@ -253,6 +261,14 @@ export const translations = {
 		'editor.commitMessage': 'Thông điệp commit',
 		'editor.noContent': 'Chưa có nội dung.',
 		'editor.untitled': 'Bài viết chưa đặt tên',
+		'editor.delete': 'Xóa bài viết',
+		'editor.deleteTitle': 'Xóa bài viết khỏi GitHub',
+		'editor.deleteWarning':
+			'Bạn có chắc chắn muốn xóa bài viết này không? Thao tác này sẽ commit việc xóa file lên nhánh main.',
+		'editor.deleteBtn': 'Xóa vĩnh viễn',
+		'editor.deleting': 'Đang xóa...',
+		'editor.deleteSuccessTitle': 'Đã xóa thành công!',
+		'editor.deleteSuccessDesc': 'Bài viết đã được xóa khỏi repository GitHub.',
 	},
 } as const;
 

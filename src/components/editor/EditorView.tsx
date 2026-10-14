@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { PostMetadata, slugify, buildPostPath, serializePost } from '@/lib/editor-utils';
-import { GitHubUser, verifyGitHubToken, fetchDocsTree, commitFile } from '@/lib/github';
+import { GitHubUser, verifyGitHubToken, fetchDocsTree, commitFile, deleteFile } from '@/lib/github';
 import TokenManager from './TokenManager';
 import PostForm from './PostForm';
 import MarkdownToolbar from './MarkdownToolbar';
@@ -18,6 +18,7 @@ import {
 	CheckCircle2,
 	AlertTriangle,
 	Loader2,
+	Trash2,
 } from 'lucide-react';
 
 const DRAFT_STORAGE_KEY = 'blog_editor_draft_v1';
@@ -66,6 +67,16 @@ export default function EditorView({
 		commitUrl: string;
 	} | null>(null);
 	const [publishError, setPublishError] = useState<string | null>(null);
+
+	// Deletion state
+	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [deleteCommitMessage, setDeleteCommitMessage] = useState('');
+	const [isDeleting, setIsDeleting] = useState(false);
+	const [deleteSuccess, setDeleteSuccess] = useState<{
+		commitSha: string;
+		commitUrl: string;
+	} | null>(null);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -225,6 +236,54 @@ export default function EditorView({
 		}
 	};
 
+	const handleOpenDelete = () => {
+		setDeleteCommitMessage(`content: delete ${currentPath} via web editor`);
+		setDeleteError(null);
+		setDeleteSuccess(null);
+		setIsDeleteModalOpen(true);
+	};
+
+	const handleDelete = async () => {
+		if (!token || !currentPath || !currentSha) return;
+
+		setIsDeleting(true);
+		setDeleteError(null);
+
+		try {
+			const res = await deleteFile(
+				token,
+				currentPath,
+				deleteCommitMessage.trim() || `content: delete ${currentPath} via web editor`,
+				currentSha
+			);
+
+			setDeleteSuccess(res);
+			localStorage.removeItem(DRAFT_STORAGE_KEY);
+			setLastSaved(null);
+
+			// Refresh docs tree
+			const updatedTree = await fetchDocsTree(token);
+			setDocsTree(updatedTree);
+		} catch (err) {
+			setDeleteError(err instanceof Error ? err.message : 'Delete failed.');
+		} finally {
+			setIsDeleting(false);
+		}
+	};
+
+	const handleCloseDeleteModal = () => {
+		setIsDeleteModalOpen(false);
+		if (deleteSuccess) {
+			setIsNew(true);
+			setMetadata(INITIAL_METADATA);
+			setSlug('');
+			setContent('');
+			setCurrentSha(undefined);
+			setCurrentPath('');
+			setDeleteSuccess(null);
+		}
+	};
+
 	const treeCategories = docsTree
 		.map((p) => p.replace(/^docs\//, '').split('/')[0])
 		.filter((c): c is string => typeof c === 'string' && c.length > 0 && !c.endsWith('.md'));
@@ -343,6 +402,18 @@ export default function EditorView({
 									{t('editor.savedAt')} {lastSaved}
 								</span>
 							</span>
+						)}
+
+						{!isNew && currentSha && currentPath && (
+							<button
+								type="button"
+								onClick={handleOpenDelete}
+								disabled={!token}
+								className="border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
+							>
+								<Trash2 className="h-3.5 w-3.5" />
+								<span>{t('editor.delete')}</span>
+							</button>
 						)}
 
 						<button
@@ -528,6 +599,133 @@ export default function EditorView({
 											<>
 												<Send className="h-3.5 w-3.5" />
 												<span>{t('editor.commitPush')}</span>
+											</>
+										)}
+									</button>
+								</div>
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* Delete Modal */}
+			{isDeleteModalOpen && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+					<div className="w-full max-w-lg space-y-4 rounded-xl border border-border bg-card p-6 shadow-xl">
+						<div className="flex items-center justify-between border-b border-border pb-3">
+							<h3 className="text-base font-semibold text-foreground">{t('editor.deleteTitle')}</h3>
+							<button
+								type="button"
+								onClick={handleCloseDeleteModal}
+								className="text-sm text-muted-foreground hover:text-foreground"
+							>
+								✕
+							</button>
+						</div>
+
+						{deleteSuccess ? (
+							<div className="space-y-4 py-2 text-center">
+								<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+									<CheckCircle2 className="h-6 w-6" />
+								</div>
+								<div>
+									<h4 className="font-medium text-foreground">{t('editor.deleteSuccessTitle')}</h4>
+									<p className="mt-1 text-xs text-muted-foreground">
+										{t('editor.deleteSuccessDesc')}
+									</p>
+								</div>
+								<div className="break-all rounded-md bg-muted p-2.5 text-left font-mono text-xs">
+									<div>
+										{t('editor.targetFile')} {currentPath}
+									</div>
+									<div>SHA: {deleteSuccess.commitSha.substring(0, 7)}</div>
+								</div>
+								<div className="flex justify-center gap-3">
+									<a
+										href={deleteSuccess.commitUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+									>
+										<span>{t('editor.viewCommit')}</span>
+										<ExternalLink className="h-3.5 w-3.5" />
+									</a>
+									<button
+										type="button"
+										onClick={handleCloseDeleteModal}
+										className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+									>
+										{t('editor.close')}
+									</button>
+								</div>
+							</div>
+						) : (
+							<div className="space-y-3">
+								<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2.5 rounded-lg border p-3 text-xs">
+									<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+									<span>{t('editor.deleteWarning')}</span>
+								</div>
+
+								<div className="space-y-1 rounded-md bg-muted/60 p-3 text-xs">
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">{t('editor.targetFile')}</span>
+										<span className="max-w-[260px] truncate font-mono font-medium text-foreground">
+											{currentPath}
+										</span>
+									</div>
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">{t('editor.branch')}</span>
+										<span className="font-mono text-foreground">main</span>
+									</div>
+								</div>
+
+								<div>
+									<label
+										htmlFor="delete-commit-msg"
+										className="mb-1 block text-xs font-medium text-foreground"
+									>
+										{t('editor.commitMessage')}
+									</label>
+									<input
+										id="delete-commit-msg"
+										type="text"
+										value={deleteCommitMessage}
+										onChange={(e) => setDeleteCommitMessage(e.target.value)}
+										className="focus:border-destructive w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:outline-none sm:text-sm"
+									/>
+								</div>
+
+								{deleteError && (
+									<div className="bg-destructive/10 text-destructive rounded-md p-2.5 text-xs">
+										{deleteError}
+									</div>
+								)}
+
+								<div className="flex justify-end gap-2 pt-2">
+									<button
+										type="button"
+										onClick={handleCloseDeleteModal}
+										disabled={isDeleting}
+										className="rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
+									>
+										{t('editor.cancel')}
+									</button>
+									<button
+										type="button"
+										onClick={handleDelete}
+										disabled={isDeleting}
+										className="bg-destructive text-destructive-foreground hover:bg-destructive/90 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-medium disabled:opacity-50"
+									>
+										{isDeleting ? (
+											<>
+												<Loader2 className="h-4 w-4 animate-spin" />
+												<span>{t('editor.deleting')}</span>
+											</>
+										) : (
+											<>
+												<Trash2 className="h-3.5 w-3.5" />
+												<span>{t('editor.deleteBtn')}</span>
 											</>
 										)}
 									</button>
