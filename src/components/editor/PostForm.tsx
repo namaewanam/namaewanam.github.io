@@ -109,7 +109,11 @@ export default function PostForm({
 				<div className="grid w-full grid-cols-2 gap-2 rounded-lg bg-muted/60 p-1">
 					<button
 						type="button"
-						onClick={() => setIsNew(true)}
+						onClick={() => {
+							setIsCustomCategory(false);
+							setSearchFilter('');
+							setIsNew(true);
+						}}
 						className={`inline-flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition sm:text-sm ${
 							isNew
 								? 'bg-background text-foreground shadow-sm'

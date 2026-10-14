@@ -271,24 +271,38 @@ export default function EditorView({
 		}
 	};
 
-	const handleCloseDeleteModal = () => {
-		setIsDeleteModalOpen(false);
-		if (deleteSuccess) {
-			setIsNew(true);
-			setMetadata(INITIAL_METADATA);
-			setSlug('');
-			setContent('');
-			setCurrentSha(undefined);
-			setCurrentPath('');
-			setDeleteSuccess(null);
-		}
-	};
-
 	const treeCategories = docsTree
 		.map((p) => p.replace(/^docs\//, '').split('/')[0])
 		.filter((c): c is string => typeof c === 'string' && c.length > 0 && !c.endsWith('.md'));
 
 	const categories = Array.from(new Set([...initialCategories, ...treeCategories])).sort();
+
+	const resetToNewPost = () => {
+		setIsNew(true);
+		setMetadata({
+			title: '',
+			date: new Date().toISOString().split('T')[0] ?? '',
+			category: categories[0] || 'Backend',
+			tags: [],
+			description: '',
+			lang: lang || 'en',
+		});
+		setSlug('');
+		setContent('');
+		setCurrentSha(undefined);
+		setCurrentPath('');
+		setLastSaved(null);
+		localStorage.removeItem(DRAFT_STORAGE_KEY);
+		setHasUnsavedDraft(false);
+	};
+
+	const handleCloseDeleteModal = () => {
+		setIsDeleteModalOpen(false);
+		if (deleteSuccess) {
+			resetToNewPost();
+			setDeleteSuccess(null);
+		}
+	};
 
 	return (
 		<div className="space-y-6">
@@ -343,10 +357,10 @@ export default function EditorView({
 				currentPath={currentPath}
 				isNew={isNew}
 				setIsNew={(val) => {
-					setIsNew(val);
 					if (val) {
-						setCurrentSha(undefined);
-						setCurrentPath('');
+						resetToNewPost();
+					} else {
+						setIsNew(false);
 					}
 				}}
 			/>
