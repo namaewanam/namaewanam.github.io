@@ -103,7 +103,7 @@ export default function PostForm({
 	const targetPath = isNew ? buildPostPath(metadata.category, slug, metadata.lang) : currentPath;
 
 	return (
-		<div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+		<div className="space-y-4 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
 			{/* Mode Switcher */}
 			<div className="flex border-b border-border pb-3">
 				<div className="grid w-full grid-cols-2 gap-2 rounded-lg bg-muted/60 p-1">
@@ -294,7 +294,7 @@ export default function PostForm({
 				</div>
 
 				{/* Date */}
-				<div className="min-w-0">
+				<div className="min-w-0 overflow-hidden">
 					<label htmlFor="post-date" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.date', 'Date')}
 					</label>
@@ -303,7 +303,7 @@ export default function PostForm({
 						type="date"
 						value={metadata.date}
 						onChange={(e) => onMetadataChange({ ...metadata, date: e.target.value })}
-						className="block w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="block w-full min-w-0 max-w-full appearance-none rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
 

@@ -943,6 +943,16 @@ input[type='date'] {
 	min-width: 0;
 	max-width: 100%;
 	box-sizing: border-box;
+	-webkit-appearance: none;
+	appearance: none;
+	background-color: transparent;
+}
+
+input[type='date']::-webkit-date-and-time-value {
+	text-align: left;
+	margin: 0;
+	padding: 0;
+	min-height: 1.25em;
 }
 
 input[type='date']::-webkit-calendar-picker-indicator {
