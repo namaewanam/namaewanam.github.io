@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { PostMetadata, slugify, buildPostPath, parsePost } from '@/lib/editor-utils';
 import { fetchFileContent } from '@/lib/github';
 import { TranslationKey } from '@/lib/i18n/translations';
-import { PlusCircle, FileText, Search, Loader2 } from 'lucide-react';
+import { PlusCircle, FileText, Search, Loader2, Calendar } from 'lucide-react';
 
 interface PostFormProps {
 	token: string | null;
@@ -46,6 +46,7 @@ export default function PostForm({
 	const [isCustomCategory, setIsCustomCategory] = useState(
 		!categories.includes(metadata.category) && metadata.category !== ''
 	);
+	const dateInputRef = useRef<HTMLInputElement>(null);
 
 	const handleTitleChange = (val: string) => {
 		onMetadataChange({ ...metadata, title: val });
@@ -294,13 +295,31 @@ export default function PostForm({
 					<label htmlFor="post-date" className="mb-1 block text-xs font-medium text-foreground">
 						{tr('editor.date', 'Date')}
 					</label>
-					<input
-						id="post-date"
-						type="date"
-						value={metadata.date}
-						onChange={(e) => onMetadataChange({ ...metadata, date: e.target.value })}
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none dark:[color-scheme:dark] sm:text-sm"
-					/>
+					<div className="date-picker-wrapper relative">
+						<input
+							ref={dateInputRef}
+							id="post-date"
+							type="date"
+							value={metadata.date}
+							onChange={(e) => onMetadataChange({ ...metadata, date: e.target.value })}
+							className="w-full rounded-md border border-border bg-background px-3 py-1.5 pr-10 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
+						/>
+						<button
+							type="button"
+							tabIndex={-1}
+							onClick={() => {
+								try {
+									dateInputRef.current?.showPicker();
+								} catch {
+									dateInputRef.current?.focus();
+								}
+							}}
+							className="pointer-events-none absolute right-2.5 flex items-center justify-center text-muted-foreground transition-colors dark:text-primary"
+							aria-hidden="true"
+						>
+							<Calendar className="h-4 w-4" />
+						</button>
+					</div>
 				</div>
 
 				{/* Tags */}
