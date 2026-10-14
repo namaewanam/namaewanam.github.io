@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { PostMetadata, slugify, buildPostPath, parsePost } from '@/lib/editor-utils';
 import { fetchFileContent } from '@/lib/github';
+import { TranslationKey } from '@/lib/i18n/translations';
 import { PlusCircle, FileText, Search, Loader2 } from 'lucide-react';
 
 interface PostFormProps {
 	token: string | null;
 	metadata: PostMetadata;
 	slug: string;
+	t?: (key: TranslationKey) => string;
 	onMetadataChange: (meta: PostMetadata) => void;
 	onSlugChange: (slug: string) => void;
 	onFileLoad: (loaded: {
@@ -28,6 +30,7 @@ export default function PostForm({
 	token,
 	metadata,
 	slug,
+	t,
 	onMetadataChange,
 	onSlugChange,
 	onFileLoad,
@@ -37,6 +40,7 @@ export default function PostForm({
 	isNew,
 	setIsNew,
 }: Readonly<PostFormProps>) {
+	const tr = (key: TranslationKey, fallback: string) => (t ? t(key) : fallback);
 	const [searchFilter, setSearchFilter] = useState('');
 	const [isLoadingFile, setIsLoadingFile] = useState(false);
 	const [isCustomCategory, setIsCustomCategory] = useState(
@@ -113,7 +117,7 @@ export default function PostForm({
 						}`}
 					>
 						<PlusCircle className="h-4 w-4" />
-						<span>New Post</span>
+						<span>{tr('editor.newPost', 'New Post')}</span>
 					</button>
 					<button
 						type="button"
@@ -125,7 +129,9 @@ export default function PostForm({
 						}`}
 					>
 						<FileText className="h-4 w-4" />
-						<span>Edit Existing ({docsTree.length})</span>
+						<span>
+							{tr('editor.editExisting', 'Edit Existing')} ({docsTree.length})
+						</span>
 					</button>
 				</div>
 			</div>
@@ -139,7 +145,7 @@ export default function PostForm({
 							type="text"
 							value={searchFilter}
 							onChange={(e) => setSearchFilter(e.target.value)}
-							placeholder="Search existing posts in docs/..."
+							placeholder={tr('editor.searchPlaceholder', 'Search existing posts in docs/...')}
 							className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none sm:text-sm"
 						/>
 					</div>
@@ -148,7 +154,7 @@ export default function PostForm({
 						{isLoadingFile ? (
 							<div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
 								<Loader2 className="h-4 w-4 animate-spin" />
-								<span>Loading post content...</span>
+								<span>{tr('editor.loadingPost', 'Loading post content...')}</span>
 							</div>
 						) : filteredTree.length > 0 ? (
 							filteredTree.map((path) => (
@@ -167,7 +173,7 @@ export default function PostForm({
 							))
 						) : (
 							<div className="py-2 text-center text-muted-foreground">
-								No matching markdown files found.
+								{tr('editor.noMatchingFiles', 'No matching markdown files found.')}
 							</div>
 						)}
 					</div>
@@ -179,14 +185,17 @@ export default function PostForm({
 				{/* Title */}
 				<div className="sm:col-span-2">
 					<label htmlFor="post-title" className="mb-1 block text-xs font-medium text-foreground">
-						Post Title
+						{tr('editor.postTitle', 'Post Title')}
 					</label>
 					<input
 						id="post-title"
 						type="text"
 						value={metadata.title}
 						onChange={(e) => handleTitleChange(e.target.value)}
-						placeholder="e.g. Understanding Distributed Locks in Go"
+						placeholder={tr(
+							'editor.titlePlaceholder',
+							'e.g. Understanding Distributed Locks in Go'
+						)}
 						required
 						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
@@ -195,7 +204,7 @@ export default function PostForm({
 				{/* Category */}
 				<div>
 					<label htmlFor="post-category" className="mb-1 block text-xs font-medium text-foreground">
-						Category
+						{tr('editor.category', 'Category')}
 					</label>
 					{isCustomCategory ? (
 						<div className="flex gap-2">
@@ -204,7 +213,7 @@ export default function PostForm({
 								type="text"
 								value={metadata.category}
 								onChange={(e) => onMetadataChange({ ...metadata, category: e.target.value })}
-								placeholder="Category name"
+								placeholder={tr('editor.categoryPlaceholder', 'Category name')}
 								className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
 							/>
 							<button
@@ -212,7 +221,7 @@ export default function PostForm({
 								onClick={() => setIsCustomCategory(false)}
 								className="rounded border border-border px-2 text-xs text-muted-foreground hover:text-foreground"
 							>
-								List
+								{tr('editor.list', 'List')}
 							</button>
 						</div>
 					) : (
@@ -227,7 +236,9 @@ export default function PostForm({
 									{cat}
 								</option>
 							))}
-							<option value="__custom__">+ Custom category...</option>
+							<option value="__custom__">
+								{tr('editor.customCategory', '+ Custom category...')}
+							</option>
 						</select>
 					)}
 				</div>
@@ -235,7 +246,7 @@ export default function PostForm({
 				{/* Language */}
 				<div>
 					<label htmlFor="post-lang" className="mb-1 block text-xs font-medium text-foreground">
-						Language
+						{tr('editor.language', 'Language')}
 					</label>
 					<div className="grid grid-cols-2 gap-2">
 						<button
@@ -266,7 +277,7 @@ export default function PostForm({
 				{/* Slug */}
 				<div>
 					<label htmlFor="post-slug" className="mb-1 block text-xs font-medium text-foreground">
-						Slug / Filename
+						{tr('editor.slug', 'Slug / Filename')}
 					</label>
 					<input
 						id="post-slug"
@@ -281,21 +292,21 @@ export default function PostForm({
 				{/* Date */}
 				<div>
 					<label htmlFor="post-date" className="mb-1 block text-xs font-medium text-foreground">
-						Date
+						{tr('editor.date', 'Date')}
 					</label>
 					<input
 						id="post-date"
 						type="date"
 						value={metadata.date}
 						onChange={(e) => onMetadataChange({ ...metadata, date: e.target.value })}
-						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none sm:text-sm"
+						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none dark:[color-scheme:dark] sm:text-sm"
 					/>
 				</div>
 
 				{/* Tags */}
 				<div className="sm:col-span-2">
 					<label htmlFor="post-tags" className="mb-1 block text-xs font-medium text-foreground">
-						Tags (comma-separated)
+						{tr('editor.tags', 'Tags (comma-separated)')}
 					</label>
 					<input
 						id="post-tags"
@@ -310,7 +321,7 @@ export default function PostForm({
 									.filter(Boolean),
 							})
 						}
-						placeholder="backend, redis, distributed-systems"
+						placeholder={tr('editor.tagsPlaceholder', 'backend, redis, distributed-systems')}
 						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
@@ -318,14 +329,17 @@ export default function PostForm({
 				{/* Description */}
 				<div className="sm:col-span-2">
 					<label htmlFor="post-desc" className="mb-1 block text-xs font-medium text-foreground">
-						Description / Summary
+						{tr('editor.description', 'Description / Summary')}
 					</label>
 					<input
 						id="post-desc"
 						type="text"
 						value={metadata.description}
 						onChange={(e) => onMetadataChange({ ...metadata, description: e.target.value })}
-						placeholder="Brief summary shown on post cards and SEO"
+						placeholder={tr(
+							'editor.descriptionPlaceholder',
+							'Brief summary shown on post cards and SEO'
+						)}
 						className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none sm:text-sm"
 					/>
 				</div>
@@ -333,7 +347,7 @@ export default function PostForm({
 
 			{/* Target File Path Preview */}
 			<div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-[11px] sm:text-xs">
-				<span className="text-muted-foreground">Target path:</span>
+				<span className="text-muted-foreground">{tr('editor.targetPath', 'Target path:')}</span>
 				<span className="max-w-[280px] truncate font-mono font-medium text-foreground sm:max-w-md">
 					{targetPath}
 				</span>

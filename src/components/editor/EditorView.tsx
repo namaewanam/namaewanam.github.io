@@ -7,6 +7,7 @@ import TokenManager from './TokenManager';
 import PostForm from './PostForm';
 import MarkdownToolbar from './MarkdownToolbar';
 import MarkdownPreview from './MarkdownPreview';
+import { Locale, translations, TranslationKey } from '@/lib/i18n/translations';
 import {
 	Send,
 	Save,
@@ -32,9 +33,15 @@ const INITIAL_METADATA: PostMetadata = {
 
 interface EditorViewProps {
 	initialCategories?: string[];
+	lang?: Locale;
 }
 
-export default function EditorView({ initialCategories = [] }: Readonly<EditorViewProps>) {
+export default function EditorView({
+	initialCategories = [],
+	lang = 'en',
+}: Readonly<EditorViewProps>) {
+	const t = (key: TranslationKey) => translations[lang]?.[key] ?? translations.en[key] ?? key;
+
 	const [token, setToken] = useState<string | null>(null);
 	const [user, setUser] = useState<GitHubUser | null>(null);
 	const [docsTree, setDocsTree] = useState<string[]>([]);
@@ -230,6 +237,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 			<TokenManager
 				token={token}
 				user={user}
+				t={t}
 				onTokenChange={(newToken, newUser) => {
 					setToken(newToken);
 					setUser(newUser);
@@ -241,7 +249,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 				<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 sm:text-sm">
 					<div className="flex items-center gap-2">
 						<AlertTriangle className="h-4 w-4 shrink-0" />
-						<span>You have an unsaved draft from a previous session.</span>
+						<span>{t('editor.draftAlert')}</span>
 					</div>
 					<div className="flex gap-2">
 						<button
@@ -249,14 +257,14 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 							onClick={restoreDraft}
 							className="rounded bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
 						>
-							Restore Draft
+							{t('editor.restoreDraft')}
 						</button>
 						<button
 							type="button"
 							onClick={discardDraft}
 							className="rounded border border-amber-500/30 px-2.5 py-1 text-xs hover:bg-amber-500/20"
 						>
-							Discard
+							{t('editor.discard')}
 						</button>
 					</div>
 				</div>
@@ -267,6 +275,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 				token={token}
 				metadata={metadata}
 				slug={slug}
+				t={t}
 				onMetadataChange={setMetadata}
 				onSlugChange={setSlug}
 				onFileLoad={handleFileLoad}
@@ -297,7 +306,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 							}`}
 						>
 							<Edit3 className="h-3.5 w-3.5" />
-							<span>Write</span>
+							<span>{t('editor.tabWrite')}</span>
 						</button>
 						<button
 							type="button"
@@ -309,7 +318,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 							}`}
 						>
 							<Eye className="h-3.5 w-3.5" />
-							<span>Preview</span>
+							<span>{t('editor.tabPreview')}</span>
 						</button>
 						<button
 							type="button"
@@ -321,7 +330,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 							}`}
 						>
 							<FileCode className="h-3.5 w-3.5" />
-							<span>Raw Doc</span>
+							<span>{t('editor.tabRaw')}</span>
 						</button>
 					</div>
 
@@ -330,7 +339,9 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 						{lastSaved && (
 							<span className="hidden items-center gap-1 sm:inline-flex">
 								<Save className="h-3 w-3 text-muted-foreground" />
-								<span>Saved {lastSaved}</span>
+								<span>
+									{t('editor.savedAt')} {lastSaved}
+								</span>
 							</span>
 						)}
 
@@ -341,7 +352,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 							className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-50"
 						>
 							<Send className="h-3.5 w-3.5" />
-							<span>Publish</span>
+							<span>{t('editor.publish')}</span>
 						</button>
 					</div>
 				</div>
@@ -355,7 +366,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 								ref={textareaRef}
 								value={content}
 								onChange={(e) => setContent(e.target.value)}
-								placeholder="Write your markdown post here... (Touch formatting buttons above for quick syntax)"
+								placeholder={t('editor.writePlaceholder')}
 								rows={18}
 								className="w-full resize-y bg-background p-4 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 sm:text-sm"
 							/>
@@ -366,17 +377,23 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 						<div className="p-4 sm:p-6">
 							<div className="mb-4 border-b border-border pb-4">
 								<h1 className="text-2xl font-bold text-foreground">
-									{metadata.title || 'Untitled Post'}
+									{metadata.title || t('editor.untitled')}
 								</h1>
 								{metadata.description && (
 									<p className="mt-1 text-sm text-muted-foreground">{metadata.description}</p>
 								)}
 								<div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-									<span>Date: {metadata.date}</span>
+									<span>
+										{t('editor.date')}: {metadata.date}
+									</span>
 									<span>•</span>
-									<span>Category: {metadata.category}</span>
+									<span>
+										{t('editor.category')}: {metadata.category}
+									</span>
 									<span>•</span>
-									<span>Lang: {metadata.lang}</span>
+									<span>
+										{t('editor.language')}: {metadata.lang}
+									</span>
 								</div>
 							</div>
 							<MarkdownPreview markdown={content} />
@@ -398,7 +415,9 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
 					<div className="w-full max-w-lg space-y-4 rounded-xl border border-border bg-card p-6 shadow-xl">
 						<div className="flex items-center justify-between border-b border-border pb-3">
-							<h3 className="text-base font-semibold text-foreground">Publish to GitHub</h3>
+							<h3 className="text-base font-semibold text-foreground">
+								{t('editor.publishTitle')}
+							</h3>
 							<button
 								type="button"
 								onClick={() => setIsPublishModalOpen(false)}
@@ -414,13 +433,13 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 									<CheckCircle2 className="h-6 w-6" />
 								</div>
 								<div>
-									<h4 className="font-medium text-foreground">Successfully Committed!</h4>
-									<p className="mt-1 text-xs text-muted-foreground">
-										GitHub Actions has been triggered and is now building your site update.
-									</p>
+									<h4 className="font-medium text-foreground">{t('editor.successTitle')}</h4>
+									<p className="mt-1 text-xs text-muted-foreground">{t('editor.successDesc')}</p>
 								</div>
 								<div className="break-all rounded-md bg-muted p-2.5 text-left font-mono text-xs">
-									<div>File: {targetPath}</div>
+									<div>
+										{t('editor.targetFile')} {targetPath}
+									</div>
 									<div>SHA: {publishSuccess.commitSha.substring(0, 7)}</div>
 								</div>
 								<div className="flex justify-center gap-3">
@@ -430,7 +449,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 										rel="noopener noreferrer"
 										className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
 									>
-										<span>View Commit on GitHub</span>
+										<span>{t('editor.viewCommit')}</span>
 										<ExternalLink className="h-3.5 w-3.5" />
 									</a>
 									<button
@@ -438,7 +457,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 										onClick={() => setIsPublishModalOpen(false)}
 										className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
 									>
-										Close
+										{t('editor.close')}
 									</button>
 								</div>
 							</div>
@@ -446,19 +465,19 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 							<div className="space-y-3">
 								<div className="space-y-1 rounded-md bg-muted/60 p-3 text-xs">
 									<div className="flex justify-between">
-										<span className="text-muted-foreground">Target File:</span>
+										<span className="text-muted-foreground">{t('editor.targetFile')}</span>
 										<span className="max-w-[260px] truncate font-mono font-medium text-foreground">
 											{targetPath}
 										</span>
 									</div>
 									<div className="flex justify-between">
-										<span className="text-muted-foreground">Action:</span>
+										<span className="text-muted-foreground">{t('editor.action')}</span>
 										<span className="font-medium text-foreground">
-											{isNew ? 'Create New File' : 'Update Existing File'}
+											{isNew ? t('editor.actionCreate') : t('editor.actionUpdate')}
 										</span>
 									</div>
 									<div className="flex justify-between">
-										<span className="text-muted-foreground">Branch:</span>
+										<span className="text-muted-foreground">{t('editor.branch')}</span>
 										<span className="font-mono text-foreground">main</span>
 									</div>
 								</div>
@@ -468,7 +487,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 										htmlFor="commit-msg"
 										className="mb-1 block text-xs font-medium text-foreground"
 									>
-										Commit Message
+										{t('editor.commitMessage')}
 									</label>
 									<input
 										id="commit-msg"
@@ -492,7 +511,7 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 										disabled={isPublishing}
 										className="rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
 									>
-										Cancel
+										{t('editor.cancel')}
 									</button>
 									<button
 										type="button"
@@ -503,12 +522,12 @@ export default function EditorView({ initialCategories = [] }: Readonly<EditorVi
 										{isPublishing ? (
 											<>
 												<Loader2 className="h-4 w-4 animate-spin" />
-												<span>Committing...</span>
+												<span>{t('editor.committing')}</span>
 											</>
 										) : (
 											<>
 												<Send className="h-3.5 w-3.5" />
-												<span>Commit & Push</span>
+												<span>{t('editor.commitPush')}</span>
 											</>
 										)}
 									</button>

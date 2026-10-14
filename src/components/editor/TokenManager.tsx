@@ -3,14 +3,22 @@
 import { useState } from 'react';
 import { KeyRound, LogOut, CheckCircle2, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
 import { verifyGitHubToken, GitHubUser, DEFAULT_REPO } from '@/lib/github';
+import { TranslationKey } from '@/lib/i18n/translations';
 
 interface TokenManagerProps {
 	token: string | null;
 	user: GitHubUser | null;
+	t?: (key: TranslationKey) => string;
 	onTokenChange: (token: string | null, user: GitHubUser | null) => void;
 }
 
-export default function TokenManager({ token, user, onTokenChange }: Readonly<TokenManagerProps>) {
+export default function TokenManager({
+	token,
+	user,
+	t,
+	onTokenChange,
+}: Readonly<TokenManagerProps>) {
+	const tr = (key: TranslationKey, fallback: string) => (t ? t(key) : fallback);
 	const [inputToken, setInputToken] = useState('');
 	const [isValidating, setIsValidating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -43,7 +51,14 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 	};
 
 	const handleDisconnect = () => {
-		if (window.confirm('Disconnect from GitHub and clear your saved token from this browser?')) {
+		if (
+			window.confirm(
+				tr(
+					'editor.disconnectConfirm',
+					'Disconnect from GitHub and clear your saved token from this browser?'
+				)
+			)
+		) {
 			localStorage.removeItem('blog_editor_gh_token');
 			onTokenChange(null, null);
 		}
@@ -64,7 +79,8 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 					<div className="flex min-w-0 items-center gap-1.5">
 						<CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
 						<span className="truncate text-muted-foreground">
-							Connected as <strong className="text-foreground">@{user.login}</strong>
+							{tr('editor.connectedAs', 'Connected as')}{' '}
+							<strong className="text-foreground">@{user.login}</strong>
 						</span>
 					</div>
 				</div>
@@ -75,7 +91,7 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 					className="hover:border-destructive hover:text-destructive inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1 text-xs text-muted-foreground transition"
 				>
 					<LogOut className="h-3.5 w-3.5" />
-					<span>Disconnect</span>
+					<span>{tr('editor.disconnect', 'Disconnect')}</span>
 				</button>
 			</div>
 		);
@@ -89,10 +105,13 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 				</div>
 				<div>
 					<h3 className="text-sm font-semibold text-foreground sm:text-base">
-						Connect GitHub Account
+						{tr('editor.connectTitle', 'Connect GitHub Account')}
 					</h3>
 					<p className="text-xs text-muted-foreground">
-						Authenticate with a Personal Access Token to commit changes directly from this browser.
+						{tr(
+							'editor.connectDesc',
+							'Authenticate with a Personal Access Token to commit changes directly from this browser.'
+						)}
 					</p>
 				</div>
 			</div>
@@ -100,7 +119,7 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 			<form onSubmit={handleConnect} className="space-y-3">
 				<div>
 					<label htmlFor="gh-token" className="mb-1 block text-xs font-medium text-foreground">
-						Personal Access Token (Fine-Grained or Classic)
+						{tr('editor.patLabel', 'Personal Access Token (Fine-Grained or Classic)')}
 					</label>
 					<input
 						id="gh-token"
@@ -127,7 +146,9 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 						rel="noopener noreferrer"
 						className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
 					>
-						<span>Create token on GitHub (Contents: Read & Write)</span>
+						<span>
+							{tr('editor.patCreateLink', 'Create token on GitHub (Contents: Read & Write)')}
+						</span>
 						<ExternalLink className="h-3 w-3" />
 					</a>
 
@@ -139,10 +160,10 @@ export default function TokenManager({ token, user, onTokenChange }: Readonly<To
 						{isValidating ? (
 							<>
 								<Loader2 className="h-4 w-4 animate-spin" />
-								<span>Verifying...</span>
+								<span>{tr('editor.verifying', 'Verifying...')}</span>
 							</>
 						) : (
-							<span>Connect Token</span>
+							<span>{tr('editor.connectBtn', 'Connect Token')}</span>
 						)}
 					</button>
 				</div>
