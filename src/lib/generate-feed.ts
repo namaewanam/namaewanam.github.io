@@ -63,8 +63,16 @@ export async function generateFeed(): Promise<Feed> {
 
 		await Promise.all(
 			latestPosts.map(async (post) => {
-				const url = `${SITE_URL}/blog/${post.category}/${post.fullPath}`;
-				const html = await renderMarkdown(post.content);
+				const lang = post.lang || 'en';
+				const url = `${SITE_URL}/${lang}/blog/${post.category}/${post.fullPath}`;
+				let html = await renderMarkdown(post.content);
+
+				// Ensure all relative links and image sources in feed content are absolute
+				html = html
+					.replace(/href="\/([^"]*)"/g, `href="${SITE_URL}/$1"`)
+					.replace(/src="\/([^"]*)"/g, `src="${SITE_URL}/$1"`)
+					.replace(/href="#([^"]*)"/g, `href="${url}#$1"`);
+
 				const categories = [
 					{ name: post.categoryName, term: post.categoryName },
 					...(post.tags ?? []).map((tag) => ({ name: tag, term: tag })),

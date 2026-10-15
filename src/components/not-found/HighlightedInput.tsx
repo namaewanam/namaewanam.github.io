@@ -134,6 +134,7 @@ const HighlightedInput = forwardRef<HTMLInputElement, HighlightedInputProps>(
 				<input
 					ref={ref}
 					type="text"
+					aria-label="Terminal command input"
 					value={value}
 					onChange={onChange}
 					onKeyDown={onKeyDown}

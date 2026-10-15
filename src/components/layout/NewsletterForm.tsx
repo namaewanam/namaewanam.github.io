@@ -22,6 +22,7 @@ export default function NewsletterForm() {
 					<input
 						type="email"
 						name="email"
+						aria-label="Email address"
 						placeholder="your@email.com"
 						required
 						className="flex-1 rounded border border-border bg-transparent px-3 py-1.5 font-mono text-xs placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
@@ -37,6 +38,7 @@ export default function NewsletterForm() {
 				<div className="flex cursor-not-allowed items-center gap-2 opacity-50">
 					<input
 						type="email"
+						aria-label="Email address"
 						placeholder="your@email.com"
 						disabled
 						className="flex-1 rounded border border-border bg-transparent px-3 py-1.5 font-mono text-xs"

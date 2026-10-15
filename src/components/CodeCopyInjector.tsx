@@ -77,11 +77,26 @@ export interface PostMetaPreview {
 	readingTimeMin: number;
 }
 
+function escapeHtml(str: string): string {
+	return str.replace(
+		/[&<>"']/g,
+		(m) =>
+			({
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#39;',
+			})[m] ?? m
+	);
+}
+
 export default function CodeCopyInjector({
 	html,
 	postsMeta,
 }: Readonly<{ html: string; postsMeta?: PostMetaPreview[] }>) {
 	const containerRef = useRef<HTMLDivElement>(null);
+	const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
 		const container = containerRef.current;
@@ -233,19 +248,18 @@ export default function CodeCopyInjector({
 				const img = wrapper.querySelector<HTMLImageElement>('img');
 				const svgLink = wrapper.querySelector<HTMLAnchorElement>('a[aria-label="Open SVG"]');
 				const fallback = wrapper.querySelector<HTMLElement>('figcaption');
-				const nextUrl = getPlantUmlSvgUrl(source, dark);
 
-				if (img) {
-					img.src = nextUrl;
-				}
-
-				if (svgLink) {
-					svgLink.href = nextUrl;
-				}
-
-				if (fallback) {
-					fallback.classList.add('hidden');
-				}
+				void getPlantUmlSvgUrl(source, dark).then((nextUrl) => {
+					if (img) {
+						img.src = nextUrl;
+					}
+					if (svgLink) {
+						svgLink.href = nextUrl;
+					}
+					if (fallback) {
+						fallback.classList.add('hidden');
+					}
+				});
 			});
 		};
 
@@ -271,7 +285,6 @@ export default function CodeCopyInjector({
 			wrapper.appendChild(langLabel);
 
 			const img = document.createElement('img');
-			img.src = getPlantUmlSvgUrl(diagram, document.documentElement.classList.contains('dark'));
 			img.alt = 'PlantUML diagram';
 			img.loading = 'lazy';
 			img.decoding = 'async';
@@ -305,8 +318,15 @@ export default function CodeCopyInjector({
 				});
 			});
 
-			const svgLink = createActionLink(DOWNLOAD_ICON, 'svg', 'Open SVG', img.src);
+			const svgLink = createActionLink(DOWNLOAD_ICON, 'svg', 'Open SVG', '');
 			svgLink.addEventListener('click', (event) => event.stopPropagation());
+
+			void getPlantUmlSvgUrl(diagram, document.documentElement.classList.contains('dark')).then(
+				(url) => {
+					img.src = url;
+					svgLink.href = url;
+				}
+			);
 
 			actions.appendChild(copyBtn);
 			actions.appendChild(svgLink);
@@ -315,8 +335,9 @@ export default function CodeCopyInjector({
 			pre.replaceWith(wrapper);
 		});
 
+		let plantUmlThemeObserver: MutationObserver | null = null;
 		if (plantUmlBlocks.length > 0) {
-			const plantUmlThemeObserver = new MutationObserver(() => {
+			plantUmlThemeObserver = new MutationObserver(() => {
 				reRenderPlantUml(document.documentElement.classList.contains('dark'));
 			});
 			plantUmlThemeObserver.observe(document.documentElement, {
@@ -397,6 +418,7 @@ export default function CodeCopyInjector({
 		});
 
 		// Mermaid diagrams: replace pre>code.language-mermaid
+		let mermaidThemeObserver: MutationObserver | null = null;
 		const mermaidBlocks = container.querySelectorAll<HTMLElement>('pre:has(code.language-mermaid)');
 		if (mermaidBlocks.length > 0) {
 			const getMermaidVars = (dark: boolean) =>
@@ -485,7 +507,7 @@ export default function CodeCopyInjector({
 						startOnLoad: false,
 						theme: 'base',
 						themeVariables: getMermaidVars(dark),
-						securityLevel: 'loose',
+						securityLevel: 'antiscript',
 					});
 
 					const wrappers = container.querySelectorAll<HTMLElement>('.mermaid-diagram[data-src]');
@@ -524,7 +546,7 @@ export default function CodeCopyInjector({
 						startOnLoad: false,
 						theme: 'base',
 						themeVariables: getMermaidVars(isDark),
-						securityLevel: 'loose',
+						securityLevel: 'antiscript',
 					});
 
 					let idx = 0;
@@ -606,11 +628,11 @@ export default function CodeCopyInjector({
 				}
 			})();
 
-			const themeObserver = new MutationObserver(() => {
+			mermaidThemeObserver = new MutationObserver(() => {
 				const dark = document.documentElement.classList.contains('dark');
 				void reRenderAll(dark);
 			});
-			themeObserver.observe(document.documentElement, {
+			mermaidThemeObserver.observe(document.documentElement, {
 				attributes: true,
 				attributeFilter: ['class'],
 			});
@@ -657,10 +679,6 @@ export default function CodeCopyInjector({
 				document.body.appendChild(popover);
 			}
 
-			// Use a global variable on the window to track the hide timeout across renders
-			// so that fast hovering doesn't glitch.
-			const w = window as any;
-
 			internalLinks.forEach((link) => {
 				const href = link.getAttribute('href');
 				if (!href) return;
@@ -675,12 +693,14 @@ export default function CodeCopyInjector({
 				if (!post) return;
 
 				link.addEventListener('mouseenter', () => {
-					clearTimeout(w.__wikiPreviewTimeout);
+					if (previewTimeoutRef.current) {
+						clearTimeout(previewTimeoutRef.current);
+					}
 
 					popover!.innerHTML = `
 						<div class="space-y-2">
-							<h4 class="font-semibold text-sm leading-tight text-foreground">${post.title}</h4>
-							${post.description ? `<p class="text-xs text-muted-foreground line-clamp-3">${post.description}</p>` : ''}
+							<h4 class="font-semibold text-sm leading-tight text-foreground">${escapeHtml(post.title)}</h4>
+							${post.description ? `<p class="text-xs text-muted-foreground line-clamp-3">${escapeHtml(post.description)}</p>` : ''}
 							<div class="flex items-center gap-1.5 text-[10px] font-mono text-primary">
 								<span>~${post.readingTimeMin} min read</span>
 							</div>
@@ -709,12 +729,22 @@ export default function CodeCopyInjector({
 				});
 
 				link.addEventListener('mouseleave', () => {
-					w.__wikiPreviewTimeout = setTimeout(() => {
-						popover!.style.opacity = '0';
+					previewTimeoutRef.current = setTimeout(() => {
+						if (popover) popover.style.opacity = '0';
 					}, 150);
 				});
 			});
 		}
+
+		return () => {
+			plantUmlThemeObserver?.disconnect();
+			mermaidThemeObserver?.disconnect();
+			if (previewTimeoutRef.current) {
+				clearTimeout(previewTimeoutRef.current);
+			}
+			const popover = document.getElementById('wiki-link-preview');
+			popover?.remove();
+		};
 	}, [html, postsMeta]);
 
 	return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;

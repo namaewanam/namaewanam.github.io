@@ -92,10 +92,11 @@ export default function PostReactions({ slug }: Readonly<{ slug: string }>) {
 						key={label}
 						type="button"
 						onClick={() => handleClick(label)}
-						className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition-all ${
+						className={`inline-flex min-h-[36px] min-w-[36px] items-center justify-center gap-1.5 rounded border px-2.5 py-1.5 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
 							isActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
 						} ${animating === label ? 'scale-110' : ''}`}
-						aria-label={`React with ${label}`}
+						aria-pressed={isActive}
+						aria-label={`React with ${label}, ${count} reaction${count !== 1 ? 's' : ''}`}
 						style={{
 							transition: 'all 0.15s ease',
 						}}

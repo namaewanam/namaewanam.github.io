@@ -1,8 +1,7 @@
 import { getAllPosts, getCategories } from '@/lib/markdown';
 import { SITE_URL } from '@/lib/site';
 
-export const SITEMAP_CHUNK_SIZE = 50_000;
-export const PRIMARY_SITEMAP_PATH = '/sitemap/0.xml';
+export const PRIMARY_SITEMAP_PATH = '/sitemap.xml';
 
 export interface SitemapEntry {
 	url: string;
@@ -16,6 +15,18 @@ export function getSitemapEntries(): SitemapEntry[] {
 	const categories = getCategories();
 	const latestPostDate = posts[0]?.lastUpdated ?? posts[0]?.date ?? new Date().toISOString();
 
+	const staticRoutes = [
+		{ path: '', priority: 1.0, freq: 'weekly' as const },
+		{ path: '/blog', priority: 0.9, freq: 'weekly' as const },
+		{ path: '/blog/tags', priority: 0.7, freq: 'weekly' as const },
+		{ path: '/stack', priority: 0.7, freq: 'monthly' as const },
+		{ path: '/reading-list', priority: 0.6, freq: 'monthly' as const },
+		{ path: '/changelog', priority: 0.6, freq: 'monthly' as const },
+		{ path: '/now', priority: 0.6, freq: 'monthly' as const },
+		{ path: '/snippets', priority: 0.6, freq: 'monthly' as const },
+		{ path: '/adr', priority: 0.6, freq: 'monthly' as const },
+	];
+
 	const staticEntries: SitemapEntry[] = [
 		{
 			url: SITE_URL,
@@ -23,32 +34,35 @@ export function getSitemapEntries(): SitemapEntry[] {
 			changeFrequency: 'weekly',
 			priority: 1,
 		},
-		{
-			url: `${SITE_URL}/blog`,
-			lastModified: latestPostDate,
-			changeFrequency: 'weekly',
-			priority: 0.9,
-		},
-		{
-			url: `${SITE_URL}/stack`,
-			lastModified: latestPostDate,
-			changeFrequency: 'monthly',
-			priority: 0.7,
-		},
 	];
 
-	const categoryEntries = categories.map((category) => {
-		const latestCategoryPost = posts.find((post) => post.category === category.slug);
-		return {
-			url: `${SITE_URL}/blog/${category.slug}`,
-			lastModified: latestCategoryPost?.lastUpdated ?? latestCategoryPost?.date ?? latestPostDate,
-			changeFrequency: 'weekly' as const,
-			priority: 0.7,
-		};
-	});
+	for (const lang of ['en', 'vi']) {
+		for (const route of staticRoutes) {
+			staticEntries.push({
+				url: `${SITE_URL}/${lang}${route.path}`,
+				lastModified: latestPostDate,
+				changeFrequency: route.freq,
+				priority: route.priority,
+			});
+		}
+	}
 
-	const postEntries = posts.map((post) => ({
-		url: `${SITE_URL}/blog/${post.category}/${post.fullPath}`,
+	const categoryEntries: SitemapEntry[] = [];
+	for (const category of categories) {
+		const latestCategoryPost = posts.find((post) => post.category === category.slug);
+		const catDate = latestCategoryPost?.lastUpdated ?? latestCategoryPost?.date ?? latestPostDate;
+		for (const lang of ['en', 'vi']) {
+			categoryEntries.push({
+				url: `${SITE_URL}/${lang}/blog/${category.slug}`,
+				lastModified: catDate,
+				changeFrequency: 'weekly',
+				priority: 0.7,
+			});
+		}
+	}
+
+	const postEntries: SitemapEntry[] = posts.map((post) => ({
+		url: `${SITE_URL}/${post.lang || 'en'}/blog/${post.category}/${post.fullPath}`,
 		lastModified: post.lastUpdated ?? post.date ?? latestPostDate,
 		changeFrequency: 'monthly' as const,
 		priority: 0.8,
@@ -57,19 +71,6 @@ export function getSitemapEntries(): SitemapEntry[] {
 	return [...staticEntries, ...categoryEntries, ...postEntries];
 }
 
-export function getSitemapIds(): Array<{ id: number }> {
-	const entryCount = getSitemapEntries().length;
-	const totalSitemaps = Math.max(1, Math.ceil(entryCount / SITEMAP_CHUNK_SIZE));
-
-	return Array.from({ length: totalSitemaps }, (_, id) => ({ id }));
-}
-
-export function getSitemapEntriesById(id: number): SitemapEntry[] {
-	const start = id * SITEMAP_CHUNK_SIZE;
-	const end = start + SITEMAP_CHUNK_SIZE;
-	return getSitemapEntries().slice(start, end);
-}
-
 export function getSitemapUrls(): string[] {
-	return getSitemapIds().map(({ id }) => `${SITE_URL}/sitemap/${id}.xml`);
+	return [`${SITE_URL}/sitemap.xml`];
 }

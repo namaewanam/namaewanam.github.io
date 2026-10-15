@@ -12,9 +12,21 @@ export default function BlogResults({
 }>) {
 	if (posts.length === 0) {
 		return (
-			<div className="py-10 text-center font-mono text-sm text-muted-foreground">
-				<span className="text-primary">→ </span>
-				no results for &ldquo;{query || activeTag}&rdquo;
+			<div
+				role="status"
+				aria-live="polite"
+				className="flex flex-col items-center gap-3 py-12 text-center font-mono text-sm text-muted-foreground"
+			>
+				<p>
+					<span className="text-primary">→ </span>
+					no results for &ldquo;{query || activeTag || 'current filter'}&rdquo;
+				</p>
+				<Link
+					href="/blog"
+					className="mt-1 rounded border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+				>
+					reset search / view all
+				</Link>
 			</div>
 		);
 	}
@@ -22,7 +34,11 @@ export default function BlogResults({
 	return (
 		<>
 			{(query || activeTag) && (
-				<p className="mb-3 font-mono text-[10px] text-muted-foreground">
+				<p
+					aria-live="polite"
+					aria-atomic="true"
+					className="mb-3 font-mono text-[10px] text-muted-foreground"
+				>
 					{posts.length} result{posts.length !== 1 ? 's' : ''}
 					{activeTag && (
 						<>

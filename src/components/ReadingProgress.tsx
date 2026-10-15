@@ -17,7 +17,7 @@ export default function ReadingProgress() {
 			const docHeight = document.documentElement.scrollHeight - window.innerHeight;
 			const progress = docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0;
 			if (progressRef.current) {
-				progressRef.current.style.width = `${progress}%`;
+				progressRef.current.style.transform = `scaleX(${progress / 100})`;
 				progressRef.current.setAttribute('aria-valuenow', String(Math.round(progress)));
 			}
 			frame = 0;

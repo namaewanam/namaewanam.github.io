@@ -26,18 +26,19 @@ export default function BookmarkButton({ slug, size = 'sm' }: Readonly<BookmarkB
 				e.stopPropagation();
 				toggle(slug);
 			}}
-			className={`inline-flex items-center gap-1 rounded border px-2 py-1 font-mono text-[11px] transition-all ${
+			className={`inline-flex min-h-[36px] items-center gap-1.5 rounded border px-2.5 py-1 font-mono text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
 				active
 					? 'border-primary text-primary'
 					: 'border-border text-muted-foreground hover:border-primary hover:text-foreground'
 			}`}
+			aria-pressed={active}
 			aria-label={
 				active
 					? size === 'md'
 						? 'Remove saved bookmark'
 						: 'Remove bookmark'
 					: size === 'md'
-						? 'Add save bookmark'
+						? 'Save bookmark'
 						: 'Add bookmark'
 			}
 		>

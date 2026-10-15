@@ -42,7 +42,8 @@ export async function generateMetadata({
 		return { title: 'Not Found · nam' };
 	}
 
-	const url = `/blog/${post.category}/${post.fullPath}`;
+	const lang = resolvedParams.lang || 'en';
+	const canonicalUrl = `/${lang}/blog/${post.category}/${post.fullPath}`;
 	const imageUrl = `/og/posts/${toPostOgSlug(post.category, post.fullPath)}.png`;
 
 	return {
@@ -53,7 +54,7 @@ export async function generateMetadata({
 			title: post.title,
 			description: post.description ?? post.title,
 			type: 'article',
-			url,
+			url: canonicalUrl,
 			publishedTime: post.date,
 			modifiedTime: post.lastUpdated,
 			tags: post.tags,
@@ -72,7 +73,14 @@ export async function generateMetadata({
 			description: post.description ?? post.title,
 			images: [imageUrl],
 		},
-		alternates: { canonical: url },
+		alternates: {
+			canonical: canonicalUrl,
+			languages: {
+				en: `/en/blog/${post.category}/${post.fullPath}`,
+				vi: `/vi/blog/${post.category}/${post.fullPath}`,
+				'x-default': `/en/blog/${post.category}/${post.fullPath}`,
+			},
+		},
 	};
 }
 

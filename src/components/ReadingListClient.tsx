@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from '@/components/LocalizedLink';
 import { Bookmark, X } from 'lucide-react';
 import { useReadingList } from '@/lib/useReadingList';
@@ -15,7 +16,20 @@ interface PostMeta {
 }
 
 export default function ReadingListClient({ posts }: Readonly<{ posts: PostMeta[] }>) {
+	const [mounted, setMounted] = useState(false);
 	const { bookmarks, toggle } = useReadingList();
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	if (!mounted) {
+		return (
+			<div className="py-16 text-center font-mono text-xs text-muted-foreground/60">
+				loading saved posts...
+			</div>
+		);
+	}
 
 	const savedPosts = posts.filter((p) => bookmarks.includes(`${p.category}/${p.fullPath}`));
 
@@ -70,7 +84,7 @@ export default function ReadingListClient({ posts }: Readonly<{ posts: PostMeta[
 					<button
 						type="button"
 						onClick={() => toggle(`${post.category}/${post.fullPath}`)}
-						className="mt-1 rounded border border-border p-1 text-muted-foreground transition-all hover:border-red-500/50 hover:text-red-500"
+						className="mt-1 inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded border border-border p-2 text-muted-foreground transition-all hover:border-red-500/50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
 						aria-label={`Remove ${post.title} from reading list`}
 					>
 						<X className="h-3 w-3" />

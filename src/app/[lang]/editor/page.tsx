@@ -5,7 +5,15 @@ import { SITE_NAME } from '@/lib/site';
 import { getCategories } from '@/lib/markdown';
 import { getDictionary } from '@/lib/i18n/server';
 import { Locale } from '@/lib/i18n/translations';
-import EditorView from '@/components/editor/EditorView';
+import dynamic from 'next/dynamic';
+
+const EditorView = dynamic(() => import('@/components/editor/EditorView'), {
+	loading: () => (
+		<div className="py-12 text-center font-mono text-xs text-muted-foreground">
+			loading editor...
+		</div>
+	),
+});
 
 export const metadata: Metadata = {
 	title: `editor · ${SITE_NAME}`,

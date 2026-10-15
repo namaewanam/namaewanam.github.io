@@ -175,14 +175,6 @@ export function toPostOgSlug(category: string, fullPath: string): string {
 	return `${category}~${fullPath.replaceAll('/', '~')}`;
 }
 
-export function fromPostOgSlug(slug: string): { category: string; fullPath: string } {
-	const [category = '', ...rest] = slug.split('~');
-	return {
-		category,
-		fullPath: rest.join('/'),
-	};
-}
-
 export function getFeaturedPosts(posts: Post[]): Post[] {
 	const wanted = new Set(FEATURED_WRITEUP_PATHS);
 	const featured = posts.filter((post) => wanted.has(`${post.category}/${post.fullPath}`));

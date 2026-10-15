@@ -604,23 +604,3 @@ export function getAllTags(lang: string = 'en'): { tag: string; count: number }[
 	// Recompute tags for the specific language
 	return buildTags(getAllPosts(lang));
 }
-
-export function searchPosts(query: string, lang: string = 'en'): Post[] {
-	const posts = getAllPosts(lang);
-	const q = query.toLowerCase().trim();
-	if (!q) return posts;
-
-	return posts.filter((post) => {
-		const inTitle = post.title.toLowerCase().includes(q);
-		const inDescription = post.description?.toLowerCase().includes(q) || false;
-		const inCategory = post.category.toLowerCase().includes(q);
-		const inTags = post.tags?.some((t) => t.includes(q)) || false;
-		return inTitle || inDescription || inCategory || inTags;
-	});
-}
-
-export function getPostsByTag(tag: string, lang: string = 'en'): Post[] {
-	const posts = getAllPosts(lang);
-	const t = tag.toLowerCase();
-	return posts.filter((post) => post.tags?.includes(t) || post.category === t);
-}

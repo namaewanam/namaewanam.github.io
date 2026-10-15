@@ -19,10 +19,14 @@ function BlogSearchInput(
 				<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 select-none font-mono text-xs text-muted-foreground">
 					/
 				</span>
+				<label htmlFor="blog-search" className="sr-only">
+					Search blog articles
+				</label>
 				<input
 					ref={ref}
 					id="blog-search"
 					type="text"
+					aria-label="Search articles by title, tags, or content"
 					value={query}
 					onChange={(e) => onQueryChange(e.target.value)}
 					placeholder="search title, tags, topics, content..."

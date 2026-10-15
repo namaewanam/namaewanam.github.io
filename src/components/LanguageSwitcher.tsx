@@ -28,7 +28,7 @@ export default function LanguageSwitcher() {
 	return (
 		<Link
 			href={nextPath}
-			className="rounded border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition-all hover:border-primary hover:text-foreground"
+			className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-border px-2.5 py-1 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 			aria-label={`Switch to ${nextLocale.toUpperCase()}`}
 		>
 			{nextLocale.toUpperCase()}

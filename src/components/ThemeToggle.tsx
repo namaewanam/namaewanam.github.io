@@ -8,8 +8,10 @@ export default function ThemeToggle() {
 	return (
 		<button
 			onClick={toggleTheme}
-			className="rounded border border-border p-2 transition-colors hover:border-primary"
-			aria-label="Toggle theme"
+			className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-border p-2.5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+			aria-label={
+				mounted ? `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode` : 'Toggle theme'
+			}
 			suppressHydrationWarning
 		>
 			{/* Render a fixed icon during SSR/pre-mount to avoid hydration mismatch.

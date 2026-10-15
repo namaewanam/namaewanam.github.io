@@ -1,5 +1,3 @@
-import { deflateRaw } from 'pako';
-
 const PLANTUML_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
 
 const LIGHT_THEME_BLOCK = `
@@ -139,8 +137,11 @@ function append3bytes(byte1: number, byte2: number, byte3: number): string {
 	return encode6bit(chunk1) + encode6bit(chunk2) + encode6bit(chunk3) + encode6bit(chunk4);
 }
 
-export function encodePlantUmlSource(source: string): string {
-	const compressed = deflateRaw(new TextEncoder().encode(source), { level: 9 });
+export function encodePlantUmlSourceWith(
+	source: string,
+	deflate: typeof import('pako').deflateRaw
+): string {
+	const compressed = deflate(new TextEncoder().encode(source), { level: 9 });
 	let encoded = '';
 
 	for (let index = 0; index < compressed.length; index += 3) {
@@ -177,10 +178,11 @@ export function applyPlantUmlTheme(source: string, dark: boolean): string {
 	);
 }
 
-export function getPlantUmlSvgUrl(source: string, dark = false): string {
+export async function getPlantUmlSvgUrl(source: string, dark = false): Promise<string> {
+	const { deflateRaw } = await import('pako');
 	const root = process.env.NEXT_PUBLIC_PLANTUML_SERVER_URL ?? 'https://www.plantuml.com/plantuml';
 	const normalizedRoot = root.replace(/\/+$/, '');
-	const encoded = encodePlantUmlSource(applyPlantUmlTheme(source, dark));
+	const encoded = encodePlantUmlSourceWith(applyPlantUmlTheme(source, dark), deflateRaw);
 
 	return normalizedRoot.endsWith('/svg')
 		? `${normalizedRoot}/${encoded}`
