@@ -9,7 +9,7 @@ import {
 import { renderMarkdown, extractHeadings } from '@/lib/mdx';
 import { notFound } from 'next/navigation';
 import PostLayout from '@/components/PostLayout';
-import { SITE_NAME, toPostOgSlug } from '@/lib/site';
+import { SITE_NAME, SITE_URL, toPostOgSlug } from '@/lib/site';
 
 export const dynamicParams = false;
 
@@ -46,6 +46,7 @@ export async function generateMetadata({
 	const imageUrl = `/og/posts/${toPostOgSlug(post.category, post.fullPath)}.png`;
 
 	return {
+		metadataBase: new URL(SITE_URL),
 		title: `${post.title} · ${SITE_NAME}`,
 		description: post.description ?? `${post.title} — notes from a backend developer`,
 		openGraph: {

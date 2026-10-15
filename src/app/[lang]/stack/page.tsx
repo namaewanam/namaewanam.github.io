@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { features } from '@/lib/features';
 import StackGroup from '@/components/stack/StackGroup';
-import { STACK_GROUPS, SITE_NAME } from '@/lib/site';
+import { STACK_GROUPS, SITE_NAME, SITE_URL } from '@/lib/site';
 import Link from '@/components/LocalizedLink';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `Stack · ${SITE_NAME}`,
 	description:
 		'My personal tech radar — technologies I adopt, trial, assess, and consciously hold.',

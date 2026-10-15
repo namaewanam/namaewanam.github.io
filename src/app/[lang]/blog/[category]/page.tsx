@@ -3,7 +3,7 @@ import { getPostsByCategory, getCategories, getSeriesMetadata } from '@/lib/mark
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import SeriesLanding from '@/components/blog/SeriesLanding';
-import { getCategoryDescription, SITE_NAME } from '@/lib/site';
+import { getCategoryDescription, SITE_NAME, SITE_URL } from '@/lib/site';
 import { renderMarkdown } from '@/lib/mdx';
 
 export const dynamicParams = false;
@@ -25,6 +25,7 @@ export async function generateMetadata({
 	const description = getCategoryDescription(resolvedParams.category);
 	const categoryTitle = resolvedParams.category.replace(/-/g, ' ');
 	return {
+		metadataBase: new URL(SITE_URL),
 		title: `${categoryTitle} · ${SITE_NAME}`,
 		description,
 		openGraph: {

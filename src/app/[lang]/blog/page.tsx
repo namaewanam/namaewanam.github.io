@@ -1,9 +1,10 @@
 import { getBlogSearchPosts, getCategories, getAllTags } from '@/lib/markdown';
 import BlogClient from '@/components/BlogClient';
 import type { Metadata } from 'next';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `Blog · ${SITE_NAME}`,
 	description: 'Articles about backend engineering, Go, Java, Spring Boot, and systems design',
 	openGraph: {
