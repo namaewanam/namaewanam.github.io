@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { features } from '@/lib/features';
 import { SITE_NAME } from '@/lib/site';
 import { getCategories } from '@/lib/markdown';
 import { getDictionary } from '@/lib/i18n/server';
@@ -19,6 +21,10 @@ export function generateStaticParams() {
 }
 
 export default async function EditorPage({ params }: { params: Promise<{ lang: Locale }> }) {
+	if (!features.editor) {
+		notFound();
+	}
+
 	const { lang } = await params;
 	const t = getDictionary(lang);
 

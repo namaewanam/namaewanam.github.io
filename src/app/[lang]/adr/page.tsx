@@ -1,3 +1,5 @@
+import { notFound } from 'next/navigation';
+import { features } from '@/lib/features';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
@@ -60,6 +62,9 @@ async function getAdrs(): Promise<AdrMeta[]> {
 }
 
 export default async function AdrPage() {
+	if (!features.adr) {
+		notFound();
+	}
 	const adrs = await getAdrs();
 
 	return (

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { features } from '@/lib/features';
 import StackGroup from '@/components/stack/StackGroup';
 import { STACK_GROUPS, SITE_NAME } from '@/lib/site';
 import Link from '@/components/LocalizedLink';
@@ -259,6 +261,9 @@ export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
 export default function StackPage() {
+	if (!features.stack) {
+		notFound();
+	}
 	return (
 		<div className="mx-auto w-full max-w-4xl space-y-14">
 			{/* Original stack groups section */}

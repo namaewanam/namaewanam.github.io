@@ -38,14 +38,30 @@ export default function FooterStatus({ lang }: { lang: Locale }) {
 				<a href={PRIMARY_SITEMAP_PATH} className="transition-colors hover:text-primary">
 					sitemap
 				</a>
-				<Dot />
-				<Link href="/stack" className="transition-colors hover:text-primary">
-					stack
-				</Link>
-				<Dot />
-				<Link href="/snippets" className="transition-colors hover:text-primary">
-					snippets
-				</Link>
+				{features.stack && (
+					<>
+						<Dot />
+						<Link href="/stack" className="transition-colors hover:text-primary">
+							stack
+						</Link>
+					</>
+				)}
+				{features.snippets && (
+					<>
+						<Dot />
+						<Link href="/snippets" className="transition-colors hover:text-primary">
+							snippets
+						</Link>
+					</>
+				)}
+				{features.adr && (
+					<>
+						<Dot />
+						<Link href="/adr" className="transition-colors hover:text-primary">
+							adr
+						</Link>
+					</>
+				)}
 				{features.nowPage && (
 					<>
 						<Dot />

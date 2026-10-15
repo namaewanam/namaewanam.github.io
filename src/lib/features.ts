@@ -69,6 +69,24 @@ export const features = {
 
 	/** "Try it" playground links on code blocks. */
 	interactiveCode: isEnabled(process.env.NEXT_PUBLIC_FEATURE_INTERACTIVE_CODE),
+
+	/** Web Markdown post editor (/editor). */
+	editor: isEnabled(process.env.NEXT_PUBLIC_FEATURE_EDITOR),
+
+	/** Tech radar (/stack) page. */
+	stack: isEnabled(process.env.NEXT_PUBLIC_FEATURE_STACK),
+
+	/** Code snippets (/snippets) library. */
+	snippets: isEnabled(process.env.NEXT_PUBLIC_FEATURE_SNIPPETS),
+
+	/** Architecture Decision Records (/adr) page. */
+	adr: isEnabled(process.env.NEXT_PUBLIC_FEATURE_ADR),
+
+	/** Related posts recommendation block on blog articles. */
+	relatedPosts: isEnabled(process.env.NEXT_PUBLIC_FEATURE_RELATED_POSTS),
+
+	/** Sticky table of contents sidebar on blog posts. */
+	tableOfContents: isEnabled(process.env.NEXT_PUBLIC_FEATURE_TABLE_OF_CONTENTS),
 } as const;
 
 export type FeatureFlag = keyof typeof features;

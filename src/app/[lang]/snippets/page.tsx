@@ -1,4 +1,6 @@
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { features } from '@/lib/features';
 import { renderMarkdown } from '@/lib/mdx';
 import { SNIPPETS } from '@/lib/snippets';
 import MarkdownContent from '@/components/MarkdownContent';
@@ -10,6 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function SnippetsPage() {
+	if (!features.snippets) {
+		notFound();
+	}
 	// Pre-render all markdown contents concurrently
 	const renderedSnippets = await Promise.all(
 		SNIPPETS.map(async (snippet) => {

@@ -180,7 +180,9 @@ export default function PostLayout({
 					</div>
 				)}
 
-				{relatedPosts && relatedPosts.length > 0 && <RelatedPosts posts={relatedPosts} />}
+				{features.relatedPosts && relatedPosts && relatedPosts.length > 0 && (
+					<RelatedPosts posts={relatedPosts} />
+				)}
 
 				{/* Navigation: Previous/Next */}
 				{adjacentPosts && (adjacentPosts.previous || adjacentPosts.next) && (
@@ -269,7 +271,7 @@ export default function PostLayout({
 				)}
 			</div>
 
-			{hasTableOfContents && (
+			{features.tableOfContents && hasTableOfContents && (
 				<div className="hidden self-start lg:sticky lg:top-20 lg:block">
 					<TableOfContents headings={headings} />
 				</div>

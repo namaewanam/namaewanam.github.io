@@ -104,14 +104,18 @@ export default async function RootLayout({
 			description: 'all articles and search',
 			keywords: ['writing', 'posts', 'articles'],
 		},
-		{
-			id: 'stack',
-			label: '/stack',
-			href: '/stack',
-			section: 'jump' as const,
-			description: 'tools, defaults, and current rabbit holes',
-			keywords: ['tech stack', 'tools'],
-		},
+		...(features.stack
+			? [
+					{
+						id: 'stack',
+						label: '/stack',
+						href: '/stack',
+						section: 'jump' as const,
+						description: 'tools, defaults, and current rabbit holes',
+						keywords: ['tech stack', 'tools'],
+					},
+				]
+			: []),
 		{
 			id: 'contact',
 			label: '/#contact',
@@ -138,14 +142,30 @@ export default async function RootLayout({
 			keywords: ['hiring', 'roles', 'opportunity'],
 			external: true,
 		},
-		{
-			id: 'snippets',
-			label: '/snippets',
-			href: '/snippets',
-			section: 'jump' as const,
-			description: 'code snippets and patterns',
-			keywords: ['snippets', 'code', 'boilerplates'],
-		},
+		...(features.snippets
+			? [
+					{
+						id: 'snippets',
+						label: '/snippets',
+						href: '/snippets',
+						section: 'jump' as const,
+						description: 'code snippets and patterns',
+						keywords: ['snippets', 'code', 'boilerplates'],
+					},
+				]
+			: []),
+		...(features.adr
+			? [
+					{
+						id: 'adr',
+						label: '/adr',
+						href: '/adr',
+						section: 'jump' as const,
+						description: 'architecture decision records',
+						keywords: ['adr', 'architecture', 'decisions'],
+					},
+				]
+			: []),
 		...(features.nowPage
 			? [
 					{
