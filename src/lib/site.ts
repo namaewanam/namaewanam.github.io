@@ -1,12 +1,34 @@
 import type { Post } from '@/lib/markdown';
 
-export const SITE_NAME = 'nam';
-export const SITE_URL = 'https://namaewanam.github.io';
-export const STATUS_LINE = 'building boring systems';
-export const SITE_DESCRIPTION = 'Notes, articles and thoughts from a backend developer';
+export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'nam';
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://namaewanam.github.io';
+export const STATUS_LINE = process.env.NEXT_PUBLIC_STATUS_LINE || 'building boring systems';
+export const SITE_DESCRIPTION =
+	process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+	'Notes, articles and thoughts from a backend developer';
 export const HOME_SIGNATURE = 'I build backend systems that are boring in production.';
 export const HOME_RECRUITING_NOTE = 'Open to backend, systems, and platform roles.';
-export const CONTACT_EMAIL = 'namisme16052004@gmail.com';
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'namisme16052004@gmail.com';
+export const GITHUB_USERNAME = process.env.NEXT_PUBLIC_GITHUB_USERNAME || 'ntnam1605';
+export const GITHUB_REPO_OWNER = process.env.NEXT_PUBLIC_GITHUB_OWNER || 'namaewanam';
+export const GITHUB_REPO_NAME = process.env.NEXT_PUBLIC_GITHUB_REPO || 'namaewanam.github.io';
+export const BUTTONDOWN_USERNAME = process.env.NEXT_PUBLIC_BUTTONDOWN_USERNAME || 'namisme16052004';
+export const GITHUB_PROFILE_URL = `https://github.com/${GITHUB_USERNAME}`;
+
+export const SITE_HOSTNAME = (() => {
+	try {
+		return new URL(SITE_URL).hostname;
+	} catch {
+		return 'namaewanam.github.io';
+	}
+})();
+
+export const GISCUS_REPO =
+	process.env.NEXT_PUBLIC_GISCUS_REPO || `${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
+export const GISCUS_REPO_ID = process.env.NEXT_PUBLIC_GISCUS_REPO_ID || 'R_kgDOQCxDSQ';
+export const GISCUS_CATEGORY = process.env.NEXT_PUBLIC_GISCUS_CATEGORY || 'Announcements';
+export const GISCUS_CATEGORY_ID =
+	process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || 'DIC_kwDOQCxDSc4C9rol';
 
 // Local CV PDF served from /public. Override with NEXT_PUBLIC_RESUME_URL env var
 // to point to a Google Drive share link in production.

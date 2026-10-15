@@ -12,6 +12,8 @@ import {
 	CONTACT_EMAIL,
 	getFeaturedPosts,
 	getInterestGroups,
+	GITHUB_PROFILE_URL,
+	GITHUB_USERNAME,
 	RESUME_URL,
 } from '@/lib/site';
 
@@ -42,7 +44,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 				{ label: 'collab', href: buildMailtoHref('collab') },
 			],
 		},
-		{ label: 'github', value: '@ntnam1605', href: 'https://github.com/ntnam1605' },
+		{ label: 'github', value: `@${GITHUB_USERNAME}`, href: GITHUB_PROFILE_URL },
 		{
 			label: 'linkedin',
 			value: '/in/ntnam',
@@ -89,7 +91,7 @@ export default async function Home({ params }: { params: Promise<{ lang: Locale 
 						recruiter
 					</a>
 					<a
-						href="https://github.com/ntnam1605"
+						href={GITHUB_PROFILE_URL}
 						target="_blank"
 						rel="noopener noreferrer"
 						className="inline-flex items-center gap-1.5 rounded border border-border px-2.5 py-1 font-mono text-xs transition-all hover:border-primary hover:text-primary"

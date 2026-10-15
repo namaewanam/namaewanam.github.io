@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from '@/components/LocalizedLink';
-import { SITE_NAME } from '@/lib/site';
+import { GITHUB_REPO_OWNER, GITHUB_REPO_NAME, SITE_NAME } from '@/lib/site';
 import { getChangelog } from '@/lib/changelog';
 
 export const metadata: Metadata = {
@@ -44,7 +44,7 @@ export default function ChangelogPage() {
 									className="flex flex-col gap-1 py-1 sm:flex-row sm:items-baseline sm:gap-3"
 								>
 									<a
-										href={`https://github.com/namaewanam/namaewanam.github.io/commit/${commit.hash}`}
+										href={`https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/commit/${commit.hash}`}
 										target="_blank"
 										rel="noopener noreferrer"
 										className="shrink-0 font-mono text-[11px] text-primary underline-offset-2 hover:underline"

@@ -6,8 +6,8 @@ export interface GitHubUser {
 	name: string;
 }
 
-export const DEFAULT_OWNER = 'namaewanam';
-export const DEFAULT_REPO = 'namaewanam.github.io';
+export const DEFAULT_OWNER = process.env.NEXT_PUBLIC_GITHUB_OWNER || 'namaewanam';
+export const DEFAULT_REPO = process.env.NEXT_PUBLIC_GITHUB_REPO || 'namaewanam.github.io';
 
 /**
  * Validates that an operation's file path is safely confined to markdown files inside docs/.

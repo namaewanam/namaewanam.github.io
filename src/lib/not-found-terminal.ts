@@ -1,4 +1,5 @@
 import type { Category, Post } from '@/lib/markdown';
+import { CONTACT_EMAIL, GITHUB_PROFILE_URL, SITE_NAME } from '@/lib/site';
 
 export type TerminalEntryKind = 'page' | 'link';
 export type HistoryTone = 'command' | 'output' | 'error' | 'hint' | 'system';
@@ -45,7 +46,7 @@ interface CommandHelp {
 }
 
 export const ROOT = '/';
-export const PROMPT_USER = 'nam';
+export const PROMPT_USER = SITE_NAME;
 export const PROMPT_HOST = 'backend-dev';
 
 /** All commands recognised by this 404 shell — used for input + history highlighting */
@@ -717,7 +718,7 @@ export function createNotFoundEntries(categories: Category[], posts: Post[]): Te
 		},
 		{
 			path: '/links/github',
-			href: 'https://github.com/ntnam1605',
+			href: GITHUB_PROFILE_URL,
 			kind: 'link',
 			label: 'github',
 			description: 'GitHub profile',
@@ -738,7 +739,7 @@ export function createNotFoundEntries(categories: Category[], posts: Post[]): Te
 		},
 		{
 			path: '/links/email',
-			href: 'mailto:namisme16052004@gmail.com',
+			href: `mailto:${CONTACT_EMAIL}`,
 			kind: 'link',
 			label: 'email',
 			description: 'send an email',

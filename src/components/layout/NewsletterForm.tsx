@@ -1,11 +1,11 @@
-'use client';
+import { BUTTONDOWN_USERNAME } from '@/lib/site';
 
 /**
  * Newsletter subscribe form — integrates with Buttondown.
  * Uses a simple form POST (no JS fetch) so it works with static export.
  */
 export default function NewsletterForm() {
-	const username = process.env.NEXT_PUBLIC_BUTTONDOWN_USERNAME;
+	const username = BUTTONDOWN_USERNAME;
 
 	return (
 		<div className="flex flex-col gap-2">

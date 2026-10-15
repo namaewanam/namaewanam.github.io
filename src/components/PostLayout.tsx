@@ -7,6 +7,7 @@ import RelatedPosts from '@/components/blog/RelatedPosts';
 import ShareButtons from '@/components/blog/ShareButtons';
 import GiscusComments from '@/components/GiscusComments';
 import { features } from '@/lib/features';
+import { GISCUS_REPO, GISCUS_REPO_ID, GISCUS_CATEGORY, GISCUS_CATEGORY_ID } from '@/lib/site';
 import type { Post, AdjacentPosts } from '@/lib/markdown';
 import type { Heading } from '@/lib/mdx';
 
@@ -257,10 +258,10 @@ export default function PostLayout({
 				{/* Giscus comments — powered by GitHub Discussions */}
 				{features.comments && (
 					<GiscusComments
-						repo="namaewanam/namaewanam.github.io"
-						repoId="R_kgDOQCxDSQ"
-						category="Announcements"
-						categoryId="DIC_kwDOQCxDSc4C9rol"
+						repo={GISCUS_REPO}
+						repoId={GISCUS_REPO_ID}
+						category={GISCUS_CATEGORY}
+						categoryId={GISCUS_CATEGORY_ID}
 						mapping="pathname"
 						strict="0"
 						reactionsEnabled="1"

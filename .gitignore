@@ -44,3 +44,7 @@ public/_content/post-metadata.json
 # Environment variables
 .env.local
 .env*.local
+
+# Agent skills
+.agents/
+skills-lock.json
