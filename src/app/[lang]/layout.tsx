@@ -1,4 +1,5 @@
 import { Locale } from '@/lib/i18n/translations';
+import { i18n } from '@/lib/i18n/server';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
@@ -80,7 +81,10 @@ export default async function RootLayout({
 	params: Promise<{ lang: string }>;
 }>) {
 	const resolvedParams = await params;
-	const lang = resolvedParams?.lang || 'en';
+	const rawLang = resolvedParams?.lang;
+	const lang: Locale = i18n.locales.includes(rawLang as Locale)
+		? (rawLang as Locale)
+		: i18n.defaultLocale;
 	const posts = getAllPosts(lang);
 	const categories = getCategories();
 	const featuredPosts = getFeaturedPosts(posts);

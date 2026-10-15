@@ -5,7 +5,7 @@ import CopyableContactValue from '@/components/home/CopyableContactValue';
 import PostStats from '@/components/home/PostStats';
 import NewsletterForm from '@/components/layout/NewsletterForm';
 import { features } from '@/lib/features';
-import { getDictionary } from '@/lib/i18n/server';
+import { getDictionary, i18n } from '@/lib/i18n/server';
 import { Locale } from '@/lib/i18n/translations';
 import {
 	buildMailtoHref,
@@ -20,8 +20,12 @@ import {
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default async function Home({ params }: { params: Promise<{ lang: Locale }> }) {
-	const { lang } = await params;
+export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
+	const resolvedParams = await params;
+	const rawLang = resolvedParams?.lang;
+	const lang: Locale = i18n.locales.includes(rawLang as Locale)
+		? (rawLang as Locale)
+		: i18n.defaultLocale;
 	const t = getDictionary(lang);
 	const posts = getAllPosts(lang);
 	const categories = getCategories();
