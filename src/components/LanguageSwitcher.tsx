@@ -14,7 +14,6 @@ export default function LanguageSwitcher() {
 	const cleanPathname = pathname.replace(/\.html$/, '');
 
 	const isVi = cleanPathname.startsWith('/vi');
-	const currentLocale = isVi ? 'vi' : 'en';
 	const nextLocale = isVi ? 'en' : 'vi';
 
 	// Replace the locale segment in the pathname

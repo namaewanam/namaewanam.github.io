@@ -139,8 +139,12 @@ export default function EditorView({
 				currentPath,
 				savedAt: new Date().toLocaleTimeString(),
 			};
-			localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-			setLastSaved(draft.savedAt);
+			try {
+				localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+				setLastSaved(draft.savedAt);
+			} catch (err) {
+				console.warn('Unable to persist draft to localStorage:', err);
+			}
 		}, 3000);
 
 		return () => clearTimeout(timer);

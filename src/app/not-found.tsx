@@ -1,6 +1,14 @@
+import type { Metadata } from 'next';
 import NotFoundTerminal from '@/components/NotFoundTerminal';
 import { getAllPosts, getCategories } from '@/lib/markdown';
 import { createNotFoundEntries } from '@/lib/not-found-terminal';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
+
+export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
+	title: `404 · ${SITE_NAME}`,
+	description: 'Page not found',
+};
 
 export default function NotFound() {
 	const categories = getCategories();

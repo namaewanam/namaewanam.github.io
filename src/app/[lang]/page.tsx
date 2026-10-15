@@ -11,8 +11,6 @@ import {
 	buildMailtoHref,
 	CONTACT_EMAIL,
 	getFeaturedPosts,
-	HOME_RECRUITING_NOTE,
-	HOME_SIGNATURE,
 	getInterestGroups,
 	RESUME_URL,
 } from '@/lib/site';

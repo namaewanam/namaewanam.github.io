@@ -10,14 +10,29 @@ export const DEFAULT_OWNER = 'namaewanam';
 export const DEFAULT_REPO = 'namaewanam.github.io';
 
 /**
+ * Validates that an operation's file path is safely confined to markdown files inside docs/.
+ * Prevents accidental or malicious modification of repository root files or workflows.
+ */
+export function validateDocsPath(path: string): void {
+	const normalized = path.replace(/\\/g, '/').trim();
+	if (!normalized.startsWith('docs/') || normalized.includes('..') || !normalized.endsWith('.md')) {
+		throw new Error(
+			`Security boundary check failed: '${path}' is outside docs/ or not a markdown file.`
+		);
+	}
+}
+
+/**
  * Safely converts any UTF-8 string (including Vietnamese and emojis) to base64.
+ * Uses 32KB chunks to prevent call-stack overflows and GC thrashing.
  */
 export function toBase64Unicode(str: string): string {
 	const bytes = new TextEncoder().encode(str);
+	const chunkSize = 0x8000;
 	let binary = '';
-	const len = bytes.byteLength;
-	for (let i = 0; i < len; i++) {
-		binary += String.fromCharCode(bytes[i] ?? 0);
+	for (let i = 0; i < bytes.length; i += chunkSize) {
+		const chunk = bytes.subarray(i, i + chunkSize);
+		binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
 	}
 	return btoa(binary);
 }
@@ -102,6 +117,7 @@ export async function fetchFileContent(
 	owner: string = DEFAULT_OWNER,
 	repo: string = DEFAULT_REPO
 ): Promise<{ content: string; sha: string }> {
+	validateDocsPath(path);
 	const octokit = getOctokit(token);
 
 	const { data } = await octokit.rest.repos.getContent({
@@ -134,6 +150,7 @@ export async function commitFile(
 	owner: string = DEFAULT_OWNER,
 	repo: string = DEFAULT_REPO
 ): Promise<{ commitSha: string; commitUrl: string }> {
+	validateDocsPath(path);
 	const octokit = getOctokit(token);
 
 	const { data } = await octokit.rest.repos.createOrUpdateFileContents({
@@ -164,6 +181,7 @@ export async function deleteFile(
 	owner: string = DEFAULT_OWNER,
 	repo: string = DEFAULT_REPO
 ): Promise<{ commitSha: string; commitUrl: string }> {
+	validateDocsPath(path);
 	const octokit = getOctokit(token);
 
 	const { data } = await octokit.rest.repos.deleteFile({

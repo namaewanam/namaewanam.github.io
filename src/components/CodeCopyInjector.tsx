@@ -715,7 +715,7 @@ export default function CodeCopyInjector({
 				});
 			});
 		}
-	}, [html]);
+	}, [html, postsMeta]);
 
 	return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />;
 }

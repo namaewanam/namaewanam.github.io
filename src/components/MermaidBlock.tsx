@@ -22,7 +22,7 @@ export default function MermaidBlock({ code, id }: MermaidBlockProps) {
 				mermaid.initialize({
 					startOnLoad: false,
 					theme: document.documentElement.classList.contains('dark') ? 'dark' : 'neutral',
-					securityLevel: 'loose',
+					securityLevel: 'antiscript',
 					fontFamily: 'var(--font-mono), monospace',
 				});
 

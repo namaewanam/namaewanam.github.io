@@ -9,6 +9,7 @@ export default function robots(): MetadataRoute.Robots {
 		rules: {
 			userAgent: '*',
 			allow: '/',
+			disallow: ['/editor/', '/en/editor/', '/vi/editor/'],
 		},
 		sitemap: getSitemapUrls(),
 		host: SITE_URL,

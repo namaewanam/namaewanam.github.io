@@ -78,7 +78,7 @@ LINKS
 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 `.trim();
 
-export function GET(request: Request) {
+export function GET() {
 	return new NextResponse(RESUME_TEXT + '\n', {
 		headers: {
 			'Content-Type': 'text/plain; charset=utf-8',
