@@ -1,12 +1,17 @@
 ---
-title: "Mermaid Diagram Test"
-date: "2026-05-23"
-description: "Test page for Mermaid diagrams — sequence, flowchart, ER, and more."
-tags: [mermaid, test, architecture]
+title: Mermaid Diagram Test
+date: '2026-05-23'
+category: Spring-Boot
+lang: en
+description: 'Test page for Mermaid diagrams — sequence, flowchart, ER, and more.'
+tags:
+  - mermaid
+  - test
+  - architecture
 difficulty: intermediate
 ---
 
-Trang này dùng để test Mermaid diagram rendering. Tất cả diagrams được render client-side, lazy-loaded.
+Trang này dùng để test Mermaid diagram rendering. Tất cả diagrams được render client-side, lazy-loaded. Test
 
 ## Sequence Diagram — Payment Flow
 
@@ -102,3 +107,4 @@ gitGraph
     merge feature/payment-v2
     commit id: "release v1.2"
 ```
+
