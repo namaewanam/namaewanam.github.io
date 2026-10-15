@@ -184,10 +184,10 @@ export default function SeriesLanding({
 				</div>
 			</div>
 
-			<div className="rounded border border-border/70 bg-background/40 p-3">
+			<div className="rounded border border-border/70 bg-background/40 p-4">
 				{seriesHtml ? (
 					<div
-						className="prose prose-sm max-w-none prose-p:my-2 prose-p:text-foreground/80 prose-a:text-accent prose-a:no-underline hover:prose-a:underline prose-strong:text-foreground prose-code:rounded prose-code:bg-muted/80 prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[12px] prose-code:before:content-none prose-code:after:content-none"
+						className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:my-2 prose-p:leading-[1.8] prose-p:text-foreground/85 prose-a:font-medium prose-a:text-accent prose-a:no-underline hover:prose-a:underline hover:prose-a:underline-offset-2 prose-strong:font-semibold prose-strong:text-foreground prose-code:rounded prose-code:bg-muted/80 prose-code:px-1 prose-code:py-0.5 prose-code:font-mono prose-code:text-[12px] prose-code:text-foreground prose-code:before:content-none prose-code:after:content-none prose-ol:text-foreground/85 prose-ul:text-foreground/85 prose-li:my-1 prose-li:text-foreground/85 prose-li:marker:text-primary/70"
 						dangerouslySetInnerHTML={{ __html: seriesHtml }}
 					/>
 				) : (

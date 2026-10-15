@@ -132,7 +132,7 @@ export default async function AdrPage() {
 
 							{adr.html && (
 								<div
-									className="prose prose-sm max-w-none text-foreground/85 prose-headings:text-foreground prose-strong:text-foreground prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none"
+									className="prose prose-sm max-w-none text-foreground/85 dark:prose-invert prose-headings:text-foreground prose-a:text-accent prose-strong:text-foreground prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none prose-ol:text-foreground/85 prose-ul:text-foreground/85 prose-li:my-1 prose-li:text-foreground/85 prose-li:marker:text-primary/70"
 									dangerouslySetInnerHTML={{ __html: adr.html }}
 								/>
 							)}

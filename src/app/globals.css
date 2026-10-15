@@ -703,6 +703,45 @@ h3:hover .heading-anchor {
 	font-style: normal;
 }
 
+/* Accessible prose typography contrast */
+.prose {
+	--tw-prose-body: hsl(var(--foreground) / 0.88);
+	--tw-prose-headings: hsl(var(--foreground));
+	--tw-prose-lead: hsl(var(--foreground) / 0.85);
+	--tw-prose-links: hsl(var(--accent));
+	--tw-prose-bold: hsl(var(--foreground));
+	--tw-prose-counters: hsl(var(--primary));
+	--tw-prose-bullets: hsl(var(--primary) / 0.75);
+	--tw-prose-hr: hsl(var(--border));
+	--tw-prose-quotes: hsl(var(--foreground) / 0.85);
+	--tw-prose-quote-borders: hsl(var(--primary) / 0.5);
+	--tw-prose-captions: hsl(var(--muted-foreground));
+	--tw-prose-code: hsl(var(--foreground));
+	--tw-prose-pre-code: hsl(var(--foreground));
+	--tw-prose-pre-bg: hsl(var(--card));
+	--tw-prose-th-borders: hsl(var(--border));
+	--tw-prose-td-borders: hsl(var(--border));
+}
+
+.dark .prose {
+	--tw-prose-body: hsl(var(--foreground) / 0.88);
+	--tw-prose-headings: hsl(var(--foreground));
+	--tw-prose-lead: hsl(var(--foreground) / 0.85);
+	--tw-prose-links: hsl(var(--accent));
+	--tw-prose-bold: hsl(var(--foreground));
+	--tw-prose-counters: hsl(var(--primary));
+	--tw-prose-bullets: hsl(var(--primary) / 0.75);
+	--tw-prose-hr: hsl(var(--border));
+	--tw-prose-quotes: hsl(var(--foreground) / 0.85);
+	--tw-prose-quote-borders: hsl(var(--primary) / 0.5);
+	--tw-prose-captions: hsl(var(--muted-foreground));
+	--tw-prose-code: hsl(var(--foreground));
+	--tw-prose-pre-code: hsl(var(--foreground));
+	--tw-prose-pre-bg: hsl(var(--card));
+	--tw-prose-th-borders: hsl(var(--border));
+	--tw-prose-td-borders: hsl(var(--border));
+}
+
 /* Code diff view: +/- line highlighting */
 /* Works automatically with rehype-highlight on ```diff blocks   */
 
