@@ -29,7 +29,7 @@ export function getSitemapEntries(): SitemapEntry[] {
 
 	const staticEntries: SitemapEntry[] = [
 		{
-			url: SITE_URL,
+			url: `${SITE_URL}/`,
 			lastModified: latestPostDate,
 			changeFrequency: 'weekly',
 			priority: 1,
@@ -39,7 +39,7 @@ export function getSitemapEntries(): SitemapEntry[] {
 	for (const lang of ['en', 'vi']) {
 		for (const route of staticRoutes) {
 			staticEntries.push({
-				url: `${SITE_URL}/${lang}${route.path}`,
+				url: `${SITE_URL}/${lang}${route.path}/`,
 				lastModified: latestPostDate,
 				changeFrequency: route.freq,
 				priority: route.priority,
@@ -53,7 +53,7 @@ export function getSitemapEntries(): SitemapEntry[] {
 		const catDate = latestCategoryPost?.lastUpdated ?? latestCategoryPost?.date ?? latestPostDate;
 		for (const lang of ['en', 'vi']) {
 			categoryEntries.push({
-				url: `${SITE_URL}/${lang}/blog/${category.slug}`,
+				url: `${SITE_URL}/${lang}/blog/${category.slug}/`,
 				lastModified: catDate,
 				changeFrequency: 'weekly',
 				priority: 0.7,
@@ -62,7 +62,7 @@ export function getSitemapEntries(): SitemapEntry[] {
 	}
 
 	const postEntries: SitemapEntry[] = posts.map((post) => ({
-		url: `${SITE_URL}/${post.lang || 'en'}/blog/${post.category}/${post.fullPath}`,
+		url: `${SITE_URL}/${post.lang || 'en'}/blog/${post.category}/${post.fullPath}/`,
 		lastModified: post.lastUpdated ?? post.date ?? latestPostDate,
 		changeFrequency: 'monthly' as const,
 		priority: 0.8,
