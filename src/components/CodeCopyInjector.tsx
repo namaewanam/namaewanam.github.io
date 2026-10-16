@@ -357,14 +357,32 @@ export default function CodeCopyInjector({
 			const langClass = Array.from(code?.classList ?? []).find((className) =>
 				className.startsWith('language-')
 			);
-			const lang = langClass?.replace('language-', '') ?? '';
+			const rawLang = langClass?.replace('language-', '') ?? '';
+			let lang = rawLang;
+			let filename = '';
+			if (rawLang.includes(':')) {
+				const parts = rawLang.split(':');
+				lang = parts[0] ?? '';
+				filename = parts.slice(1).join(':');
+			}
 
 			const wrapper = document.createElement('div');
 			wrapper.className = 'code-block-wrapper relative group';
 			pre.parentNode?.insertBefore(wrapper, pre);
 			wrapper.appendChild(pre);
 
-			if (lang) {
+			if (filename) {
+				const header = document.createElement('div');
+				header.className = 'code-block-header';
+				header.innerHTML = `
+					<span class="code-block-filename">
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+						${escapeHtml(filename)}
+					</span>
+					<span class="font-mono text-[10px] text-muted-foreground uppercase">${escapeHtml(lang || 'code')}</span>
+				`;
+				wrapper.insertBefore(header, pre);
+			} else if (lang) {
 				const label = document.createElement('span');
 				label.className = 'code-lang-label';
 				label.textContent = lang;
@@ -376,7 +394,26 @@ export default function CodeCopyInjector({
 				if (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
 					lines.pop();
 				}
-				code.innerHTML = lines.map((line) => `<span class="code-line">${line}</span>`).join('\n');
+				code.innerHTML = lines
+					.map((line) => {
+						const plain = line.replace(/<[^>]*>/g, '').trimStart();
+						let diffClass = '';
+						if (
+							plain.startsWith('+ ') ||
+							plain.startsWith('+\t') ||
+							(lang === 'diff' && plain.startsWith('+'))
+						) {
+							diffClass = ' code-line-diff-add';
+						} else if (
+							plain.startsWith('- ') ||
+							plain.startsWith('-\t') ||
+							(lang === 'diff' && plain.startsWith('-'))
+						) {
+							diffClass = ' code-line-diff-remove';
+						}
+						return `<span class="code-line${diffClass}">${line}</span>`;
+					})
+					.join('\n');
 				code.classList.add('code-numbered');
 			}
 
@@ -415,10 +452,25 @@ export default function CodeCopyInjector({
 				});
 				wrapper.appendChild(tryBtn);
 			}
+
+			// Line numbers toggle button
+			const lineToggleBtn = document.createElement('button');
+			lineToggleBtn.className = 'code-copy-btn code-line-toggle-btn';
+			lineToggleBtn.setAttribute('aria-label', 'Toggle line numbers');
+			lineToggleBtn.innerHTML = '#';
+			lineToggleBtn.style.cssText = playgroundUrl ? 'right:4.75rem;' : 'right:2.75rem;';
+			lineToggleBtn.addEventListener('click', () => {
+				code?.classList.toggle('code-numbered');
+				showToast(
+					code?.classList.contains('code-numbered') ? 'line numbers on' : 'line numbers off'
+				);
+			});
+			wrapper.appendChild(lineToggleBtn);
 		});
 
 		// Mermaid diagrams: replace pre>code.language-mermaid
 		let mermaidThemeObserver: MutationObserver | null = null;
+		let mermaidVisibilityObserver: IntersectionObserver | null = null;
 		const mermaidBlocks = container.querySelectorAll<HTMLElement>('pre:has(code.language-mermaid)');
 		if (mermaidBlocks.length > 0) {
 			const getMermaidVars = (dark: boolean) =>
@@ -538,7 +590,7 @@ export default function CodeCopyInjector({
 				}
 			};
 
-			void (async () => {
+			const renderAllMermaid = async () => {
 				try {
 					const mermaid = (await import('mermaid')).default;
 					const isDark = document.documentElement.classList.contains('dark');
@@ -626,7 +678,20 @@ export default function CodeCopyInjector({
 				} catch (error) {
 					console.warn('Mermaid not available:', error);
 				}
-			})();
+			};
+
+			mermaidVisibilityObserver = new IntersectionObserver(
+				(entries) => {
+					if (entries.some((entry) => entry.isIntersecting)) {
+						mermaidVisibilityObserver?.disconnect();
+						mermaidVisibilityObserver = null;
+						void renderAllMermaid();
+					}
+				},
+				{ rootMargin: '400px 0px' }
+			);
+
+			mermaidBlocks.forEach((block) => mermaidVisibilityObserver?.observe(block));
 
 			mermaidThemeObserver = new MutationObserver(() => {
 				const dark = document.documentElement.classList.contains('dark');
@@ -739,6 +804,7 @@ export default function CodeCopyInjector({
 		return () => {
 			plantUmlThemeObserver?.disconnect();
 			mermaidThemeObserver?.disconnect();
+			mermaidVisibilityObserver?.disconnect();
 			if (previewTimeoutRef.current) {
 				clearTimeout(previewTimeoutRef.current);
 			}

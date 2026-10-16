@@ -18,6 +18,7 @@ import PageTransition from '@/components/layout/PageTransition';
 import ShortcutHelp from '@/components/layout/ShortcutHelp';
 import type { CommandPaletteItem } from '@/lib/command-palette';
 import { features } from '@/lib/features';
+import Analytics from '@/components/analytics/Analytics';
 import { FEED_PATHS } from '@/lib/feed-paths';
 import {
 	buildMailtoHref,
@@ -343,6 +344,7 @@ export default async function RootLayout({
 					</div>
 					{features.backToTop && <BackToTop />}
 				</ThemeProvider>
+				<Analytics />
 			</body>
 		</html>
 	);
