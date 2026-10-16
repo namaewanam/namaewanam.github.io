@@ -195,8 +195,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Wait for CDN propagation
+        run: sleep 20
+
       - name: Submit URLs to IndexNow
         run: pnpm indexnow
+        continue-on-error: true
         env:
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
 

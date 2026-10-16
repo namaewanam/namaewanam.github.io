@@ -28,33 +28,37 @@ async function submitIndexNow() {
 		urlList: urls,
 	};
 
-	try {
-		const response = await fetch(INDEXNOW_ENDPOINT, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json; charset=utf-8',
-			},
-			body: JSON.stringify(payload),
-		});
+	const endpoints = [INDEXNOW_ENDPOINT, 'https://www.bing.com/indexnow'];
 
-		if (response.ok || response.status === 200 || response.status === 202) {
-			console.log(
-				`✓ Successfully submitted ${urls.length} URL(s) to IndexNow! (HTTP ${response.status} ${response.statusText || 'OK'})`
-			);
-		} else {
-			const body = await response.text();
-			console.error(
-				`✗ IndexNow submission failed with HTTP ${response.status} ${response.statusText}`
-			);
-			if (body) {
-				console.error(`Response details: ${body}`);
+	for (const endpoint of endpoints) {
+		console.log(`Submitting to ${endpoint}...`);
+		try {
+			const response = await fetch(endpoint, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json; charset=utf-8',
+				},
+				body: JSON.stringify(payload),
+			});
+
+			if (response.ok || response.status === 200 || response.status === 202) {
+				console.log(
+					`✓ Successfully submitted ${urls.length} URL(s) to IndexNow via ${endpoint}! (HTTP ${response.status})`
+				);
+				return;
 			}
-			process.exitCode = 1;
+
+			const body = await response.text();
+			console.warn(
+				`⚠ IndexNow submission via ${endpoint} returned HTTP ${response.status}: ${body}`
+			);
+		} catch (error) {
+			console.warn(`⚠ Network error connecting to ${endpoint}:`, error);
 		}
-	} catch (error) {
-		console.error('✗ Network error while connecting to IndexNow:', error);
-		process.exitCode = 1;
 	}
+
+	console.error('✗ All IndexNow submission attempts failed.');
+	process.exitCode = 1;
 }
 
 submitIndexNow();
