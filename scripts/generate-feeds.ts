@@ -22,6 +22,10 @@ interface PostMetaManifest {
 	posts: Record<string, { lastUpdated: string }>;
 }
 
+function isSeriesFile(filename: string): boolean {
+	return /^_series(?:\.[a-z]{2})?\.md$/i.test(filename);
+}
+
 function getStagedMarkdownFiles(): string[] {
 	try {
 		const output = execSync('git diff --cached --name-only --diff-filter=ACMR -- docs', {
@@ -32,7 +36,7 @@ function getStagedMarkdownFiles(): string[] {
 		return output
 			.split('\n')
 			.map((line) => line.trim())
-			.filter((line) => line.endsWith('.md') && !line.endsWith('_series.md'))
+			.filter((line) => line.endsWith('.md') && !isSeriesFile(path.basename(line)))
 			.map((line) => path.join(process.cwd(), line));
 	} catch {
 		return [];
@@ -51,7 +55,7 @@ function listMarkdownFiles(dir: string, filesList: string[] = []): string[] {
 			return;
 		}
 
-		if (file.endsWith('.md') && file !== '_series.md') {
+		if (file.endsWith('.md') && !isSeriesFile(file)) {
 			filesList.push(filePath);
 		}
 	});
@@ -94,7 +98,7 @@ function collectLastUpdatedManifest(): PostMetaManifest {
 				return;
 			}
 
-			if (!line.endsWith('.md') || line.endsWith('_series.md') || !currentCommitDate) return;
+			if (!line.endsWith('.md') || isSeriesFile(path.basename(line)) || !currentCommitDate) return;
 			const absolutePath = path.join(process.cwd(), line);
 			const key = buildPostKeyFromFilePath(absolutePath);
 			if (!manifest.posts[key]) {

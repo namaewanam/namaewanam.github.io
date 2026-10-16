@@ -13,9 +13,8 @@ import BackToTop from '@/components/BackToTop';
 import WebVitals from '@/components/WebVitals';
 import CommandPaletteButton from '@/components/layout/CommandPaletteButton';
 import FooterStatus from '@/components/layout/FooterStatus';
-import GlobalCommandPalette from '@/components/layout/GlobalCommandPalette';
+import dynamic from 'next/dynamic';
 import PageTransition from '@/components/layout/PageTransition';
-import ShortcutHelp from '@/components/layout/ShortcutHelp';
 import KeyboardNavigation from '@/components/layout/KeyboardNavigation';
 import type { CommandPaletteItem } from '@/lib/command-palette';
 import { features } from '@/lib/features';
@@ -30,6 +29,9 @@ import {
 	SITE_URL,
 } from '@/lib/site';
 import '../globals.css';
+
+const GlobalCommandPalette = dynamic(() => import('@/components/layout/GlobalCommandPalette'));
+const ShortcutHelp = dynamic(() => import('@/components/layout/ShortcutHelp'));
 
 const sans = IBM_Plex_Sans({
 	subsets: ['latin'],

@@ -21,11 +21,14 @@ export async function generateStaticParams() {
 export async function generateMetadata({
 	params,
 }: {
-	params: Promise<{ category: string }>;
+	params: Promise<{ lang: string; category: string }>;
 }): Promise<Metadata> {
 	const resolvedParams = await params;
-	const description = getCategoryDescription(resolvedParams.category);
-	const categoryTitle = resolvedParams.category.replace(/-/g, ' ');
+	const lang = resolvedParams.lang || 'en';
+	const seriesMetadata = getSeriesMetadata(resolvedParams.category, lang);
+	const description =
+		seriesMetadata?.description || getCategoryDescription(resolvedParams.category);
+	const categoryTitle = seriesMetadata?.title || resolvedParams.category.replace(/-/g, ' ');
 	return {
 		metadataBase: new URL(SITE_URL),
 		title: `${categoryTitle} · ${SITE_NAME}`,
@@ -34,7 +37,7 @@ export async function generateMetadata({
 			title: `${categoryTitle} · ${SITE_NAME}`,
 			description,
 			type: 'website',
-			url: `/blog/${resolvedParams.category}`,
+			url: `/${lang}/blog/${resolvedParams.category}`,
 		},
 		twitter: {
 			card: 'summary_large_image',
@@ -50,7 +53,8 @@ export default async function CategoryPage({
 	params: Promise<{ lang: string; category: string }>;
 }) {
 	const resolvedParams = await params;
-	const posts = getPostsByCategory(resolvedParams.category, resolvedParams.lang);
+	const lang = resolvedParams.lang || 'en';
+	const posts = getPostsByCategory(resolvedParams.category, lang);
 	const categoryMeta = getCategories().find(
 		(category) => category.slug === resolvedParams.category
 	);
@@ -61,7 +65,7 @@ export default async function CategoryPage({
 
 	const categoryName = posts[0]?.categoryName || resolvedParams.category;
 	const categoryDescription = getCategoryDescription(resolvedParams.category);
-	const seriesMetadata = getSeriesMetadata(resolvedParams.category);
+	const seriesMetadata = getSeriesMetadata(resolvedParams.category, lang);
 	const seriesHtml = seriesMetadata?.content
 		? await renderMarkdown(seriesMetadata.content)
 		: undefined;
@@ -83,7 +87,6 @@ export default async function CategoryPage({
 		return a.localeCompare(b);
 	});
 
-	const lang = resolvedParams.lang || 'en';
 	const breadcrumbs = [
 		{ name: 'Home', url: `${SITE_URL}/${lang}/` },
 		{ name: 'Blog', url: `${SITE_URL}/${lang}/blog/` },

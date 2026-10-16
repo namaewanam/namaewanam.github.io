@@ -59,9 +59,6 @@
 	}
 	body {
 		@apply bg-background text-foreground;
-		transition:
-			background-color 0.3s ease,
-			color 0.3s ease;
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 		text-rendering: optimizeLegibility;
@@ -70,17 +67,6 @@
 	button,
 	input {
 		-webkit-tap-highlight-color: transparent;
-	}
-	header,
-	footer,
-	main,
-	.bg-card,
-	.bg-muted,
-	.bg-secondary {
-		transition:
-			background-color 0.3s ease,
-			color 0.3s ease,
-			border-color 0.3s ease;
 	}
 }
 

@@ -346,128 +346,155 @@ export default function CodeCopyInjector({
 			});
 		}
 
-		// Code blocks: wrap, label, copy, line numbers
-		const preBlocks = container.querySelectorAll('pre');
-		preBlocks.forEach((pre) => {
-			if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
-			if (pre.querySelector('code.language-mermaid')) return;
-			if (pre.querySelector('code.language-plantuml, code.language-puml')) return;
+		// Code blocks: wrap, label, copy, line numbers (chunked to prevent blocking user interactions)
+		const preBlocks = Array.from(container.querySelectorAll('pre')).filter(
+			(pre) =>
+				!pre.parentElement?.classList.contains('code-block-wrapper') &&
+				!pre.querySelector('code.language-mermaid') &&
+				!pre.querySelector('code.language-plantuml, code.language-puml')
+		);
 
-			const code = pre.querySelector('code');
-			const langClass = Array.from(code?.classList ?? []).find((className) =>
-				className.startsWith('language-')
-			);
-			const rawLang = langClass?.replace('language-', '') ?? '';
-			let lang = rawLang;
-			let filename = '';
-			if (rawLang.includes(':')) {
-				const parts = rawLang.split(':');
-				lang = parts[0] ?? '';
-				filename = parts.slice(1).join(':');
-			}
+		let isCancelled = false;
+		let chunkIdx = 0;
+		const CHUNK_SIZE = 5;
 
-			const wrapper = document.createElement('div');
-			wrapper.className = 'code-block-wrapper relative group';
-			pre.parentNode?.insertBefore(wrapper, pre);
-			wrapper.appendChild(pre);
+		const processCodeBlocksBatch = () => {
+			if (isCancelled) return;
+			const end = Math.min(chunkIdx + CHUNK_SIZE, preBlocks.length);
+			for (; chunkIdx < end; chunkIdx++) {
+				const pre = preBlocks[chunkIdx];
+				if (!pre) continue;
 
-			if (filename) {
-				const header = document.createElement('div');
-				header.className = 'code-block-header';
-				header.innerHTML = `
+				if (pre.parentElement?.classList.contains('code-block-wrapper')) continue;
+				if (pre.querySelector('code.language-mermaid')) continue;
+				if (pre.querySelector('code.language-plantuml, code.language-puml')) continue;
+
+				const code = pre.querySelector('code');
+				const langClass = Array.from(code?.classList ?? []).find((className) =>
+					className.startsWith('language-')
+				);
+				const rawLang = langClass?.replace('language-', '') ?? '';
+				let lang = rawLang;
+				let filename = '';
+				if (rawLang.includes(':')) {
+					const parts = rawLang.split(':');
+					lang = parts[0] ?? '';
+					filename = parts.slice(1).join(':');
+				}
+
+				const wrapper = document.createElement('div');
+				wrapper.className = 'code-block-wrapper relative group';
+				pre.parentNode?.insertBefore(wrapper, pre);
+				wrapper.appendChild(pre);
+
+				if (filename) {
+					const header = document.createElement('div');
+					header.className = 'code-block-header';
+					header.innerHTML = `
 					<span class="code-block-filename">
 						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
 						${escapeHtml(filename)}
 					</span>
 					<span class="font-mono text-[10px] text-muted-foreground uppercase">${escapeHtml(lang || 'code')}</span>
 				`;
-				wrapper.insertBefore(header, pre);
-			} else if (lang) {
-				const label = document.createElement('span');
-				label.className = 'code-lang-label';
-				label.textContent = lang;
-				wrapper.appendChild(label);
-			}
-
-			if (code) {
-				const isDiff =
-					lang === 'diff' ||
-					lang === 'patch' ||
-					rawLang.toLowerCase().includes('diff') ||
-					filename.toLowerCase().endsWith('.diff') ||
-					filename.toLowerCase().endsWith('.patch');
-
-				const lines = code.innerHTML.split('\n');
-				if (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
-					lines.pop();
+					wrapper.insertBefore(header, pre);
+				} else if (lang) {
+					const label = document.createElement('span');
+					label.className = 'code-lang-label';
+					label.textContent = lang;
+					wrapper.appendChild(label);
 				}
-				code.innerHTML = lines
-					.map((line) => {
-						const plain = line.replace(/<[^>]*>/g, '').trimStart();
-						let diffClass = '';
-						if (isDiff) {
-							if (plain.startsWith('+') && !plain.startsWith('+++')) {
-								diffClass = ' code-line-diff-add';
-							} else if (plain.startsWith('-') && !plain.startsWith('---')) {
-								diffClass = ' code-line-diff-remove';
+
+				if (code) {
+					const isDiff =
+						lang === 'diff' ||
+						lang === 'patch' ||
+						rawLang.toLowerCase().includes('diff') ||
+						filename.toLowerCase().endsWith('.diff') ||
+						filename.toLowerCase().endsWith('.patch');
+
+					const lines = code.innerHTML.split('\n');
+					if (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
+						lines.pop();
+					}
+					code.innerHTML = lines
+						.map((line) => {
+							const plain = line.replace(/<[^>]*>/g, '').trimStart();
+							let diffClass = '';
+							if (isDiff) {
+								if (plain.startsWith('+') && !plain.startsWith('+++')) {
+									diffClass = ' code-line-diff-add';
+								} else if (plain.startsWith('-') && !plain.startsWith('---')) {
+									diffClass = ' code-line-diff-remove';
+								}
 							}
-						}
-						return `<span class="code-line${diffClass}">${line}</span>`;
-					})
-					.join('\n');
-				code.classList.add('code-numbered');
-			}
+							return `<span class="code-line${diffClass}">${line}</span>`;
+						})
+						.join('\n');
+					code.classList.add('code-numbered');
+				}
 
-			const button = document.createElement('button');
-			button.className = 'code-copy-btn';
-			button.setAttribute('aria-label', 'Copy code');
-			button.innerHTML = COPY_ICON;
-			button.addEventListener('click', () => {
-				const text = code?.textContent ?? pre.textContent ?? '';
-				navigator.clipboard.writeText(text).then(() => {
-					button.innerHTML = CHECK_ICON;
-					button.classList.add('copied');
-					showToast('copied code');
-					setTimeout(() => {
-						button.innerHTML = COPY_ICON;
-						button.classList.remove('copied');
-					}, 2000);
-				});
-			});
-			wrapper.appendChild(button);
-
-			// Interactive code: add "try it" button for supported languages
-			const playgroundUrl = lang ? PLAYGROUND_URLS[lang.toLowerCase()] : undefined;
-			if (playgroundUrl) {
-				const tryBtn = document.createElement('button');
-				tryBtn.className = 'code-copy-btn code-try-btn';
-				tryBtn.setAttribute('aria-label', `Try ${lang} code in playground`);
-				tryBtn.innerHTML = PLAY_ICON;
-				tryBtn.style.cssText = 'right:2.75rem;';
-				tryBtn.addEventListener('click', () => {
+				const button = document.createElement('button');
+				button.className = 'code-copy-btn';
+				button.setAttribute('aria-label', 'Copy code');
+				button.innerHTML = COPY_ICON;
+				button.addEventListener('click', () => {
 					const text = code?.textContent ?? pre.textContent ?? '';
 					navigator.clipboard.writeText(text).then(() => {
-						showToast('code copied — paste in playground');
-						window.open(playgroundUrl, '_blank', 'noopener,noreferrer');
+						button.innerHTML = CHECK_ICON;
+						button.classList.add('copied');
+						showToast('copied code');
+						setTimeout(() => {
+							button.innerHTML = COPY_ICON;
+							button.classList.remove('copied');
+						}, 2000);
 					});
 				});
-				wrapper.appendChild(tryBtn);
+				wrapper.appendChild(button);
+
+				// Interactive code: add "try it" button for supported languages
+				const playgroundUrl = lang ? PLAYGROUND_URLS[lang.toLowerCase()] : undefined;
+				if (playgroundUrl) {
+					const tryBtn = document.createElement('button');
+					tryBtn.className = 'code-copy-btn code-try-btn';
+					tryBtn.setAttribute('aria-label', `Try ${lang} code in playground`);
+					tryBtn.innerHTML = PLAY_ICON;
+					tryBtn.style.cssText = 'right:2.75rem;';
+					tryBtn.addEventListener('click', () => {
+						const text = code?.textContent ?? pre.textContent ?? '';
+						navigator.clipboard.writeText(text).then(() => {
+							showToast('code copied — paste in playground');
+							window.open(playgroundUrl, '_blank', 'noopener,noreferrer');
+						});
+					});
+					wrapper.appendChild(tryBtn);
+				}
+
+				// Line numbers toggle button
+				const lineToggleBtn = document.createElement('button');
+				lineToggleBtn.className = 'code-copy-btn code-line-toggle-btn active';
+				lineToggleBtn.setAttribute('aria-label', 'Toggle line numbers');
+				lineToggleBtn.setAttribute('title', 'Toggle line numbers');
+				lineToggleBtn.innerHTML = '#';
+				lineToggleBtn.style.cssText = playgroundUrl ? 'right:4.75rem;' : 'right:2.75rem;';
+				lineToggleBtn.addEventListener('click', () => {
+					const isNowOn = code?.classList.toggle('code-numbered');
+					lineToggleBtn.classList.toggle('active', Boolean(isNowOn));
+					showToast(isNowOn ? 'line numbers on' : 'line numbers off');
+				});
+				wrapper.appendChild(lineToggleBtn);
 			}
 
-			// Line numbers toggle button
-			const lineToggleBtn = document.createElement('button');
-			lineToggleBtn.className = 'code-copy-btn code-line-toggle-btn active';
-			lineToggleBtn.setAttribute('aria-label', 'Toggle line numbers');
-			lineToggleBtn.setAttribute('title', 'Toggle line numbers');
-			lineToggleBtn.innerHTML = '#';
-			lineToggleBtn.style.cssText = playgroundUrl ? 'right:4.75rem;' : 'right:2.75rem;';
-			lineToggleBtn.addEventListener('click', () => {
-				const isNowOn = code?.classList.toggle('code-numbered');
-				lineToggleBtn.classList.toggle('active', Boolean(isNowOn));
-				showToast(isNowOn ? 'line numbers on' : 'line numbers off');
-			});
-			wrapper.appendChild(lineToggleBtn);
-		});
+			if (chunkIdx < preBlocks.length && !isCancelled) {
+				if (typeof window.requestIdleCallback !== 'undefined') {
+					window.requestIdleCallback(processCodeBlocksBatch, { timeout: 100 });
+				} else {
+					setTimeout(processCodeBlocksBatch, 0);
+				}
+			}
+		};
+
+		processCodeBlocksBatch();
 
 		// Mermaid diagrams: replace pre>code.language-mermaid
 		let mermaidThemeObserver: MutationObserver | null = null;
@@ -803,6 +830,7 @@ export default function CodeCopyInjector({
 		}
 
 		return () => {
+			isCancelled = true;
 			plantUmlThemeObserver?.disconnect();
 			mermaidThemeObserver?.disconnect();
 			mermaidVisibilityObserver?.disconnect();

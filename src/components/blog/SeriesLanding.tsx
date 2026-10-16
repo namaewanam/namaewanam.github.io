@@ -18,6 +18,7 @@ export default function SeriesLanding({
 	const totalMinutes = posts.reduce((sum, post) => sum + post.readingTimeMin, 0);
 	const normalizeReference = (reference: string) =>
 		reference
+			.replace(/\.(en|vi)\.md$/i, '')
 			.replace(/\.md$/i, '')
 			.replace(/^\/+|\/+$/g, '')
 			.toLowerCase();

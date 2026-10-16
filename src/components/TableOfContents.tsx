@@ -16,59 +16,43 @@ export default function TableOfContents({ headings }: Readonly<{ headings: Headi
 	useEffect(() => {
 		if (headings.length === 0) return;
 
-		const updateActiveHeading = () => {
-			const scrollY = window.scrollY;
-			const headingElements = headings
-				.map(({ id }) => ({
-					id,
-					element: document.getElementById(id),
-				}))
-				.filter((item): item is { id: string; element: HTMLElement } => item.element !== null);
+		const headingElements = headings
+			.map(({ id }) => document.getElementById(id))
+			.filter((el): el is HTMLElement => el !== null);
 
-			if (headingElements.length === 0) return;
+		if (headingElements.length === 0) return;
 
-			// Header offset for fixed navbar and top breathing room
-			const offset = 120;
+		// IntersectionObserver tracks headings off the main thread without scroll reflows
+		const visibleHeadings = new Map<string, number>();
 
-			// Find the last heading that has scrolled past the offset line
-			let currentActive = headingElements[0]?.id ?? '';
-			for (const { id, element } of headingElements) {
-				const top = element.getBoundingClientRect().top + scrollY;
-				if (scrollY >= top - offset) {
-					currentActive = id;
-				} else {
-					break;
-				}
-			}
-
-			// If user has scrolled to the bottom of the page, activate the last heading
-			const lastHeading = headingElements[headingElements.length - 1];
-			if (
-				lastHeading &&
-				window.innerHeight + scrollY >= document.documentElement.scrollHeight - 50
-			) {
-				currentActive = lastHeading.id;
-			}
-
-			setActiveId(currentActive);
-		};
-
-		// Run once on mount
-		updateActiveHeading();
-
-		let ticking = false;
-		const handleScroll = () => {
-			if (!ticking) {
-				window.requestAnimationFrame(() => {
-					updateActiveHeading();
-					ticking = false;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						visibleHeadings.set(entry.target.id, entry.boundingClientRect.top);
+					} else {
+						visibleHeadings.delete(entry.target.id);
+					}
 				});
-				ticking = true;
-			}
-		};
 
-		window.addEventListener('scroll', handleScroll, { passive: true });
-		return () => window.removeEventListener('scroll', handleScroll);
+				if (visibleHeadings.size > 0) {
+					let topHeadingId = '';
+					let minTop = Infinity;
+					for (const [id, top] of visibleHeadings.entries()) {
+						if (top < minTop) {
+							minTop = top;
+							topHeadingId = id;
+						}
+					}
+					if (topHeadingId) setActiveId(topHeadingId);
+				}
+			},
+			{ rootMargin: '-70px 0px -60% 0px' }
+		);
+
+		headingElements.forEach((el) => observer.observe(el));
+
+		return () => observer.disconnect();
 	}, [headings]);
 
 	return (

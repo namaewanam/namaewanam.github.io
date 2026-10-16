@@ -35,9 +35,15 @@ interface PostDetails {
 	url: string;
 }
 
+function isSeriesFile(filename: string): boolean {
+	return /^_series(?:\.[a-z]{2})?\.md$/i.test(filename);
+}
+
 function getNewMarkdownFiles(): string[] {
 	// If a specific file or list of files is passed via CLI args:
-	const cliArgs = process.argv.slice(2).filter((arg) => arg.endsWith('.md'));
+	const cliArgs = process.argv
+		.slice(2)
+		.filter((arg) => arg.endsWith('.md') && !isSeriesFile(path.basename(arg)));
 	if (cliArgs.length > 0) {
 		return cliArgs.filter((f) => fs.existsSync(f));
 	}
@@ -59,7 +65,7 @@ function getNewMarkdownFiles(): string[] {
 				(line) =>
 					line.startsWith('docs/') &&
 					line.endsWith('.md') &&
-					!line.endsWith('_series.md') &&
+					!isSeriesFile(path.basename(line)) &&
 					fs.existsSync(line)
 			);
 	} catch (err) {

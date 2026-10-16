@@ -6,6 +6,21 @@ import { getCategoryDescription, getCategoryStartHerePath } from '@/lib/site';
 
 const postsDirectory = path.join(process.cwd(), 'docs');
 const SERIES_FILENAME = '_series.md';
+const SERIES_FILE_PATTERN = /^_series(?:\.([a-z]{2}))?\.md$/i;
+
+function isSeriesFile(filename: string): boolean {
+	return SERIES_FILE_PATTERN.test(filename);
+}
+
+function parseSeriesFilename(filename: string): { isSeries: boolean; lang?: string } {
+	const match = filename.match(SERIES_FILE_PATTERN);
+	if (!match) return { isSeries: false };
+	const lang = match[1]?.toLowerCase();
+	return {
+		isSeries: true,
+		...(lang ? { lang } : {}),
+	};
+}
 const postMetadataManifestPath = path.join(
 	process.cwd(),
 	'public',
@@ -68,6 +83,7 @@ export interface SeriesMetadata {
 	prerequisites?: string[];
 	youWillUnderstand?: string[];
 	useItFor?: string[];
+	lang?: string;
 }
 
 export interface AdjacentPosts {
@@ -81,7 +97,7 @@ interface ContentIndex {
 	categories: Category[];
 	postsByCategory: Map<string, Post[]>;
 	postByKey: Map<string, Post>;
-	seriesByCategory: Map<string, SeriesMetadata>;
+	seriesByCategory: Map<string, Map<string, SeriesMetadata>>;
 	allTags: { tag: string; count: number }[];
 }
 
@@ -155,12 +171,18 @@ function buildSearchText(post: {
 	tags?: string[];
 	content: string;
 }) {
+	// Strip fenced code blocks and limit prose excerpt to prevent bloating HTML/RSC payload
+	const proseContent = post.content
+		.replace(/```[\s\S]*?```/g, '')
+		.replace(/\s+/g, ' ')
+		.slice(0, 1500);
+
 	return [
 		post.title,
 		post.description,
 		post.categoryName,
 		(post.tags ?? []).join(' '),
-		post.content,
+		proseContent,
 	]
 		.filter(Boolean)
 		.join(' ')
@@ -196,6 +218,7 @@ function loadLastUpdatedMap(): Map<string, string> {
 
 function normalizePostReference(reference: string): string {
 	return reference
+		.replace(/\.(en|vi)\.md$/i, '')
 		.replace(/\.md$/i, '')
 		.replace(/^\/+|\/+$/g, '')
 		.toLowerCase();
@@ -362,7 +385,7 @@ function collectPostsFromDirectory(dir: string, category: string, filesList: Pos
 			return;
 		}
 
-		if (!file.endsWith('.md') || file === SERIES_FILENAME) return;
+		if (!file.endsWith('.md') || isSeriesFile(file)) return;
 
 		const categoryPath = path.join(postsDirectory, category);
 		const relativePath = path.relative(categoryPath, filePath);
@@ -398,7 +421,7 @@ function buildContentIndex(): ContentIndex {
 	const categories: Category[] = [];
 	const postsByCategory = new Map<string, Post[]>();
 	const postByKey = new Map<string, Post>();
-	const seriesByCategory = new Map<string, SeriesMetadata>();
+	const seriesByCategory = new Map<string, Map<string, SeriesMetadata>>();
 
 	categoryDirs.forEach((categoryDir) => {
 		const categoryPath = path.join(postsDirectory, categoryDir);
@@ -422,9 +445,30 @@ function buildContentIndex(): ContentIndex {
 			});
 		}
 
-		const seriesMetadata = readSeriesMetadata(path.join(categoryPath, SERIES_FILENAME));
-		if (seriesMetadata) {
-			seriesByCategory.set(categorySlug, seriesMetadata);
+		const categorySeriesMap = new Map<string, SeriesMetadata>();
+		const defaultSeries = readSeriesMetadata(path.join(categoryPath, SERIES_FILENAME));
+		if (defaultSeries) {
+			categorySeriesMap.set('default', defaultSeries);
+		}
+
+		// Scan for localized series files (e.g., _series.vi.md, _series.en.md)
+		const categoryEntries = fs.readdirSync(categoryPath);
+		categoryEntries.forEach((entry) => {
+			const parsed = parseSeriesFilename(entry);
+			if (parsed.isSeries && parsed.lang) {
+				const localizedSeries = readSeriesMetadata(path.join(categoryPath, entry));
+				if (localizedSeries) {
+					categorySeriesMap.set(parsed.lang, {
+						...(defaultSeries ?? {}),
+						...localizedSeries,
+						lang: parsed.lang,
+					});
+				}
+			}
+		});
+
+		if (categorySeriesMap.size > 0) {
+			seriesByCategory.set(categorySlug, categorySeriesMap);
 		}
 	});
 
@@ -511,8 +555,26 @@ export function getPostsByCategory(category: string, lang: string = 'en'): Post[
 	return getAllPosts(lang).filter((p) => p.category === category.toLowerCase());
 }
 
-export function getSeriesMetadata(category: string): SeriesMetadata | null {
-	return getContentIndex().seriesByCategory.get(category.toLowerCase()) ?? null;
+export function getSeriesMetadata(category: string, lang: string = 'en'): SeriesMetadata | null {
+	const categorySeries = getContentIndex().seriesByCategory.get(category.toLowerCase());
+	if (!categorySeries) return null;
+
+	const normalizedLang = lang.toLowerCase();
+
+	// 1. Try exact requested language (e.g. 'vi', 'en')
+	const target = categorySeries.get(normalizedLang);
+	if (target) return target;
+
+	// 2. Fall back to 'default' (_series.md)
+	const defaultSeries = categorySeries.get('default');
+	if (defaultSeries) return defaultSeries;
+
+	// 3. Fall back to 'en'
+	const enSeries = categorySeries.get('en');
+	if (enSeries) return enSeries;
+
+	// 4. Return any available series metadata
+	return categorySeries.values().next().value ?? null;
 }
 
 export function getPostBySlug(category: string, slug: string, lang: string = 'en'): Post | null {

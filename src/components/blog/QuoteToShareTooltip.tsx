@@ -72,31 +72,38 @@ export default function QuoteToShareTooltip({ articleTitle }: QuoteToShareToolti
 		}
 	}, []);
 
+	const positionRef = useRef(position);
+	positionRef.current = position;
+
 	useEffect(() => {
 		function handleSelectionEnd() {
-			// Small delay so click outside or double-click settles
+			const selection = window.getSelection();
+			// Skip calculation if no text is selected and no tooltip is currently open
+			if ((!selection || selection.isCollapsed) && !positionRef.current) {
+				return;
+			}
 			window.requestAnimationFrame(updateSelection);
 		}
 
 		function handleScrollOrResize() {
-			if (position) {
+			if (positionRef.current) {
 				updateSelection();
 			}
 		}
 
 		function handleKeyDown(e: KeyboardEvent) {
-			if (e.key === 'Escape') {
+			if (e.key === 'Escape' && positionRef.current) {
 				setPosition(null);
 				window.getSelection()?.removeAllRanges();
 			}
 		}
 
 		function handlePointerDown(e: MouseEvent | TouchEvent) {
+			if (!positionRef.current) return;
 			// If clicking inside the tooltip, don't dismiss immediately
 			if (tooltipRef.current?.contains(e.target as Node)) {
 				return;
 			}
-			// When clicking outside, selection is about to collapse
 			window.requestAnimationFrame(updateSelection);
 		}
 
@@ -117,7 +124,7 @@ export default function QuoteToShareTooltip({ articleTitle }: QuoteToShareToolti
 			window.removeEventListener('resize', handleScrollOrResize);
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [updateSelection, position]);
+	}, [updateSelection]);
 
 	if (!position || !selectedText) return null;
 

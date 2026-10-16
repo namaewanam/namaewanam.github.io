@@ -27,6 +27,9 @@ const nextConfig = {
 	// breaking dev mode (unsafe-eval needed for HMR). Removed intentionally.
 	turbopack: {},
 	trailingSlash: true,
+	experimental: {
+		optimizePackageImports: ['lucide-react'],
+	},
 	...(process.env.NODE_ENV !== 'production' && {
 		async redirects() {
 			return [
