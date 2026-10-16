@@ -79,6 +79,7 @@ export const KNOWN_COMMANDS = new Set([
 	'li',
 	'fb',
 	'mail',
+	'guestbook',
 ]);
 
 export const ALIASES: Record<string, string> = {
@@ -89,6 +90,7 @@ export const ALIASES: Record<string, string> = {
 	fb: 'open /links/facebook',
 	mail: 'open /links/email',
 	fetch: 'fastfetch',
+	guestbook: 'open /guestbook',
 };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
@@ -101,6 +103,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 		usage: 'suggest',
 		summary: 'show a few quick destinations you can open right away',
 		examples: ['suggest'],
+	},
+	guestbook: {
+		usage: 'guestbook',
+		summary: 'open the interactive terminal guestbook',
+		examples: ['guestbook'],
 	},
 	man: {
 		usage: 'man <command>',

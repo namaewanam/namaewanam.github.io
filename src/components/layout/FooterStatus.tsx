@@ -87,6 +87,10 @@ export default function FooterStatus({ lang }: { lang: Locale }) {
 					</>
 				)}
 				<Dot />
+				<Link href="/guestbook" className="transition-colors hover:text-primary">
+					guestbook
+				</Link>
+				<Dot />
 				<a
 					href={RESUME_URL}
 					target="_blank"

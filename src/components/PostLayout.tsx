@@ -5,6 +5,7 @@ import BookmarkButton from '@/components/blog/BookmarkButton';
 import PostReactions from '@/components/blog/PostReactions';
 import RelatedPosts from '@/components/blog/RelatedPosts';
 import ShareButtons from '@/components/blog/ShareButtons';
+import QuoteToShareTooltip from '@/components/blog/QuoteToShareTooltip';
 import GiscusComments from '@/components/GiscusComments';
 import { features } from '@/lib/features';
 import { GISCUS_REPO, GISCUS_REPO_ID, GISCUS_CATEGORY, GISCUS_CATEGORY_ID } from '@/lib/site';
@@ -169,6 +170,7 @@ export default function PostLayout({
 				<article>
 					<MarkdownContent html={html} />
 				</article>
+				<QuoteToShareTooltip articleTitle={post.title} />
 
 				{/* Post Interactions: share, reactions, bookmark */}
 				{(features.shareButtons || features.postReactions || features.readingList) && (
@@ -192,6 +194,7 @@ export default function PostLayout({
 							<div>
 								{adjacentPosts.previous && (
 									<Link
+										id="post-nav-prev"
 										href={`/blog/${post.category}/${adjacentPosts.previous.fullPath}`}
 										className="group flex items-start gap-2 rounded border border-border p-3 transition-all hover:border-primary"
 									>
@@ -218,6 +221,7 @@ export default function PostLayout({
 							<div className="flex justify-end">
 								{adjacentPosts.next && (
 									<Link
+										id="post-nav-next"
 										href={`/blog/${post.category}/${adjacentPosts.next.fullPath}`}
 										className="group flex w-full items-start gap-2 rounded border border-border p-3 text-right transition-all hover:border-primary"
 									>

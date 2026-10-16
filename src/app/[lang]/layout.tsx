@@ -16,6 +16,7 @@ import FooterStatus from '@/components/layout/FooterStatus';
 import GlobalCommandPalette from '@/components/layout/GlobalCommandPalette';
 import PageTransition from '@/components/layout/PageTransition';
 import ShortcutHelp from '@/components/layout/ShortcutHelp';
+import KeyboardNavigation from '@/components/layout/KeyboardNavigation';
 import type { CommandPaletteItem } from '@/lib/command-palette';
 import { features } from '@/lib/features';
 import Analytics from '@/components/analytics/Analytics';
@@ -225,6 +226,14 @@ export default async function RootLayout({
 					},
 				]
 			: []),
+		{
+			id: 'guestbook',
+			label: '/guestbook',
+			href: '/guestbook',
+			section: 'jump' as const,
+			description: 'interactive terminal guestbook',
+			keywords: ['guestbook', 'terminal', 'sign', 'feedback', 'cli'],
+		},
 		...(features.tagsBrowsing
 			? [
 					{
@@ -284,6 +293,7 @@ export default async function RootLayout({
 					{enableWebVitals ? <WebVitals debug={debugWebVitals} /> : null}
 					{features.commandPalette && <GlobalCommandPalette items={commandPaletteItems} />}
 					{features.shortcutHelp && <ShortcutHelp />}
+					<KeyboardNavigation />
 					{features.readingProgress && <ReadingProgress />}
 					<div className="flex min-h-screen flex-col">
 						{/* Header */}

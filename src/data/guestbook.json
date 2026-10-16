@@ -1,0 +1,26 @@
+[
+	{
+		"id": "entry-1",
+		"name": "Nam",
+		"handle": "ntnam1605",
+		"message": "Welcome to the terminal guestbook! Leave a note, tell me what you're building, or drop your favorite production debugging war story.",
+		"date": "2026-10-10",
+		"verified": true
+	},
+	{
+		"id": "entry-2",
+		"name": "Alex",
+		"handle": "alex_systems",
+		"message": "Loved the writeup on auth concepts and distributed sessions. Keep building boring systems that actually stay up!",
+		"date": "2026-10-12",
+		"verified": false
+	},
+	{
+		"id": "entry-3",
+		"name": "Dat Nguyen",
+		"handle": "dat_dev",
+		"message": "The CSC14005 ML lecture rewrites helped me clear my exam. Greetings from HCMC!",
+		"date": "2026-10-14",
+		"verified": false
+	}
+]

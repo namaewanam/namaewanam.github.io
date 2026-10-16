@@ -14,15 +14,32 @@ const SHORTCUT_GROUPS = [
 		],
 	},
 	{
+		title: 'navigation',
+		items: [
+			{ keys: ['g', 'h'], description: 'go to home page' },
+			{ keys: ['g', 'b'], description: 'go to blog' },
+			{ keys: ['g', 's'], description: 'go to stack' },
+			{ keys: ['g', 'a'], description: 'go to ADR' },
+			{ keys: ['g', 'm'], description: 'go to guestbook' },
+			{ keys: ['g', 'g'], description: 'scroll to top' },
+			{ keys: ['G'], description: 'scroll to bottom' },
+		],
+	},
+	{
+		title: 'reading & articles',
+		items: [
+			{ keys: ['j'], description: 'scroll down smoothly' },
+			{ keys: ['k'], description: 'scroll up smoothly' },
+			{ keys: ['['], description: 'navigate to previous article' },
+			{ keys: [']'], description: 'navigate to next article' },
+		],
+	},
+	{
 		title: 'palette',
 		items: [
 			{ keys: ['↑', '↓'], description: 'move through results' },
 			{ keys: ['enter'], description: 'open the selected result' },
 		],
-	},
-	{
-		title: 'blog',
-		items: [{ keys: ['/'], description: 'focus article search on the blog page' }],
 	},
 ] as const;
 
