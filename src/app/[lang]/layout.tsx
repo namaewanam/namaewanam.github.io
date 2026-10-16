@@ -82,6 +82,9 @@ export const metadata: Metadata = {
 			'application/feed+json': FEED_PATHS.json,
 		},
 	},
+	verification: {
+		google: 'OzYwJVC2pmlxYSycufnEWK1nNSL4YPvFlaTa4RdGfZU',
+	},
 };
 
 export function generateStaticParams() {
