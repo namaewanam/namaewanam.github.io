@@ -455,15 +455,15 @@ export default function CodeCopyInjector({
 
 			// Line numbers toggle button
 			const lineToggleBtn = document.createElement('button');
-			lineToggleBtn.className = 'code-copy-btn code-line-toggle-btn';
+			lineToggleBtn.className = 'code-copy-btn code-line-toggle-btn active';
 			lineToggleBtn.setAttribute('aria-label', 'Toggle line numbers');
+			lineToggleBtn.setAttribute('title', 'Toggle line numbers');
 			lineToggleBtn.innerHTML = '#';
 			lineToggleBtn.style.cssText = playgroundUrl ? 'right:4.75rem;' : 'right:2.75rem;';
 			lineToggleBtn.addEventListener('click', () => {
-				code?.classList.toggle('code-numbered');
-				showToast(
-					code?.classList.contains('code-numbered') ? 'line numbers on' : 'line numbers off'
-				);
+				const isNowOn = code?.classList.toggle('code-numbered');
+				lineToggleBtn.classList.toggle('active', Boolean(isNowOn));
+				showToast(isNowOn ? 'line numbers on' : 'line numbers off');
 			});
 			wrapper.appendChild(lineToggleBtn);
 		});

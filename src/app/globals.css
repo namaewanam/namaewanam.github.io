@@ -501,10 +501,10 @@ pre:not(.code-block-wrapper pre) {
 .code-numbered {
 	counter-reset: line;
 }
-.code-line {
+.code-numbered .code-line {
 	counter-increment: line;
 }
-.code-line::before {
+.code-numbered .code-line::before {
 	content: counter(line);
 	display: inline-block;
 	width: 2.5em;
@@ -517,6 +517,23 @@ pre:not(.code-block-wrapper pre) {
 	padding-right: 0.75em;
 }
 
+/* Line Number Toggle Button */
+.code-lang-label ~ .code-line-toggle-btn {
+	top: 1.75rem;
+}
+.code-line-toggle-btn {
+	font-family: var(--font-mono), monospace;
+	font-weight: 600;
+	font-size: 11px;
+	line-height: 1;
+	min-width: 1.75rem;
+	text-align: center;
+}
+.code-line-toggle-btn.active {
+	color: hsl(var(--primary));
+	border-color: hsl(var(--primary) / 0.5);
+}
+
 /* Diff Line Highlighting */
 .code-line.code-line-diff-add {
 	background-color: hsl(142 70% 45% / 0.12);
@@ -525,7 +542,7 @@ pre:not(.code-block-wrapper pre) {
 	padding: 0 1rem;
 	border-left: 2px solid hsl(142 70% 45%);
 }
-.code-line.code-line-diff-add::before {
+.code-numbered .code-line.code-line-diff-add::before {
 	color: hsl(142 70% 45%);
 }
 
@@ -536,7 +553,7 @@ pre:not(.code-block-wrapper pre) {
 	padding: 0 1rem;
 	border-left: 2px solid hsl(0 70% 50%);
 }
-.code-line.code-line-diff-remove::before {
+.code-numbered .code-line.code-line-diff-remove::before {
 	color: hsl(0 70% 50%);
 }
 
