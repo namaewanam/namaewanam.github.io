@@ -40,7 +40,7 @@ export default function GiscusComments({
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
-		if (!containerRef.current) return;
+		if (!repo || !repoId || !categoryId || !containerRef.current) return;
 
 		const isDark = document.documentElement.classList.contains('dark');
 		// Built-in Giscus themes: clean, well-polished, no custom CSS needed
@@ -96,6 +96,10 @@ export default function GiscusComments({
 		inputPosition,
 		lang,
 	]);
+
+	if (!repo || !repoId || !categoryId) {
+		return null;
+	}
 
 	return (
 		<div ref={containerRef} className="mt-12 border-t border-border pt-8" aria-label="Comments" />

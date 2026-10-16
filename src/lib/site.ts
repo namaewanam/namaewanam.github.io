@@ -25,10 +25,9 @@ export const SITE_HOSTNAME = (() => {
 
 export const GISCUS_REPO =
 	process.env.NEXT_PUBLIC_GISCUS_REPO || `${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
-export const GISCUS_REPO_ID = process.env.NEXT_PUBLIC_GISCUS_REPO_ID || 'R_kgDOQCxDSQ';
+export const GISCUS_REPO_ID = process.env.NEXT_PUBLIC_GISCUS_REPO_ID || '';
 export const GISCUS_CATEGORY = process.env.NEXT_PUBLIC_GISCUS_CATEGORY || 'Announcements';
-export const GISCUS_CATEGORY_ID =
-	process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || 'DIC_kwDOQCxDSc4C9rol';
+export const GISCUS_CATEGORY_ID = process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || '';
 
 // Local CV PDF served from /public. Override with NEXT_PUBLIC_RESUME_URL env var
 // to point to a Google Drive share link in production.

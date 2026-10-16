@@ -256,7 +256,7 @@ export default function PostLayout({
 				</div>
 
 				{/* Giscus comments — powered by GitHub Discussions */}
-				{features.comments && (
+				{features.comments && GISCUS_REPO && GISCUS_REPO_ID && GISCUS_CATEGORY_ID && (
 					<GiscusComments
 						repo={GISCUS_REPO}
 						repoId={GISCUS_REPO_ID}
