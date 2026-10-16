@@ -1095,6 +1095,15 @@ body.zen-mode aside[aria-label='Table of contents'] {
 	transition: opacity 0.3s ease;
 }
 
+html {
+	transition: font-size 0.15s ease-out;
+}
+
+[data-font-scale] .prose pre,
+[data-font-scale] .prose code {
+	font-size: calc(13px * var(--font-scale, 1)) !important;
+}
+
 article,
 article .prose {
 	transition:

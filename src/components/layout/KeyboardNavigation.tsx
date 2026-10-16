@@ -108,22 +108,42 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 		});
 	}, [showToast]);
 
-	// Adjust Article Font Size
+	// Adjust Page & Article Font Size
 	const handleAdjustFontSize = useCallback(
-		(delta: number) => {
+		(deltaOrTarget: number | 'reset', isAbsolute = false) => {
 			setFontSizeMultiplier((prev) => {
-				const next =
-					delta === 0 ? 1 : Math.max(0.7, Math.min(1.6, Math.round((prev + delta) * 10) / 10));
-				const target = (document.querySelector('article .prose') ||
-					document.querySelector('article') ||
-					document.querySelector('main')) as HTMLElement | null;
-
-				if (target) {
-					target.style.zoom = next.toString();
-					target.style.fontSize = `${next * 100}%`;
-					showToast(next === 1 ? 'Font size reset: 100%' : `Font size: ${Math.round(next * 100)}%`);
+				let next: number;
+				if (deltaOrTarget === 'reset' || deltaOrTarget === 0) {
+					next = 1;
+				} else if (isAbsolute) {
+					next = Math.max(0.7, Math.min(1.8, Math.round(Number(deltaOrTarget) * 10) / 10));
 				} else {
-					showToast('No article on this page');
+					next = Math.max(0.7, Math.min(1.8, Math.round((prev + Number(deltaOrTarget)) * 10) / 10));
+				}
+
+				if (typeof document !== 'undefined') {
+					const percent = Math.round(next * 100);
+					if (next === 1) {
+						document.documentElement.style.fontSize = '';
+						document.documentElement.removeAttribute('data-font-scale');
+						document.documentElement.style.removeProperty('--font-scale');
+						const article = (document.querySelector('article .prose') ||
+							document.querySelector('article')) as HTMLElement | null;
+						if (article) {
+							article.style.zoom = '';
+						}
+						showToast('Font size reset: 100%');
+					} else {
+						document.documentElement.style.fontSize = `${percent}%`;
+						document.documentElement.setAttribute('data-font-scale', next.toString());
+						document.documentElement.style.setProperty('--font-scale', next.toString());
+						const article = (document.querySelector('article .prose') ||
+							document.querySelector('article')) as HTMLElement | null;
+						if (article) {
+							article.style.zoom = next.toString();
+						}
+						showToast(`Font size: ${percent}%`);
+					}
 				}
 				return next;
 			});
@@ -385,6 +405,26 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 					openShortcutHelp();
 					break;
 
+				case 'font':
+				case 'size': {
+					if (!arg || arg === 'reset' || arg === '100' || arg === '100%') {
+						handleAdjustFontSize(0);
+					} else if (arg === '+' || arg === 'up' || arg === 'more') {
+						handleAdjustFontSize(0.1);
+					} else if (arg === '-' || arg === 'down' || arg === 'less') {
+						handleAdjustFontSize(-0.1);
+					} else {
+						const parsed = parseFloat(arg.replace('%', ''));
+						if (!isNaN(parsed)) {
+							const scale = parsed > 5 ? parsed / 100 : parsed;
+							handleAdjustFontSize(scale, true);
+						} else {
+							showToast('Usage: :font [+ | - | reset | 120%]');
+						}
+					}
+					break;
+				}
+
 				default:
 					showToast(`Unknown command: :${cmd}. Type :help`);
 					break;
@@ -403,6 +443,7 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 			handleToggleLanguage,
 			handleToggleZenMode,
 			handleRandomArticle,
+			handleAdjustFontSize,
 		]
 	);
 
@@ -659,23 +700,33 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 			}
 
 			// Font Size: + / = (increase) or - / _ (decrease) or 0 (reset)
-			if (event.key === '+' || event.key === '=') {
+			if (
+				event.key === '+' ||
+				event.key === '=' ||
+				event.code === 'NumpadAdd' ||
+				(event.code === 'Equal' && !event.ctrlKey && !event.metaKey && !event.altKey)
+			) {
 				event.preventDefault();
 				handleAdjustFontSize(0.1);
 				return;
 			}
-			if (event.key === '-' || event.key === '_') {
+			if (
+				event.key === '-' ||
+				event.key === '_' ||
+				event.code === 'NumpadSubtract' ||
+				(event.code === 'Minus' && !event.ctrlKey && !event.metaKey && !event.altKey)
+			) {
 				event.preventDefault();
 				handleAdjustFontSize(-0.1);
 				return;
 			}
-			if (event.key === '0' && !pendingKey) {
-				const article = document.querySelector('article');
-				if (article) {
-					event.preventDefault();
-					handleAdjustFontSize(0);
-					return;
-				}
+			if (
+				(event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') &&
+				!pendingKey
+			) {
+				event.preventDefault();
+				handleAdjustFontSize(0);
+				return;
 			}
 
 			// Audio TTS Read-Aloud: p

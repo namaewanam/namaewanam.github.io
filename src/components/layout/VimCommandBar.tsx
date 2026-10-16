@@ -48,7 +48,7 @@ export default function VimCommandBar({ isOpen, onClose, onExecute }: VimCommand
 					onChange={(e) => setCommand(e.target.value)}
 					onKeyDown={handleKeyDown}
 					onBlur={() => onClose()}
-					placeholder="w (save), q (quit), e blog, theme dark, random, help..."
+					placeholder="w (save), q (quit), e blog, font 120, theme dark, random, help..."
 					className="flex-1 bg-transparent font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/40 sm:text-sm"
 					autoCapitalize="off"
 					autoComplete="off"
