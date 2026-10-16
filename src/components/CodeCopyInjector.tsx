@@ -390,6 +390,13 @@ export default function CodeCopyInjector({
 			}
 
 			if (code) {
+				const isDiff =
+					lang === 'diff' ||
+					lang === 'patch' ||
+					rawLang.toLowerCase().includes('diff') ||
+					filename.toLowerCase().endsWith('.diff') ||
+					filename.toLowerCase().endsWith('.patch');
+
 				const lines = code.innerHTML.split('\n');
 				if (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
 					lines.pop();
@@ -398,18 +405,12 @@ export default function CodeCopyInjector({
 					.map((line) => {
 						const plain = line.replace(/<[^>]*>/g, '').trimStart();
 						let diffClass = '';
-						if (
-							plain.startsWith('+ ') ||
-							plain.startsWith('+\t') ||
-							(lang === 'diff' && plain.startsWith('+'))
-						) {
-							diffClass = ' code-line-diff-add';
-						} else if (
-							plain.startsWith('- ') ||
-							plain.startsWith('-\t') ||
-							(lang === 'diff' && plain.startsWith('-'))
-						) {
-							diffClass = ' code-line-diff-remove';
+						if (isDiff) {
+							if (plain.startsWith('+') && !plain.startsWith('+++')) {
+								diffClass = ' code-line-diff-add';
+							} else if (plain.startsWith('-') && !plain.startsWith('---')) {
+								diffClass = ' code-line-diff-remove';
+							}
 						}
 						return `<span class="code-line${diffClass}">${line}</span>`;
 					})
