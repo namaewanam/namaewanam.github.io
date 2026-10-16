@@ -10,6 +10,7 @@ import VimCommandBar from '@/components/layout/VimCommandBar';
 
 interface KeyboardNavigationProps {
 	postPaths?: string[];
+	postFileMap?: Record<string, string>;
 }
 
 function isTypingField(target: EventTarget | null): boolean {
@@ -21,7 +22,10 @@ function isTypingField(target: EventTarget | null): boolean {
 	);
 }
 
-export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigationProps) {
+export default function KeyboardNavigation({
+	postPaths = [],
+	postFileMap = {},
+}: KeyboardNavigationProps) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const isVi = pathname?.startsWith('/vi');
@@ -36,6 +40,12 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 	const [, setIsZenMode] = useState(false);
 	const [, setFontSizeMultiplier] = useState(1);
 	const [, setIsSpeaking] = useState(false);
+
+	// Table of Contents quick-jump palette (:toc)
+	const [isTocOpen, setIsTocOpen] = useState(false);
+	const [tocHeadings, setTocHeadings] = useState<{ id: string; text: string; level: number }[]>([]);
+	const [tocIndex, setTocIndex] = useState(0);
+	const tocListRef = useRef<HTMLUListElement>(null);
 
 	const timerRef = useRef<NodeJS.Timeout | null>(null);
 	const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -55,15 +65,48 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 		[lang]
 	);
 
-	// Extract article slug from pathname if on an article page
+	// Extract article slug from pathname if on an article page (category/slug)
 	const currentArticleSlug = (() => {
 		if (!pathname) return null;
-		const match = pathname.match(/^\/(?:en|vi)\/blog\/([^/]+)\/(.+)$/);
-		if (match && match[1] && match[2]) {
-			return `${match[1]}/${match[2]}`;
+		const clean = pathname.replace(/^\/(?:en|vi)\/blog\//, '').replace(/\/+$/, '');
+		const parts = clean.split('/');
+		if (parts.length >= 2 && parts[0] && parts[1]) {
+			return `${parts[0]}/${parts.slice(1).join('/')}`;
 		}
 		return null;
 	})();
+
+	// Resolve exact GitHub markdown source URL with exact folder casing and no trailing slashes
+	const getSourceUrl = useCallback(() => {
+		if (!pathname) {
+			return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
+		}
+
+		// Clean path: strip language prefix (/en or /vi) and trailing slashes
+		const cleanPath = pathname.replace(/^\/(?:en|vi)/, '').replace(/\/+$/, '') || '/';
+
+		// 1. Direct match in postFileMap
+		if (postFileMap && postFileMap[cleanPath]) {
+			return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/${postFileMap[cleanPath]}`;
+		}
+
+		// 2. ADR match (/adr/0001-...)
+		const adrMatch = cleanPath.match(/^\/adr\/(.+)$/);
+		if (adrMatch && adrMatch[1]) {
+			const adrSlug = adrMatch[1].replace(/\.md$/, '').replace(/\/+$/, '');
+			return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/adr/${adrSlug}.md`;
+		}
+
+		// 3. Fallback for blog paths (/blog/category/slug)
+		const blogMatch = cleanPath.match(/^\/blog\/([^/]+)\/(.+)$/);
+		if (blogMatch && blogMatch[1] && blogMatch[2]) {
+			const cat = blogMatch[1];
+			const slug = blogMatch[2].replace(/\.md$/, '').replace(/\/+$/, '');
+			return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/${cat}/${slug}.md`;
+		}
+
+		return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
+	}, [pathname, postFileMap]);
 
 	// Toggle Language
 	const handleToggleLanguage = useCallback(() => {
@@ -212,6 +255,31 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 		},
 		[showToast]
 	);
+
+	// Jump directly to heading by ID (used by :toc)
+	const handleJumpToHeadingId = useCallback(
+		(id: string, text?: string) => {
+			const target = document.getElementById(id);
+			if (target) {
+				const yOffset = -80; // Account for fixed header
+				const y = target.getBoundingClientRect().top + window.pageYOffset + yOffset;
+				window.scrollTo({ top: y, behavior: 'smooth' });
+				showToast(`Jumped to: ${text || id}`);
+			} else {
+				showToast('Heading not found');
+			}
+			setIsTocOpen(false);
+		},
+		[showToast]
+	);
+
+	// Auto-scroll selected TOC item into view
+	useEffect(() => {
+		if (isTocOpen && tocListRef.current) {
+			const activeEl = tocListRef.current.children[tocIndex] as HTMLElement | undefined;
+			activeEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		}
+	}, [tocIndex, isTocOpen]);
 
 	// Code Snippet Navigation (]c / [c)
 	const handleCodeSnippetJump = useCallback(
@@ -377,26 +445,53 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 					break;
 
 				case 'source':
-					if (currentArticleSlug) {
-						const url = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/${currentArticleSlug}.md`;
-						window.open(url, '_blank', 'noopener,noreferrer');
-					} else {
-						window.open(
-							`https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`,
-							'_blank',
-							'noopener,noreferrer'
-						);
-					}
+					window.open(getSourceUrl(), '_blank', 'noopener,noreferrer');
+					showToast('Opening GitHub source...');
 					break;
 
 				case 'toc': {
-					const toc = document.querySelector('[aria-label="Table of contents"]');
-					if (toc) {
-						toc.scrollIntoView({ behavior: 'smooth' });
-						showToast('Scrolled to Table of Contents');
-					} else {
+					const headingEls = Array.from(
+						document.querySelectorAll('article h1, article h2, article h3, article h4')
+					) as HTMLElement[];
+
+					const fallbackEls =
+						headingEls.length > 0
+							? headingEls
+							: (Array.from(
+									document.querySelectorAll('main h1, main h2, main h3, main h4')
+								) as HTMLElement[]);
+
+					if (fallbackEls.length === 0) {
 						showToast('No Table of Contents on this page');
+						break;
 					}
+
+					const items = fallbackEls.map((h, i) => {
+						let id = h.id;
+						if (!id) {
+							id = `section-heading-${i}`;
+							h.id = id;
+						}
+						const level = parseInt(h.tagName.substring(1), 10) || 2;
+						return {
+							id,
+							text: h.textContent?.replace(/^#+\s*/, '').trim() || `Section ${i + 1}`,
+							level,
+						};
+					});
+
+					setTocHeadings(items);
+
+					// Determine closest current heading to viewport top
+					const currentIdx = items.findIndex((item) => {
+						const el = document.getElementById(item.id);
+						if (!el) return false;
+						const rect = el.getBoundingClientRect();
+						return rect.top >= 0 && rect.top <= window.innerHeight * 0.4;
+					});
+
+					setTocIndex(currentIdx >= 0 ? currentIdx : 0);
+					setIsTocOpen(true);
 					break;
 				}
 
@@ -444,6 +539,7 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 			handleToggleZenMode,
 			handleRandomArticle,
 			handleAdjustFontSize,
+			getSourceUrl,
 		]
 	);
 
@@ -452,6 +548,34 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 		function handleKeyDown(event: KeyboardEvent) {
 			if (event.defaultPrevented) return;
 			if (isTypingField(event.target)) return;
+
+			// If TOC modal is open, capture navigation and prevent outside keys
+			if (isTocOpen) {
+				if (event.key === 'Escape' || event.key === 'q') {
+					event.preventDefault();
+					setIsTocOpen(false);
+					return;
+				}
+				if (event.key === 'j' || event.key === 'ArrowDown') {
+					event.preventDefault();
+					setTocIndex((prev) => (prev + 1) % tocHeadings.length);
+					return;
+				}
+				if (event.key === 'k' || event.key === 'ArrowUp') {
+					event.preventDefault();
+					setTocIndex((prev) => (prev - 1 + tocHeadings.length) % tocHeadings.length);
+					return;
+				}
+				if (event.key === 'Enter') {
+					event.preventDefault();
+					const selected = tocHeadings[tocIndex];
+					if (selected) {
+						handleJumpToHeadingId(selected.id, selected.text);
+					}
+					return;
+				}
+				return;
+			}
 
 			// Vim Ex-Command Bar trigger: `:`
 			if (event.key === ':' && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -691,10 +815,7 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 			// Open GitHub Repo: .
 			if (event.key === '.') {
 				event.preventDefault();
-				const target = currentArticleSlug
-					? `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/${currentArticleSlug}.md`
-					: `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
-				window.open(target, '_blank', 'noopener,noreferrer');
+				window.open(getSourceUrl(), '_blank', 'noopener,noreferrer');
 				showToast('Opening GitHub source...');
 				return;
 			}
@@ -761,6 +882,11 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 		handleHeadingJump,
 		handleCodeSnippetJump,
 		handleYankNearestCode,
+		isTocOpen,
+		tocHeadings,
+		tocIndex,
+		handleJumpToHeadingId,
+		getSourceUrl,
 	]);
 
 	return (
@@ -771,6 +897,60 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 				onClose={() => setIsCommandBarOpen(false)}
 				onExecute={handleExecuteVimCommand}
 			/>
+
+			{/* Table of Contents Quick Navigator (:toc) */}
+			{isTocOpen && (
+				<div
+					className="fixed inset-0 z-[110] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+					onClick={() => setIsTocOpen(false)}
+				>
+					<div
+						className="animate-in fade-in zoom-in-95 flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border border-border bg-card shadow-2xl"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="flex items-center justify-between border-b border-border px-4 py-3">
+							<div className="flex items-center gap-2">
+								<span className="font-mono text-sm font-bold text-primary">:toc</span>
+								<span className="text-xs text-muted-foreground">
+									· Table of Contents ({tocHeadings.length})
+								</span>
+							</div>
+							<span className="font-mono text-[10px] text-muted-foreground">
+								&lt;j/k&gt; move · &lt;Enter&gt; jump · &lt;Esc&gt; close
+							</span>
+						</div>
+
+						<ul ref={tocListRef} className="flex-1 space-y-0.5 overflow-y-auto p-2">
+							{tocHeadings.map((h, idx) => {
+								const isSelected = idx === tocIndex;
+								return (
+									<li key={h.id}>
+										<button
+											type="button"
+											onClick={() => handleJumpToHeadingId(h.id, h.text)}
+											onMouseEnter={() => setTocIndex(idx)}
+											className={`flex w-full items-center gap-2 rounded px-3 py-1.5 text-left font-mono text-xs transition-colors ${
+												isSelected
+													? 'bg-primary/10 font-semibold text-primary'
+													: 'text-foreground/80 hover:bg-muted/50 hover:text-foreground'
+											}`}
+											style={{
+												paddingLeft: `${Math.max(0.75, (h.level - 1) * 1.0)}rem`,
+											}}
+										>
+											<span className="text-[10px] text-muted-foreground/60">
+												{'#'.repeat(Math.max(1, h.level))}
+											</span>
+											<span className="flex-1 truncate">{h.text}</span>
+											{isSelected && <span className="text-[10px] text-primary">⏎ jump</span>}
+										</button>
+									</li>
+								);
+							})}
+						</ul>
+					</div>
+				</div>
+			)}
 
 			{/* Multi-key sequence indicator badge */}
 			{pendingKey && (

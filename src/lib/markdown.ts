@@ -24,6 +24,7 @@ export interface Post {
 	content: string;
 	order?: number;
 	fullPath: string;
+	filePath: string;
 	tags?: string[];
 	readingTimeMin: number;
 	codePercent: number;
@@ -322,6 +323,7 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 			title: (data.title as string | undefined) ?? slug.replace(/-/g, ' '),
 			content,
 			fullPath: urlPath,
+			filePath: `${category}/${relativePath}`,
 			tags,
 			readingTimeMin,
 			codePercent,

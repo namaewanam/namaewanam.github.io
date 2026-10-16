@@ -107,6 +107,12 @@ export default async function RootLayout({
 		: i18n.defaultLocale;
 	const posts = getAllPosts(lang);
 	const postPaths = posts.map((post) => `/blog/${post.category}/${post.fullPath}`);
+	const postFileMap: Record<string, string> = {};
+	posts.forEach((post) => {
+		if (post.filePath) {
+			postFileMap[`/blog/${post.category}/${post.fullPath}`] = post.filePath;
+		}
+	});
 	const categories = getCategories();
 	const featuredPosts = getFeaturedPosts(posts);
 	const debugWebVitals = process.env.NEXT_PUBLIC_DEBUG_WEB_VITALS === '1';
@@ -294,7 +300,7 @@ export default async function RootLayout({
 					{enableWebVitals ? <WebVitals debug={debugWebVitals} /> : null}
 					{features.commandPalette && <GlobalCommandPalette items={commandPaletteItems} />}
 					{features.shortcutHelp && <ShortcutHelp />}
-					<KeyboardNavigation postPaths={postPaths} />
+					<KeyboardNavigation postPaths={postPaths} postFileMap={postFileMap} />
 					{features.readingProgress && <ReadingProgress />}
 					<div className="flex min-h-screen flex-col">
 						{/* Header */}

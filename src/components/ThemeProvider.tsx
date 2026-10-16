@@ -29,10 +29,26 @@ export function ThemeProvider({ children }: Readonly<{ children: React.ReactNode
 	const [theme, setTheme] = useState<Theme>('light');
 	const [mounted, setMounted] = useState(false);
 
-	// On mount, read the actual theme from the DOM (set by ThemeScript)
+	// On mount, read theme from localStorage first, then DOM/media query
 	useEffect(() => {
-		const isDark = document.documentElement.classList.contains('dark');
-		setTheme(isDark ? 'dark' : 'light');
+		let initialTheme: Theme = 'light';
+		try {
+			const saved = localStorage.getItem('theme');
+			if (saved === 'dark' || saved === 'light') {
+				initialTheme = saved;
+			} else if (
+				document.documentElement.classList.contains('dark') ||
+				window.matchMedia('(prefers-color-scheme: dark)').matches
+			) {
+				initialTheme = 'dark';
+			}
+		} catch {
+			initialTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+		}
+
+		setTheme(initialTheme);
+		document.documentElement.classList.remove('light', 'dark');
+		document.documentElement.classList.add(initialTheme);
 		setMounted(true);
 	}, []);
 
