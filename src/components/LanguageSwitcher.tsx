@@ -38,7 +38,7 @@ export default function LanguageSwitcher() {
 					// ignore
 				}
 			}}
-			className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-border px-2.5 py-1 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+			className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-border px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 			aria-label={`Switch to ${nextLocale.toUpperCase()}`}
 		>
 			{nextLocale.toUpperCase()}
