@@ -18,6 +18,7 @@
 		"check:links": "tsx scripts/check-static-links.ts",
 		"check:feeds": "tsx scripts/verify-feeds.ts",
 		"notify:newsletter": "tsx scripts/notify-newsletter.ts",
+		"indexnow": "tsx scripts/submit-indexnow.ts",
 		"start": "next start",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
