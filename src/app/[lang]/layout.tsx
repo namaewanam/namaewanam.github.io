@@ -106,6 +106,7 @@ export default async function RootLayout({
 		? (rawLang as Locale)
 		: i18n.defaultLocale;
 	const posts = getAllPosts(lang);
+	const postPaths = posts.map((post) => `/blog/${post.category}/${post.fullPath}`);
 	const categories = getCategories();
 	const featuredPosts = getFeaturedPosts(posts);
 	const debugWebVitals = process.env.NEXT_PUBLIC_DEBUG_WEB_VITALS === '1';
@@ -293,7 +294,7 @@ export default async function RootLayout({
 					{enableWebVitals ? <WebVitals debug={debugWebVitals} /> : null}
 					{features.commandPalette && <GlobalCommandPalette items={commandPaletteItems} />}
 					{features.shortcutHelp && <ShortcutHelp />}
-					<KeyboardNavigation />
+					<KeyboardNavigation postPaths={postPaths} />
 					{features.readingProgress && <ReadingProgress />}
 					<div className="flex min-h-screen flex-col">
 						{/* Header */}

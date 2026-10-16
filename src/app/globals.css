@@ -1084,3 +1084,13 @@ input[type='date']::-webkit-calendar-picker-indicator:hover {
 .dark input[type='date']::-webkit-calendar-picker-indicator {
 	filter: invert(0.88) brightness(1.2);
 }
+
+/* Zen / Focus Mode */
+body.zen-mode header,
+body.zen-mode footer,
+body.zen-mode [aria-label='Table of contents'],
+body.zen-mode aside[aria-label='Table of contents'] {
+	opacity: 0 !important;
+	pointer-events: none !important;
+	transition: opacity 0.3s ease;
+}
