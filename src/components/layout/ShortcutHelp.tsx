@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { SHORTCUT_HELP_EVENT } from '@/lib/shortcut-help';
 
 const SHORTCUT_GROUPS = [
@@ -81,6 +81,12 @@ function ShortcutKey({ value }: Readonly<{ value: string }>) {
 
 export default function ShortcutHelp() {
 	const [isOpen, setIsOpen] = useState(false);
+	const isOpenRef = useRef(false);
+	const contentRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		isOpenRef.current = isOpen;
+	}, [isOpen]);
 
 	useEffect(() => {
 		function openHelp() {
@@ -88,24 +94,61 @@ export default function ShortcutHelp() {
 		}
 
 		function handleKeydown(event: KeyboardEvent) {
+			if (!isOpenRef.current) {
+				if (event.defaultPrevented || isTypingField(event.target)) return;
+				if (event.metaKey || event.ctrlKey || event.altKey) return;
+				if (event.key !== '?') return;
+
+				event.preventDefault();
+				setIsOpen(true);
+				return;
+			}
+
+			// Modal is OPEN:
 			if (event.key === 'Escape') {
+				event.preventDefault();
 				setIsOpen(false);
 				return;
 			}
 
-			if (event.defaultPrevented || isTypingField(event.target)) return;
-			if (event.metaKey || event.ctrlKey || event.altKey) return;
-			if (event.key !== '?') return;
-
-			event.preventDefault();
-			setIsOpen(true);
+			// Scroll inside modal with j/k, Ctrl+d/u, arrows, G
+			if (event.key === 'j' || event.key === 'ArrowDown') {
+				event.preventDefault();
+				event.stopPropagation();
+				contentRef.current?.scrollBy({ top: 140, behavior: 'smooth' });
+				return;
+			}
+			if (event.key === 'k' || event.key === 'ArrowUp') {
+				event.preventDefault();
+				event.stopPropagation();
+				contentRef.current?.scrollBy({ top: -140, behavior: 'smooth' });
+				return;
+			}
+			if (event.ctrlKey && event.key === 'd') {
+				event.preventDefault();
+				event.stopPropagation();
+				contentRef.current?.scrollBy({ top: 260, behavior: 'smooth' });
+				return;
+			}
+			if (event.ctrlKey && event.key === 'u') {
+				event.preventDefault();
+				event.stopPropagation();
+				contentRef.current?.scrollBy({ top: -260, behavior: 'smooth' });
+				return;
+			}
+			if (event.key === 'G' && event.shiftKey) {
+				event.preventDefault();
+				event.stopPropagation();
+				contentRef.current?.scrollTo({ top: contentRef.current.scrollHeight, behavior: 'smooth' });
+				return;
+			}
 		}
 
 		window.addEventListener(SHORTCUT_HELP_EVENT, openHelp);
-		window.addEventListener('keydown', handleKeydown);
+		window.addEventListener('keydown', handleKeydown, { capture: true });
 		return () => {
 			window.removeEventListener(SHORTCUT_HELP_EVENT, openHelp);
-			window.removeEventListener('keydown', handleKeydown);
+			window.removeEventListener('keydown', handleKeydown, { capture: true });
 		};
 	}, []);
 
@@ -122,58 +165,73 @@ export default function ShortcutHelp() {
 
 	return (
 		<div
-			className="bg-background/72 fixed inset-0 z-[81] backdrop-blur-sm"
+			className="animate-in fade-in fixed inset-0 z-[81] flex items-center justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm sm:p-6"
 			onClick={() => setIsOpen(false)}
+			role="dialog"
+			aria-modal="true"
+			aria-label="Keyboard Shortcuts"
 		>
-			<div className="mx-auto mt-24 w-full max-w-xl px-4 sm:px-6">
-				<div
-					className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
-					onClick={(event) => event.stopPropagation()}
-				>
-					<div className="border-b border-border px-4 py-3">
-						<div className="flex items-center justify-between gap-3">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-widest text-primary">
-									keyboard shortcuts
-								</p>
-								<h2 className="mt-1 text-sm font-semibold text-foreground">
-									Small commands for moving faster
-								</h2>
-							</div>
-							<button
-								type="button"
-								onClick={() => setIsOpen(false)}
-								className="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-							>
-								esc
-							</button>
+			<div
+				className="animate-in zoom-in-95 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+				onClick={(event) => event.stopPropagation()}
+			>
+				{/* Fixed Header */}
+				<div className="shrink-0 border-b border-border bg-muted/20 px-4 py-3">
+					<div className="flex items-center justify-between gap-3">
+						<div>
+							<p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+								keyboard shortcuts // :help
+							</p>
+							<h2 className="mt-1 text-sm font-semibold text-foreground">
+								Vim motions &amp; quick commands
+							</h2>
 						</div>
+						<button
+							type="button"
+							onClick={() => setIsOpen(false)}
+							className="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground active:scale-95"
+						>
+							esc
+						</button>
 					</div>
+				</div>
 
-					<div className="space-y-5 p-4">
-						{SHORTCUT_GROUPS.map((group) => (
-							<section key={group.title} className="space-y-2">
-								<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
-									{group.title}
-								</p>
-								<div className="space-y-2">
-									{group.items.map((item) => (
-										<div
-											key={`${group.title}-${item.description}`}
-											className="flex items-center justify-between gap-4 rounded-lg border border-border/70 bg-background/40 px-3 py-2"
-										>
-											<div className="flex flex-wrap items-center gap-1.5">
-												{item.keys.map((key) => (
-													<ShortcutKey key={`${item.description}-${key}`} value={key} />
-												))}
-											</div>
-											<p className="text-right text-xs text-muted-foreground">{item.description}</p>
+				{/* Scrollable Body */}
+				<div ref={contentRef} className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-5">
+					{SHORTCUT_GROUPS.map((group) => (
+						<section key={group.title} className="space-y-2">
+							<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+								{group.title}
+							</p>
+							<div className="space-y-2">
+								{group.items.map((item) => (
+									<div
+										key={`${group.title}-${item.description}`}
+										className="flex items-center justify-between gap-4 rounded-lg border border-border/70 bg-background/40 px-3 py-2"
+									>
+										<div className="flex flex-wrap items-center gap-1.5">
+											{item.keys.map((key) => (
+												<ShortcutKey key={`${item.description}-${key}`} value={key} />
+											))}
 										</div>
-									))}
-								</div>
-							</section>
-						))}
-					</div>
+										<p className="text-right text-xs text-muted-foreground">{item.description}</p>
+									</div>
+								))}
+							</div>
+						</section>
+					))}
+				</div>
+
+				{/* Footer with Hint */}
+				<div className="flex shrink-0 items-center justify-between border-t border-border bg-muted/10 px-4 py-2 font-mono text-[11px] text-muted-foreground">
+					<span>
+						Scroll with <kbd className="text-foreground">j</kbd>/
+						<kbd className="text-foreground">k</kbd>, <kbd className="text-foreground">^d</kbd>/
+						<kbd className="text-foreground">^u</kbd> or mousewheel
+					</span>
+					<span>
+						<kbd className="text-foreground">Esc</kbd> to close
+					</span>
 				</div>
 			</div>
 		</div>
