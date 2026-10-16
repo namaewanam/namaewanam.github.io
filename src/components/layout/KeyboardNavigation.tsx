@@ -58,6 +58,19 @@ export default function KeyboardNavigation({
 		}, 2000);
 	}, []);
 
+	// Display pending toast across page navigations / language changes
+	useEffect(() => {
+		try {
+			const pending = sessionStorage.getItem('pending_toast');
+			if (pending) {
+				sessionStorage.removeItem('pending_toast');
+				showToast(pending);
+			}
+		} catch {
+			// ignore
+		}
+	}, [pathname, showToast]);
+
 	const localize = useCallback(
 		(path: string) => {
 			return `/${lang}${path === '/' ? '' : path}`;
@@ -109,19 +122,44 @@ export default function KeyboardNavigation({
 	}, [pathname, postFileMap]);
 
 	// Toggle Language
-	const handleToggleLanguage = useCallback(() => {
-		if (!pathname) return;
-		let nextPath = pathname;
-		if (pathname.startsWith('/vi')) {
-			nextPath = pathname.replace(/^\/vi/, '/en');
-		} else if (pathname.startsWith('/en')) {
-			nextPath = pathname.replace(/^\/en/, '/vi');
-		} else {
-			nextPath = `/vi${pathname}`;
-		}
-		router.push(nextPath);
-		showToast(`Language switched: ${nextPath.startsWith('/vi') ? 'vi' : 'en'}`);
-	}, [pathname, router, showToast]);
+	const handleToggleLanguage = useCallback(
+		(targetLang?: 'en' | 'vi') => {
+			if (!pathname) return;
+			let nextPath = pathname;
+			const currentIsVi = pathname.startsWith('/vi');
+			const desiredLang = targetLang || (currentIsVi ? 'en' : 'vi');
+
+			if (targetLang) {
+				if (targetLang === 'vi' && currentIsVi) {
+					showToast('Already in Tiếng Việt (vi)');
+					return;
+				}
+				if (targetLang === 'en' && !currentIsVi) {
+					showToast('Already in English (en)');
+					return;
+				}
+			}
+
+			if (desiredLang === 'en' && currentIsVi) {
+				nextPath = pathname.replace(/^\/vi/, '/en');
+			} else if (desiredLang === 'vi' && !currentIsVi) {
+				nextPath = pathname.startsWith('/en') ? pathname.replace(/^\/en/, '/vi') : `/vi${pathname}`;
+			}
+
+			const label = desiredLang === 'vi' ? 'Tiếng Việt (vi)' : 'English (en)';
+			const msg = `Language: ${label}`;
+
+			try {
+				sessionStorage.setItem('pending_toast', msg);
+			} catch {
+				// ignore
+			}
+
+			showToast(msg);
+			router.push(nextPath);
+		},
+		[pathname, router, showToast]
+	);
 
 	// Jump to Random Article
 	const handleRandomArticle = useCallback(() => {
@@ -131,8 +169,13 @@ export default function KeyboardNavigation({
 		}
 		const randomPath = postPaths[Math.floor(Math.random() * postPaths.length)];
 		if (randomPath) {
-			router.push(localize(randomPath));
+			try {
+				sessionStorage.setItem('pending_toast', 'Random article loaded');
+			} catch {
+				// ignore
+			}
 			showToast('Jumping to random article...');
+			router.push(localize(randomPath));
 		}
 	}, [postPaths, localize, router, showToast]);
 
@@ -416,13 +459,15 @@ export default function KeyboardNavigation({
 					}
 					break;
 
-				case 'lang':
-					if (arg.toLowerCase() === 'en' || arg.toLowerCase() === 'vi') {
-						if (lang !== arg.toLowerCase()) handleToggleLanguage();
+				case 'lang': {
+					const target = arg.toLowerCase();
+					if (target === 'en' || target === 'vi') {
+						handleToggleLanguage(target);
 					} else {
 						handleToggleLanguage();
 					}
 					break;
+				}
 
 				case 'zen':
 					handleToggleZenMode();
@@ -534,7 +579,6 @@ export default function KeyboardNavigation({
 			localize,
 			theme,
 			toggleTheme,
-			lang,
 			handleToggleLanguage,
 			handleToggleZenMode,
 			handleRandomArticle,
