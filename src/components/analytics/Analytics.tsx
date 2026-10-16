@@ -1,5 +1,3 @@
-import Script from 'next/script';
-
 /**
  * Lightweight, privacy-first web analytics component.
  * Automatically activates Cloudflare Web Analytics or Umami when their
@@ -12,19 +10,20 @@ export default function Analytics() {
 	const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
 	const umamiSrc = process.env.NEXT_PUBLIC_UMAMI_SRC || 'https://cloud.umami.is/script.js';
 
+	if (!cfToken && !umamiWebsiteId) {
+		return null;
+	}
+
 	return (
 		<>
 			{cfToken && (
-				<Script
+				<script
 					defer
 					src="https://static.cloudflareinsights.com/beacon.min.js"
-					data-cf-beacon={JSON.stringify({ token: cfToken })}
-					strategy="afterInteractive"
+					data-cf-beacon={`{"token": "${cfToken}"}`}
 				/>
 			)}
-			{umamiWebsiteId && (
-				<Script defer src={umamiSrc} data-website-id={umamiWebsiteId} strategy="afterInteractive" />
-			)}
+			{umamiWebsiteId && <script defer src={umamiSrc} data-website-id={umamiWebsiteId} />}
 		</>
 	);
 }
