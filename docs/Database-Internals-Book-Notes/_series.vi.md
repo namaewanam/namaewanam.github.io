@@ -14,9 +14,10 @@ useItFor:
 
 Series này là các ghi chú của mình khi đọc cuốn sách **Database Internals** của tác giả Alex Petrov. Mình sẽ cố gắng tóm tắt những kiến thức quan trọng nhất trong từng chương, đồng thời thêm một số ví dụ minh họa để dễ hình dung hơn.
 
-Suggested flow:
+Lời khuyên: 
 
-1. 
+nếu bạn chưa đọc cuốn sách này, hãy đọc nó trước khi đọc series này. Series này chỉ là các ghi chú tóm tắt, không thể thay thế cho việc đọc sách.
 
-If you are reading this for the first time, treat it like a map.
-If you are returning later, use it like an index.
+1. Hệ thống kiến thức kèm thực hành.
+
+Có thể đọc theo flow của series, bắt đầu từ chương 1 đến chương cuối cùng. Mỗi chương sẽ có một bài viết riêng.
