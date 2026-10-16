@@ -112,11 +112,16 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 	const handleAdjustFontSize = useCallback(
 		(delta: number) => {
 			setFontSizeMultiplier((prev) => {
-				const next = Math.max(0.85, Math.min(1.4, Math.round((prev + delta) * 100) / 100));
-				const article = document.querySelector('article');
-				if (article) {
-					article.style.fontSize = `${next * 100}%`;
-					showToast(`Font size: ${Math.round(next * 100)}%`);
+				const next =
+					delta === 0 ? 1 : Math.max(0.7, Math.min(1.6, Math.round((prev + delta) * 10) / 10));
+				const target = (document.querySelector('article .prose') ||
+					document.querySelector('article') ||
+					document.querySelector('main')) as HTMLElement | null;
+
+				if (target) {
+					target.style.zoom = next.toString();
+					target.style.fontSize = `${next * 100}%`;
+					showToast(next === 1 ? 'Font size reset: 100%' : `Font size: ${Math.round(next * 100)}%`);
 				} else {
 					showToast('No article on this page');
 				}
@@ -653,16 +658,24 @@ export default function KeyboardNavigation({ postPaths = [] }: KeyboardNavigatio
 				return;
 			}
 
-			// Font Size: + / = or -
+			// Font Size: + / = (increase) or - / _ (decrease) or 0 (reset)
 			if (event.key === '+' || event.key === '=') {
 				event.preventDefault();
-				handleAdjustFontSize(0.05);
+				handleAdjustFontSize(0.1);
 				return;
 			}
 			if (event.key === '-' || event.key === '_') {
 				event.preventDefault();
-				handleAdjustFontSize(-0.05);
+				handleAdjustFontSize(-0.1);
 				return;
+			}
+			if (event.key === '0' && !pendingKey) {
+				const article = document.querySelector('article');
+				if (article) {
+					event.preventDefault();
+					handleAdjustFontSize(0);
+					return;
+				}
 			}
 
 			// Audio TTS Read-Aloud: p

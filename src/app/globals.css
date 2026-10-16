@@ -1094,3 +1094,10 @@ body.zen-mode aside[aria-label='Table of contents'] {
 	pointer-events: none !important;
 	transition: opacity 0.3s ease;
 }
+
+article,
+article .prose {
+	transition:
+		font-size 0.15s ease,
+		zoom 0.15s ease;
+}
