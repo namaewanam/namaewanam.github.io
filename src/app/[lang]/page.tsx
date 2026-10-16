@@ -16,6 +16,8 @@ import {
 	GITHUB_USERNAME,
 	RESUME_URL,
 } from '@/lib/site';
+import JsonLd from '@/components/seo/JsonLd';
+import { getPersonSchema, getWebSiteSchema } from '@/lib/schema';
 
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
@@ -66,6 +68,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 
 	return (
 		<div className="mx-auto w-full max-w-3xl space-y-16">
+			<JsonLd data={[getPersonSchema(), getWebSiteSchema()]} />
 			{/* Who Am I */}
 			<section id="home" className="space-y-4">
 				<div className="space-y-1">

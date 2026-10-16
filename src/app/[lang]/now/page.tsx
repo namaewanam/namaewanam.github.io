@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `now · ${SITE_NAME}`,
 	description: 'What I am doing right now.',
 };

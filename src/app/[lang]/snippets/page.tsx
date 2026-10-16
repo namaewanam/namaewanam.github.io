@@ -4,9 +4,10 @@ import { features } from '@/lib/features';
 import { renderMarkdown } from '@/lib/mdx';
 import { SNIPPETS } from '@/lib/snippets';
 import MarkdownContent from '@/components/MarkdownContent';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `snippets · ${SITE_NAME}`,
 	description: 'A collection of useful code snippets, boilerplates, and patterns.',
 };

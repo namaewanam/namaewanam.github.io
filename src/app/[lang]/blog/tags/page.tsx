@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from '@/components/LocalizedLink';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { getAllPosts, getAllTags } from '@/lib/markdown';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `tags · ${SITE_NAME}`,
 	description: 'Browse all blog posts by tags.',
 };

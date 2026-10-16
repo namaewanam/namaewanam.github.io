@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { getAllPosts } from '@/lib/markdown';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import ReadingListClient from '@/components/ReadingListClient';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `reading list · ${SITE_NAME}`,
 	description: 'Your bookmarked posts for later reading.',
 };

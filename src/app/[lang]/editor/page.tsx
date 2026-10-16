@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { features } from '@/lib/features';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { getCategories } from '@/lib/markdown';
 import { getDictionary } from '@/lib/i18n/server';
 import { Locale } from '@/lib/i18n/translations';
@@ -16,6 +16,7 @@ const EditorView = dynamic(() => import('@/components/editor/EditorView'), {
 });
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `editor · ${SITE_NAME}`,
 	description: 'Mobile Markdown Editor for creating and updating blog posts.',
 	robots: {

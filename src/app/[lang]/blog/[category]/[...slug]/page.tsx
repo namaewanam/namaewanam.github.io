@@ -10,6 +10,8 @@ import { renderMarkdown, extractHeadings } from '@/lib/mdx';
 import { notFound } from 'next/navigation';
 import PostLayout from '@/components/PostLayout';
 import { SITE_NAME, SITE_URL, toPostOgSlug } from '@/lib/site';
+import JsonLd from '@/components/seo/JsonLd';
+import { getBlogPostingSchema, getBreadcrumbSchema } from '@/lib/schema';
 
 export const dynamicParams = false;
 
@@ -44,7 +46,7 @@ export async function generateMetadata({
 
 	const lang = resolvedParams.lang || 'en';
 	const canonicalUrl = `/${lang}/blog/${post.category}/${post.fullPath}`;
-	const imageUrl = `/og/posts/${toPostOgSlug(post.category, post.fullPath)}.png`;
+	const imageUrl = `${SITE_URL}/og/posts/${toPostOgSlug(post.category, post.fullPath)}.png`;
 
 	return {
 		metadataBase: new URL(SITE_URL),
@@ -117,14 +119,31 @@ export default async function PostPage({
 				}
 			: undefined;
 
+	const lang = resolvedParams.lang || 'en';
+	const breadcrumbs = [
+		{ name: 'Home', url: `${SITE_URL}/${lang}/` },
+		{ name: 'Blog', url: `${SITE_URL}/${lang}/blog/` },
+		{
+			name: post.categoryName || post.category,
+			url: `${SITE_URL}/${lang}/blog/${post.category}/`,
+		},
+		{
+			name: post.title,
+			url: `${SITE_URL}/${lang}/blog/${post.category}/${post.fullPath}/`,
+		},
+	];
+
 	return (
-		<PostLayout
-			post={post}
-			html={html}
-			headings={headings}
-			adjacentPosts={adjacentPosts}
-			relatedPosts={relatedPosts}
-			{...(seriesInfo ? { seriesInfo } : {})}
-		/>
+		<>
+			<JsonLd data={[getBlogPostingSchema(post, lang), getBreadcrumbSchema(breadcrumbs)]} />
+			<PostLayout
+				post={post}
+				html={html}
+				headings={headings}
+				adjacentPosts={adjacentPosts}
+				relatedPosts={relatedPosts}
+				{...(seriesInfo ? { seriesInfo } : {})}
+			/>
+		</>
 	);
 }

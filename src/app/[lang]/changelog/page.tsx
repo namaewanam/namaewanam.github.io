@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from '@/components/LocalizedLink';
-import { GITHUB_REPO_OWNER, GITHUB_REPO_NAME, SITE_NAME } from '@/lib/site';
+import { GITHUB_REPO_OWNER, GITHUB_REPO_NAME, SITE_NAME, SITE_URL } from '@/lib/site';
 import { getChangelog } from '@/lib/changelog';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `changelog · ${SITE_NAME}`,
 	description: 'Recent updates and changes to this site.',
 };

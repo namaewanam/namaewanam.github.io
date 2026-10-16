@@ -5,6 +5,8 @@ import type { Metadata } from 'next';
 import SeriesLanding from '@/components/blog/SeriesLanding';
 import { getCategoryDescription, SITE_NAME, SITE_URL } from '@/lib/site';
 import { renderMarkdown } from '@/lib/mdx';
+import JsonLd from '@/components/seo/JsonLd';
+import { getBreadcrumbSchema } from '@/lib/schema';
 
 export const dynamicParams = false;
 
@@ -81,8 +83,16 @@ export default async function CategoryPage({
 		return a.localeCompare(b);
 	});
 
+	const lang = resolvedParams.lang || 'en';
+	const breadcrumbs = [
+		{ name: 'Home', url: `${SITE_URL}/${lang}/` },
+		{ name: 'Blog', url: `${SITE_URL}/${lang}/blog/` },
+		{ name: categoryName, url: `${SITE_URL}/${lang}/blog/${resolvedParams.category}/` },
+	];
+
 	return (
 		<div className="mx-auto w-full max-w-3xl space-y-10">
+			<JsonLd data={getBreadcrumbSchema(breadcrumbs)} />
 			{/* Header */}
 			<div className="space-y-3">
 				<Link

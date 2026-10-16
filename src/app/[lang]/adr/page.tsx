@@ -5,10 +5,11 @@ import path from 'path';
 import matter from 'gray-matter';
 import { renderMarkdown } from '@/lib/mdx';
 import type { Metadata } from 'next';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import Link from '@/components/LocalizedLink';
 
 export const metadata: Metadata = {
+	metadataBase: new URL(SITE_URL),
 	title: `ADR · ${SITE_NAME}`,
 	description:
 		'Architecture Decision Records — engineering decisions with context and consequences.',
