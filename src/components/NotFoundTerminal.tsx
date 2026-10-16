@@ -12,8 +12,11 @@ import {
 	buildTerminalIndex,
 	createInitialHistory,
 	formatPrompt,
+	getInitialLocale,
 	getTabCompletion,
 	isExternalHref,
+	isNonLocalizedRoute,
+	localizeHref,
 	normalizePath,
 	renderFetch,
 	renderGrep,
@@ -38,8 +41,11 @@ export default function NotFoundTerminal({
 	const endRef = useRef<HTMLDivElement>(null);
 	const nextIdRef = useRef(100);
 	const [cwd, setCwd] = useState(ROOT);
+	const [lang, setLang] = useState<'en' | 'vi'>(() => getInitialLocale(pathname));
 	const [input, setInput] = useState('');
-	const [history, setHistory] = useState<HistoryLine[]>(() => createInitialHistory(pathname));
+	const [history, setHistory] = useState<HistoryLine[]>(() =>
+		createInitialHistory(pathname, getInitialLocale(pathname))
+	);
 	const [commandHistory, setCommandHistory] = useState<string[]>([]);
 	const [historyCursor, setHistoryCursor] = useState<number | null>(null);
 	const [historyDraft, setHistoryDraft] = useState('');
@@ -54,6 +60,19 @@ export default function NotFoundTerminal({
 		inputRef.current?.focus();
 	}, []);
 
+	useEffect(() => {
+		if (typeof window !== 'undefined') {
+			const path = window.location.pathname;
+			if (path.startsWith('/vi')) {
+				setLang('vi');
+			} else if (path.startsWith('/en')) {
+				setLang('en');
+			} else if (document.documentElement.lang === 'vi') {
+				setLang('vi');
+			}
+		}
+	}, [pathname]);
+
 	function appendHistory(lines: Omit<HistoryLine, 'id'>[]) {
 		setHistory((current) => [
 			...current,
@@ -61,12 +80,14 @@ export default function NotFoundTerminal({
 		]);
 	}
 
-	function navigateTo(href: string) {
+	function navigateTo(href: string, localeOverride?: 'en' | 'vi') {
+		const targetLang = localeOverride ?? lang;
 		if (isExternalHref(href)) {
 			window.open(href, '_blank', 'noopener,noreferrer');
 			return;
 		}
-		router.push(href);
+		const localized = localizeHref(href, targetLang);
+		router.push(localized);
 	}
 
 	function handleCommand(rawCommand: string) {
@@ -118,12 +139,60 @@ export default function NotFoundTerminal({
 				appendHistory(renderManual(argsText));
 				break;
 			}
+			case 'lang': {
+				const targetLang = argsText.trim().toLowerCase();
+				if (!targetLang) {
+					appendHistory([
+						{
+							text: `current language: ${lang} (${lang === 'vi' ? 'Tiếng Việt' : 'English'})`,
+							tone: 'output',
+						},
+						{
+							text: "usage: lang <en|vi>  (e.g. 'lang vi' or 'lang en')",
+							tone: 'hint',
+						},
+					]);
+					break;
+				}
+
+				if (targetLang === 'vi' || targetLang === 'en') {
+					setLang(targetLang);
+					appendHistory([
+						{
+							text: `language switched to: ${targetLang} (${targetLang === 'vi' ? 'Tiếng Việt' : 'English'})`,
+							tone: 'hint',
+						},
+						{
+							text: `navigation commands will now target /${targetLang}/* routes`,
+							tone: 'hint',
+						},
+					]);
+				} else {
+					appendHistory([
+						{
+							text: `invalid language: '${argsText}'. Supported: 'en', 'vi'`,
+							tone: 'error',
+						},
+					]);
+				}
+				break;
+			}
 			case 'suggest': {
 				appendHistory([
 					{ text: '/            home', tone: 'hint' },
 					{ text: '/blog        all articles', tone: 'hint' },
+					{ text: '/stack       tech stack & tools radar', tone: 'hint' },
+					{ text: '/guestbook   interactive terminal guestbook', tone: 'hint' },
+					{ text: '/adr         architecture decision records', tone: 'hint' },
+					{ text: '/snippets    code snippets & recipes', tone: 'hint' },
+					{ text: '/reading-list saved bookmarks & articles', tone: 'hint' },
+					{ text: '/now         what I am doing now', tone: 'hint' },
+					{ text: '/changelog   recent git commits', tone: 'hint' },
+					{ text: '/editor      markdown post editor', tone: 'hint' },
+					{ text: '/resume      curriculum vitae', tone: 'hint' },
 					{ text: '/contact     contact section on home', tone: 'hint' },
 					{ text: '/links       external profiles', tone: 'hint' },
+					{ text: 'lang [en|vi] switch navigation language', tone: 'hint' },
 					{ text: 'gh           alias for GitHub profile', tone: 'hint' },
 					{ text: 'docs         alias for /blog', tone: 'hint' },
 				]);
@@ -134,7 +203,13 @@ export default function NotFoundTerminal({
 				break;
 			}
 			case 'ls': {
-				const target = argsText ? normalizePath(argsText, cwd) : cwd;
+				let target = argsText ? normalizePath(argsText, cwd) : cwd;
+				if (!index.dirPaths.has(target)) {
+					const clean = target.replace(/^\/(?:en|vi)(?=\/|$)/, '') || '/';
+					if (index.dirPaths.has(clean)) {
+						target = clean;
+					}
+				}
 				if (!index.dirPaths.has(target)) {
 					appendHistory([
 						{
@@ -165,7 +240,15 @@ export default function NotFoundTerminal({
 				break;
 			}
 			case 'cd': {
-				const target = argsText ? normalizePath(argsText, cwd) : ROOT;
+				let target = argsText ? normalizePath(argsText, cwd) : ROOT;
+				if (!index.dirPaths.has(target)) {
+					const clean = target.replace(/^\/(?:en|vi)(?=\/|$)/, '') || '/';
+					if (index.dirPaths.has(clean)) {
+						if (target.startsWith('/vi')) setLang('vi');
+						if (target.startsWith('/en')) setLang('en');
+						target = clean;
+					}
+				}
 				if (!index.dirPaths.has(target)) {
 					appendHistory([
 						{
@@ -189,14 +272,23 @@ export default function NotFoundTerminal({
 					appendHistory([{ text: 'usage: cat <path>', tone: 'error' }]);
 					break;
 				}
-				const target = normalizePath(argsText, cwd);
-				const entry = index.entryMap.get(target);
+				let target = normalizePath(argsText, cwd);
+				let entry = index.entryMap.get(target);
+				if (!entry) {
+					const clean = target.replace(/^\/(?:en|vi)(?=\/|$)/, '') || '/';
+					entry = index.entryMap.get(clean);
+					if (entry) target = clean;
+				}
 
 				if (entry) {
+					const localized =
+						isExternalHref(entry.href) || isNonLocalizedRoute(entry.href)
+							? entry.href
+							: localizeHref(entry.href, lang);
 					appendHistory([
 						{ text: `${entry.path}`, tone: 'output' },
 						{ text: `${entry.label} · ${entry.description}`, tone: 'hint' },
-						{ text: `target -> ${entry.href}`, tone: 'hint' },
+						{ text: `target -> ${localized}`, tone: 'hint' },
 					]);
 					break;
 				}
@@ -225,17 +317,40 @@ export default function NotFoundTerminal({
 			}
 			case 'open': {
 				const target = argsText ? normalizePath(argsText, cwd) : cwd;
-				const entry = index.entryMap.get(target);
+				const cleanTarget = target.replace(/^\/(?:en|vi)(?=\/|$)/, '') || '/';
+				const specifiedLocale = target.startsWith('/vi')
+					? 'vi'
+					: target.startsWith('/en')
+						? 'en'
+						: undefined;
+
+				if (specifiedLocale && specifiedLocale !== lang) {
+					setLang(specifiedLocale);
+				}
+
+				const effectiveLocale = specifiedLocale ?? lang;
+				const entry = index.entryMap.get(target) ?? index.entryMap.get(cleanTarget);
 
 				if (entry) {
-					appendHistory([{ text: `opening ${entry.href} ...`, tone: 'hint' }]);
-					navigateTo(entry.href);
+					const destination = localizeHref(entry.href, effectiveLocale);
+					appendHistory([{ text: `opening ${destination} ...`, tone: 'hint' }]);
+					navigateTo(entry.href, effectiveLocale);
 					break;
 				}
 
-				if (index.routeableDirs.has(target)) {
-					appendHistory([{ text: `opening ${target} ...`, tone: 'hint' }]);
-					navigateTo(target);
+				if (index.routeableDirs.has(target) || index.routeableDirs.has(cleanTarget)) {
+					const routeTarget = index.routeableDirs.has(target) ? target : cleanTarget;
+					const destination = localizeHref(routeTarget, effectiveLocale);
+					appendHistory([{ text: `opening ${destination} ...`, tone: 'hint' }]);
+					navigateTo(routeTarget, effectiveLocale);
+					break;
+				}
+
+				if (target === '/en' || target === '/vi') {
+					const chosen = target.slice(1) as 'en' | 'vi';
+					setLang(chosen);
+					appendHistory([{ text: `opening /${chosen} ...`, tone: 'hint' }]);
+					navigateTo(`/${chosen}`, chosen);
 					break;
 				}
 
@@ -349,6 +464,32 @@ export default function NotFoundTerminal({
 					404 shell
 				</span>
 				<span>cwd {cwd}</span>
+				<span
+					className="ml-auto flex items-center gap-1.5 text-[10px] lowercase"
+					style={{ color: 'rgba(203,213,225,0.6)' }}
+				>
+					<span>locale:</span>
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							const next = lang === 'vi' ? 'en' : 'vi';
+							setLang(next);
+							appendHistory([
+								{
+									text: `language switched to: ${next} (${next === 'vi' ? 'Tiếng Việt' : 'English'})`,
+									tone: 'hint',
+								},
+							]);
+						}}
+						className="cursor-pointer font-bold tracking-wider underline-offset-2 hover:underline"
+						style={{ color: '#fccb26' }}
+						title="Click to toggle language (en/vi)"
+					>
+						{lang}
+					</button>
+					<span>({lang === 'vi' ? 'Tiếng Việt' : 'English'})</span>
+				</span>
 			</div>
 
 			<TerminalHistory history={history} />

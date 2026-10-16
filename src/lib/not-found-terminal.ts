@@ -1,5 +1,6 @@
 import type { Category, Post } from '@/lib/markdown';
-import { CONTACT_EMAIL, GITHUB_PROFILE_URL, SITE_NAME } from '@/lib/site';
+import { CONTACT_EMAIL, GITHUB_PROFILE_URL, RESUME_URL, SITE_NAME } from '@/lib/site';
+import { SNIPPETS } from '@/lib/snippets';
 
 export type TerminalEntryKind = 'page' | 'link';
 export type HistoryTone = 'command' | 'output' | 'error' | 'hint' | 'system';
@@ -60,6 +61,10 @@ export const KNOWN_COMMANDS = new Set([
 	'cat',
 	'grep',
 	'open',
+	'lang',
+	':lang',
+	':h',
+	':help',
 	'whoami',
 	'fastfetch',
 	'neofetch',
@@ -80,6 +85,16 @@ export const KNOWN_COMMANDS = new Set([
 	'fb',
 	'mail',
 	'guestbook',
+	'stack',
+	'adr',
+	'editor',
+	'now',
+	'changelog',
+	'snippets',
+	'tags',
+	'reading',
+	'resume',
+	'cv',
 ]);
 
 export const ALIASES: Record<string, string> = {
@@ -91,28 +106,89 @@ export const ALIASES: Record<string, string> = {
 	mail: 'open /links/email',
 	fetch: 'fastfetch',
 	guestbook: 'open /guestbook',
+	stack: 'open /stack',
+	adr: 'open /adr',
+	editor: 'open /editor',
+	now: 'open /now',
+	changelog: 'open /changelog',
+	snippets: 'open /snippets',
+	tags: 'open /blog/tags',
+	reading: 'open /reading-list',
+	resume: 'open /resume',
+	cv: 'open /resume',
 };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
 	help: {
 		usage: 'help [command]',
 		summary: 'show all commands or detailed help for one command',
-		examples: ['help', 'help ls', 'help open'],
+		examples: ['help', 'help ls', 'help open', 'help lang'],
 	},
 	suggest: {
 		usage: 'suggest',
-		summary: 'show a few quick destinations you can open right away',
+		summary: 'show a list of quick destinations you can open right away',
 		examples: ['suggest'],
+	},
+	lang: {
+		usage: 'lang [en|vi]',
+		summary: 'view or switch current navigation locale (en / vi)',
+		examples: ['lang', 'lang vi', 'lang en'],
 	},
 	guestbook: {
 		usage: 'guestbook',
 		summary: 'open the interactive terminal guestbook',
 		examples: ['guestbook'],
 	},
+	stack: {
+		usage: 'stack',
+		summary: 'open the tech stack and tools radar',
+		examples: ['stack'],
+	},
+	adr: {
+		usage: 'adr',
+		summary: 'open architecture decision records',
+		examples: ['adr'],
+	},
+	editor: {
+		usage: 'editor',
+		summary: 'open the markdown post editor and preview',
+		examples: ['editor'],
+	},
+	now: {
+		usage: 'now',
+		summary: 'open what I am doing now page',
+		examples: ['now'],
+	},
+	changelog: {
+		usage: 'changelog',
+		summary: 'open the git commits changelog',
+		examples: ['changelog'],
+	},
+	snippets: {
+		usage: 'snippets',
+		summary: 'open the code snippets library',
+		examples: ['snippets'],
+	},
+	tags: {
+		usage: 'tags',
+		summary: 'browse blog posts by tags',
+		examples: ['tags'],
+	},
+	reading: {
+		usage: 'reading',
+		summary: 'open saved reading list bookmarks',
+		examples: ['reading'],
+	},
+	resume: {
+		usage: 'resume',
+		summary: 'view curriculum vitae or download PDF resume',
+		examples: ['resume'],
+		aliases: ['cv'],
+	},
 	man: {
 		usage: 'man <command>',
 		summary: 'show a fuller manual-style description for a command',
-		examples: ['man grep', 'man open'],
+		examples: ['man grep', 'man open', 'man lang'],
 	},
 	pwd: {
 		usage: 'pwd',
@@ -122,33 +198,57 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 	ls: {
 		usage: 'ls [path]',
 		summary: 'list folders, pages, and links inside the current path or a target path',
-		examples: ['ls', 'ls /blog', 'ls ../links'],
+		examples: ['ls', 'ls /blog', 'ls /snippets', 'ls ../links'],
 	},
 	cd: {
 		usage: 'cd <dir>',
 		summary: 'move to another directory in the virtual site tree',
-		examples: ['cd /blog', 'cd csc14005', 'cd ..'],
+		examples: ['cd /blog', 'cd /snippets', 'cd csc14005', 'cd ..'],
 	},
 	tree: {
 		usage: 'tree [path]',
 		summary: 'render a directory tree from the current path or a target path',
-		examples: ['tree', 'tree /blog', 'tree /links'],
+		examples: ['tree', 'tree /blog', 'tree /snippets', 'tree /links'],
 	},
 	cat: {
 		usage: 'cat <path>',
 		summary: 'inspect a page or link target without navigating to it',
-		examples: ['cat /blog', 'cat /blog/csc14005/ml-lecture1-guide', 'cat /links/github'],
+		examples: ['cat /blog', 'cat /stack', 'cat /snippets', 'cat /links/github'],
 	},
 	grep: {
 		usage: 'grep <term> [path]',
 		summary: 'search paths, titles, and descriptions under a target directory',
-		examples: ['grep spring /blog', 'grep java', 'grep github /links'],
+		examples: ['grep spring /blog', 'grep docker /snippets', 'grep github /links'],
 	},
 	open: {
 		usage: 'open <path>',
-		summary: 'navigate to a local route or open an external link',
-		examples: ['open /', 'open /blog/csc14005', 'open /links/linkedin'],
-		aliases: ['gh', 'docs', 'home', 'li', 'fb', 'mail'],
+		summary: 'navigate to a local route or open an external link (localized automatically)',
+		examples: [
+			'open /',
+			'open /stack',
+			'open /guestbook',
+			'open /blog/csc14005',
+			'open /links/github',
+		],
+		aliases: [
+			'gh',
+			'docs',
+			'home',
+			'li',
+			'fb',
+			'mail',
+			'stack',
+			'adr',
+			'guestbook',
+			'editor',
+			'now',
+			'changelog',
+			'snippets',
+			'tags',
+			'reading',
+			'resume',
+			'cv',
+		],
 	},
 	whoami: {
 		usage: 'whoami',
@@ -221,6 +321,46 @@ export function isExternalHref(href: string): boolean {
 	return href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:');
 }
 
+export function isStaticAssetHref(href: string): boolean {
+	return /\.(pdf|png|jpe?g|svg|ico|webp|txt|xml|json)$/i.test(href);
+}
+
+export function isNonLocalizedRoute(href: string): boolean {
+	if (isExternalHref(href)) return true;
+	if (isStaticAssetHref(href)) return true;
+	const clean = href.replace(/[?#].*$/, '');
+	return clean === '/resume' || clean.startsWith('/feeds/');
+}
+
+export function getInitialLocale(pathname?: string | null): 'en' | 'vi' {
+	if (typeof window !== 'undefined') {
+		const path = window.location.pathname;
+		if (path.startsWith('/vi')) return 'vi';
+		if (path.startsWith('/en')) return 'en';
+		if (document.documentElement.lang === 'vi') return 'vi';
+	}
+	if (pathname?.startsWith('/vi')) return 'vi';
+	return 'en';
+}
+
+export function localizeHref(href: string, lang: 'en' | 'vi' = 'en'): string {
+	if (isExternalHref(href) || isNonLocalizedRoute(href)) {
+		return href;
+	}
+
+	// Remove leading /en or /vi if present to avoid duplicate prefixes
+	const withoutLocale = href.replace(/^\/(?:en|vi)(?=\/|$|#)/, '') || '/';
+
+	if (withoutLocale === '/') {
+		return `/${lang}`;
+	}
+	if (withoutLocale.startsWith('/#')) {
+		return `/${lang}/${withoutLocale.slice(1)}`;
+	}
+	const pathWithSlash = withoutLocale.startsWith('/') ? withoutLocale : `/${withoutLocale}`;
+	return `/${lang}${pathWithSlash}`;
+}
+
 export function formatPrompt(cwd: string): string {
 	return `${PROMPT_USER}@${PROMPT_HOST}:${cwd === ROOT ? '~' : cwd}$`;
 }
@@ -229,30 +369,30 @@ function getSearchableText(entry: TerminalEntry): string {
 	return `${entry.path} ${entry.label} ${entry.description}`.toLowerCase();
 }
 
-export function createInitialHistory(pathname: string): HistoryLine[] {
+export function createInitialHistory(pathname: string, lang: 'en' | 'vi' = 'en'): HistoryLine[] {
 	return [
 		{ id: 1, text: 'journalctl -u router -n 4', tone: 'command', cwd: ROOT },
 		{ id: 2, text: `[warn] route lookup failed for ${pathname}`, tone: 'system' },
 		{ id: 3, text: '[info] fallback handler engaged -> /404', tone: 'system' },
 		{
 			id: 4,
-			text: '[info] interactive shell ready',
+			text: `[info] interactive shell ready (active locale: ${lang})`,
 			tone: 'system',
 		},
 		{ id: 5, text: 'help', tone: 'command', cwd: ROOT },
 		{
 			id: 6,
-			text: 'commands: help, man, suggest, ls, cd, tree, cat, grep, open, whoami, fastfetch, clear',
+			text: 'commands: help, man, suggest, ls, cd, tree, cat, grep, open, lang, whoami, fastfetch, clear',
 			tone: 'hint',
 		},
 		{
 			id: 7,
-			text: 'tip: use help <command> for details, e.g. help open or help ls',
+			text: 'tip: use help <command> for details, e.g. help open or help lang',
 			tone: 'hint',
 		},
 		{
 			id: 8,
-			text: 'try: tree /blog, grep spring /blog, whoami, gh, docs, fastfetch',
+			text: 'try: suggest, tree /, open /blog, open /guestbook, open /stack, fastfetch',
 			tone: 'hint',
 		},
 	];
@@ -370,15 +510,21 @@ export function suggestCommand(token: string): string | undefined {
 }
 
 export function resolveCommand(input: string) {
-	const [command = '', ...rest] = input.trim().split(/\s+/);
+	const trimmed = input.trim();
+	const [rawCommand = '', ...rest] = trimmed.split(/\s+/);
 	const argsText = rest.join(' ');
+
+	let command = rawCommand;
+	if (command === ':lang') command = 'lang';
+	else if (command === ':h' || command === ':help') command = 'help';
+
 	const aliasExpansion = ALIASES[command];
 
 	if (!aliasExpansion) {
 		return {
 			command,
 			argsText,
-			effectiveInput: input.trim(),
+			effectiveInput: trimmed,
 			aliasUsed: undefined,
 		};
 	}
@@ -390,7 +536,7 @@ export function resolveCommand(input: string) {
 		command: expandedCommand,
 		argsText: expandedRest.join(' '),
 		effectiveInput: expanded,
-		aliasUsed: { alias: command, expansion: aliasExpansion },
+		aliasUsed: { alias: rawCommand, expansion: aliasExpansion },
 	};
 }
 
@@ -607,6 +753,16 @@ export function getTabCompletion(
 		return completeCommandHelp(input);
 	}
 
+	if (command === 'lang') {
+		const [, partial = ''] = input.split(/\s+/, 2);
+		const locales = ['en', 'vi'];
+		const matches = locales.filter((l) => l.startsWith(partial.toLowerCase()));
+		if (matches.length === 1 && matches[0]) {
+			return { nextInput: `lang ${matches[0]}`, suggestions: [] };
+		}
+		return { nextInput: input, suggestions: matches };
+	}
+
 	if (
 		command === 'ls' ||
 		command === 'cd' ||
@@ -703,6 +859,83 @@ export function createNotFoundEntries(categories: Category[], posts: Post[]): Te
 			description: 'all articles',
 		},
 		{
+			path: '/blog/tags',
+			href: '/blog/tags',
+			kind: 'page',
+			label: 'tags',
+			description: 'browse articles by tag',
+		},
+		{
+			path: '/stack',
+			href: '/stack',
+			kind: 'page',
+			label: 'stack',
+			description: 'tech stack & tools radar',
+		},
+		{
+			path: '/guestbook',
+			href: '/guestbook',
+			kind: 'page',
+			label: 'guestbook',
+			description: 'interactive terminal guestbook',
+		},
+		{
+			path: '/adr',
+			href: '/adr',
+			kind: 'page',
+			label: 'adr',
+			description: 'architecture decision records',
+		},
+		{
+			path: '/adr/0001-use-spring-boot-for-payment-services',
+			href: '/adr#0001-use-spring-boot-for-payment-services',
+			kind: 'page',
+			label: 'adr-0001',
+			description: 'accepted · use spring boot for payment services',
+		},
+		{
+			path: '/snippets',
+			href: '/snippets',
+			kind: 'page',
+			label: 'snippets',
+			description: 'code snippets & recipes',
+		},
+		{
+			path: '/reading-list',
+			href: '/reading-list',
+			kind: 'page',
+			label: 'reading-list',
+			description: 'saved bookmarks & articles',
+		},
+		{
+			path: '/now',
+			href: '/now',
+			kind: 'page',
+			label: 'now',
+			description: 'what I am doing now',
+		},
+		{
+			path: '/changelog',
+			href: '/changelog',
+			kind: 'page',
+			label: 'changelog',
+			description: 'recent git commits & release updates',
+		},
+		{
+			path: '/editor',
+			href: '/editor',
+			kind: 'page',
+			label: 'editor',
+			description: 'markdown post editor & preview',
+		},
+		{
+			path: '/resume',
+			href: '/resume',
+			kind: 'page',
+			label: 'resume',
+			description: 'plain-text resume & curriculum vitae',
+		},
+		{
 			path: '/about',
 			href: '/#about',
 			kind: 'page',
@@ -751,6 +984,13 @@ export function createNotFoundEntries(categories: Category[], posts: Post[]): Te
 			label: 'email',
 			description: 'send an email',
 		},
+		{
+			path: '/links/resume',
+			href: RESUME_URL,
+			kind: 'link',
+			label: 'cv.pdf',
+			description: 'download curriculum vitae (PDF)',
+		},
 		...categories.map((category) => ({
 			path: `/blog/${category.slug}`,
 			href: `/blog/${category.slug}`,
@@ -764,6 +1004,13 @@ export function createNotFoundEntries(categories: Category[], posts: Post[]): Te
 			kind: 'page' as const,
 			label: post.title,
 			description: post.description ?? `article in ${post.categoryName}`,
+		})),
+		...SNIPPETS.map((snippet) => ({
+			path: `/snippets/${snippet.id}`,
+			href: `/snippets#${snippet.id}`,
+			kind: 'page' as const,
+			label: snippet.title,
+			description: snippet.description,
 		})),
 	];
 }

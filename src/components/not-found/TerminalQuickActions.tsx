@@ -5,13 +5,17 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
 	{ label: 'help', command: 'help' },
-	{ label: 'man grep', command: 'man grep' },
+	{ label: 'suggest', command: 'suggest' },
+	{ label: 'tree /', command: 'tree /' },
+	{ label: 'open /blog', command: 'open /blog' },
+	{ label: 'open /stack', command: 'open /stack' },
+	{ label: 'open /guestbook', command: 'open /guestbook' },
+	{ label: 'open /snippets', command: 'open /snippets' },
+	{ label: 'open /adr', command: 'open /adr' },
+	{ label: 'open /now', command: 'open /now' },
+	{ label: 'lang vi', command: 'lang vi' },
 	{ label: 'whoami', command: 'whoami' },
 	{ label: 'fastfetch', command: 'fastfetch' },
-	{ label: 'tree /blog', command: 'tree /blog' },
-	{ label: 'help open', command: 'help open' },
-	{ label: 'ls /blog', command: 'ls /blog' },
-	{ label: 'open /blog', command: 'open /blog' },
 	{ label: 'open github', command: 'open /links/github' },
 ];
 
