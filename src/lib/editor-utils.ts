@@ -10,6 +10,9 @@ export interface PostMetadata {
 	difficulty?: 'beginner' | 'intermediate' | 'advanced' | undefined;
 	featured?: boolean | undefined;
 	order?: number | undefined;
+	type?: 'theory' | 'practice' | undefined;
+	practice?: string | undefined;
+	practiceFor?: string | undefined;
 }
 
 /**
@@ -70,6 +73,18 @@ export function serializePost(metadata: PostMetadata, markdownBody: string): str
 		frontmatterData.order = metadata.order;
 	}
 
+	if (metadata.type) {
+		frontmatterData.type = metadata.type;
+	}
+
+	if (metadata.practice) {
+		frontmatterData.practice = metadata.practice;
+	}
+
+	if (metadata.practiceFor) {
+		frontmatterData.practiceFor = metadata.practiceFor;
+	}
+
 	const cleanedBody = markdownBody.trimStart();
 	return matter.stringify(cleanedBody ? `\n${cleanedBody}\n` : '\n', frontmatterData);
 }
@@ -118,6 +133,9 @@ export function parsePost(rawContent: string): {
 			difficulty: data.difficulty,
 			featured: typeof data.featured === 'boolean' ? data.featured : undefined,
 			order: typeof data.order === 'number' ? data.order : undefined,
+			type: data.type === 'practice' || data.type === 'theory' ? data.type : undefined,
+			practice: typeof data.practice === 'string' ? data.practice.trim() : undefined,
+			practiceFor: typeof data.practiceFor === 'string' ? data.practiceFor.trim() : undefined,
 		},
 		markdownBody: parsed.content || '',
 	};

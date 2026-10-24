@@ -5,6 +5,8 @@ import {
 	getCategories,
 	getAdjacentPosts,
 	getRelatedPosts,
+	getPracticePost,
+	getTheoryPost,
 } from '@/lib/markdown';
 import { renderMarkdown, extractHeadings } from '@/lib/mdx';
 import { notFound } from 'next/navigation';
@@ -113,6 +115,8 @@ export default async function PostPage({
 	// Adjacent posts for prev/next navigation
 	const adjacentPosts = getAdjacentPosts(resolvedParams.category, post, resolvedParams.lang);
 	const relatedPosts = getRelatedPosts(post, 3, resolvedParams.lang);
+	const practicePost = getPracticePost(resolvedParams.category, post, resolvedParams.lang);
+	const theoryPost = getTheoryPost(resolvedParams.category, post, resolvedParams.lang);
 
 	// Series info: all posts in same category for "Part X of Y" nav
 	const categoryPosts = getPostsByCategory(resolvedParams.category, resolvedParams.lang);
@@ -150,6 +154,8 @@ export default async function PostPage({
 				adjacentPosts={adjacentPosts}
 				relatedPosts={relatedPosts}
 				requestedLang={lang}
+				practicePost={practicePost}
+				theoryPost={theoryPost}
 				{...(seriesInfo ? { seriesInfo } : {})}
 			/>
 		</>

@@ -8,12 +8,25 @@ import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import Link from '@/components/LocalizedLink';
 
-export const metadata: Metadata = {
-	metadataBase: new URL(SITE_URL),
-	title: `ADR · ${SITE_NAME}`,
-	description:
-		'Architecture Decision Records — engineering decisions with context and consequences.',
-};
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+	return {
+		metadataBase: new URL(SITE_URL),
+		title: `${isVi ? 'Hồ sơ Quyết định Kiến trúc' : 'ADR'} · ${SITE_NAME}`,
+		description: isVi
+			? 'Hồ sơ Quyết định Kiến trúc (ADR) — ghi chép các quyết định kỹ thuật kèm bối cảnh và sự đánh đổi.'
+			: 'Architecture Decision Records — engineering decisions with context and consequences.',
+	};
+}
+
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
 
 interface AdrMeta {
 	slug: string;
@@ -62,10 +75,17 @@ async function getAdrs(): Promise<AdrMeta[]> {
 	return adrs;
 }
 
-export default async function AdrPage() {
+export default async function AdrPage({
+	params,
+}: Readonly<{
+	params: Promise<{ lang: string }>;
+}>) {
 	if (!features.adr) {
 		notFound();
 	}
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+	const dateLocale = isVi ? 'vi-VN' : 'en-US';
 	const adrs = await getAdrs();
 
 	return (
@@ -73,11 +93,12 @@ export default async function AdrPage() {
 			<div className="space-y-2">
 				<p className="font-mono text-xs uppercase tracking-widest text-primary">adr</p>
 				<h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-					Architecture Decision Records
+					{isVi ? 'Hồ sơ Quyết định Kiến trúc' : 'Architecture Decision Records'}
 				</h1>
 				<p className="text-sm leading-relaxed text-foreground/70 sm:text-base">
-					A log of significant engineering decisions — what was decided, why, and what the tradeoffs
-					are. Inspired by{' '}
+					{isVi
+						? 'Nhật ký các quyết định kỹ thuật quan trọng — lý do lựa chọn, bối cảnh và sự đánh đổi (tradeoffs). Lấy cảm hứng từ '
+						: 'A log of significant engineering decisions — what was decided, why, and what the tradeoffs are. Inspired by '}
 					<a
 						href="https://adr.github.io"
 						target="_blank"
@@ -93,7 +114,9 @@ export default async function AdrPage() {
 			{adrs.length === 0 ? (
 				<div className="rounded border border-dashed border-border px-6 py-10 text-center">
 					<p className="font-mono text-sm text-muted-foreground">
-						No ADRs yet. Add markdown files to{' '}
+						{isVi
+							? 'Chưa có bản ghi ADR nào. Thêm tệp markdown vào '
+							: 'No ADRs yet. Add markdown files to '}
 						<code className="rounded bg-muted px-1.5 py-0.5 text-xs">docs/adr/</code>.
 					</p>
 				</div>
@@ -112,7 +135,7 @@ export default async function AdrPage() {
 									<div className="flex flex-wrap gap-3 font-mono text-xs text-muted-foreground">
 										{adr.date && (
 											<span>
-												{new Date(adr.date).toLocaleDateString('en-US', {
+												{new Date(adr.date).toLocaleDateString(dateLocale, {
 													year: 'numeric',
 													month: 'short',
 													day: 'numeric',
@@ -120,7 +143,9 @@ export default async function AdrPage() {
 											</span>
 										)}
 										{adr.deciders && adr.deciders.length > 0 && (
-											<span>by {adr.deciders.join(', ')}</span>
+											<span>
+												{isVi ? `bởi ${adr.deciders.join(', ')}` : `by ${adr.deciders.join(', ')}`}
+											</span>
 										)}
 									</div>
 								</div>
@@ -147,7 +172,7 @@ export default async function AdrPage() {
 					href="/"
 					className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
 				>
-					← home
+					{isVi ? '← trang chủ' : '← home'}
 				</Link>
 			</div>
 		</div>

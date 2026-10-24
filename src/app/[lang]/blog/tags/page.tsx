@@ -3,19 +3,37 @@ import Link from '@/components/LocalizedLink';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { getAllPosts, getAllTags } from '@/lib/markdown';
 
-export const metadata: Metadata = {
-	metadataBase: new URL(SITE_URL),
-	title: `tags · ${SITE_NAME}`,
-	description: 'Browse all blog posts by tags.',
-};
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+	return {
+		metadataBase: new URL(SITE_URL),
+		title: `${isVi ? 'Thẻ' : 'tags'} · ${SITE_NAME}`,
+		description: isVi ? 'Duyệt tất cả bài viết theo thẻ tag.' : 'Browse all blog posts by tags.',
+	};
+}
+
+function formatTagPostCount(count: number, isVi: boolean): string {
+	if (isVi) {
+		return `${count} bài viết`;
+	}
+	return `${count} ${count === 1 ? 'post' : 'posts'}`;
+}
 
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
 export default async function TagsPage({ params }: { params: Promise<{ lang: string }> }) {
 	const resolvedParams = await params;
-	const tags = getAllTags(resolvedParams.lang);
-	const posts = getAllPosts(resolvedParams.lang);
+	const lang = resolvedParams.lang;
+	const isVi = lang === 'vi';
+	const dateLocale = isVi ? 'vi-VN' : 'en-US';
+	const tags = getAllTags(lang);
+	const posts = getAllPosts(lang);
 
 	// Build a map of tag -> posts
 	const postsByTag = new Map<string, typeof posts>();
@@ -37,10 +55,12 @@ export default async function TagsPage({ params }: { params: Promise<{ lang: str
 		<div className="mx-auto w-full max-w-3xl space-y-12">
 			<section className="space-y-4">
 				<div className="space-y-2">
-					<p className="font-mono text-xs uppercase tracking-widest text-primary">browse</p>
-					<h1 className="text-2xl font-bold text-foreground">All Tags</h1>
+					<p className="font-mono text-xs uppercase tracking-widest text-primary">
+						{isVi ? 'khám phá' : 'browse'}
+					</p>
+					<h1 className="text-2xl font-bold text-foreground">{isVi ? 'Tất cả thẻ' : 'All Tags'}</h1>
 					<p className="text-sm leading-relaxed text-muted-foreground">
-						Explore posts across all topics.
+						{isVi ? 'Khám phá bài viết theo từng chủ đề.' : 'Explore posts across all topics.'}
 					</p>
 				</div>
 
@@ -72,7 +92,7 @@ export default async function TagsPage({ params }: { params: Promise<{ lang: str
 							<div className="flex items-baseline gap-2 border-b border-border/50 pb-2">
 								<h2 className="font-mono text-lg font-semibold text-foreground">#{t.tag}</h2>
 								<span className="font-mono text-xs text-muted-foreground">
-									{t.count} {t.count === 1 ? 'post' : 'posts'}
+									{formatTagPostCount(t.count, isVi)}
 								</span>
 							</div>
 
@@ -92,7 +112,7 @@ export default async function TagsPage({ params }: { params: Promise<{ lang: str
 												<>
 													<span>·</span>
 													<span>
-														{new Date(post.date).toLocaleDateString('en-US', {
+														{new Date(post.date).toLocaleDateString(dateLocale, {
 															year: 'numeric',
 															month: 'short',
 														})}
@@ -113,7 +133,7 @@ export default async function TagsPage({ params }: { params: Promise<{ lang: str
 				href="/blog"
 				className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
 			>
-				← back to blog
+				{isVi ? '← quay lại blog' : '← back to blog'}
 			</Link>
 		</div>
 	);

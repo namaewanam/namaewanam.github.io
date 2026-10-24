@@ -2,21 +2,32 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { features } from '@/lib/features';
 import StackGroup from '@/components/stack/StackGroup';
-import { STACK_GROUPS, SITE_NAME, SITE_URL } from '@/lib/site';
+import { getStackGroups, SITE_NAME, SITE_URL } from '@/lib/site';
 import Link from '@/components/LocalizedLink';
 
-export const metadata: Metadata = {
-	metadataBase: new URL(SITE_URL),
-	title: `Stack · ${SITE_NAME}`,
-	description:
-		'My personal tech radar — technologies I adopt, trial, assess, and consciously hold.',
-	openGraph: {
-		title: `Stack · ${SITE_NAME}`,
-		description: 'Personal tech radar: Adopt / Trial / Assess / Hold.',
-		type: 'website',
-		url: '/stack',
-	},
-};
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+	return {
+		metadataBase: new URL(SITE_URL),
+		title: `${isVi ? 'Công nghệ' : 'Stack'} · ${SITE_NAME}`,
+		description: isVi
+			? 'Tech radar cá nhân — các công nghệ tôi áp dụng, thử nghiệm, đánh giá và tạm ngưng.'
+			: 'My personal tech radar — technologies I adopt, trial, assess, and consciously hold.',
+		openGraph: {
+			title: `${isVi ? 'Công nghệ' : 'Stack'} · ${SITE_NAME}`,
+			description: isVi
+				? 'Tech radar cá nhân: Áp dụng / Thử nghiệm / Đánh giá / Tạm ngưng.'
+				: 'Personal tech radar: Adopt / Trial / Assess / Hold.',
+			type: 'website',
+			url: `/${lang}/stack`,
+		},
+	};
+}
 
 type Ring = 'adopt' | 'trial' | 'assess' | 'hold';
 type Quadrant = 'languages' | 'frameworks' | 'infrastructure' | 'practices';
@@ -209,76 +220,93 @@ const RADAR: Tech[] = [
 	},
 ];
 
-const RINGS: {
-	id: Ring;
-	label: string;
-	desc: string;
-	color: string;
-	dot: string;
-	border: string;
-}[] = [
-	{
-		id: 'adopt',
-		label: 'Adopt',
-		desc: 'Use in production.',
-		color: 'text-emerald-600 dark:text-emerald-400',
-		dot: 'bg-emerald-500',
-		border: 'border-emerald-500/30',
-	},
-	{
-		id: 'trial',
-		label: 'Trial',
-		desc: 'Worth pursuing on new projects.',
-		color: 'text-blue-600 dark:text-blue-400',
-		dot: 'bg-blue-500',
-		border: 'border-blue-500/30',
-	},
-	{
-		id: 'assess',
-		label: 'Assess',
-		desc: 'Worth a PoC.',
-		color: 'text-amber-600 dark:text-amber-400',
-		dot: 'bg-amber-500',
-		border: 'border-amber-500/30',
-	},
-	{
-		id: 'hold',
-		label: 'Hold',
-		desc: 'Avoid for new projects.',
-		color: 'text-red-600 dark:text-red-400',
-		dot: 'bg-red-500',
-		border: 'border-red-500/30',
-	},
-];
-
-const QUADRANTS: { id: Quadrant; label: string; icon: string }[] = [
-	{ id: 'languages', label: 'Languages', icon: '⌨' },
-	{ id: 'frameworks', label: 'Frameworks & Libraries', icon: '⚙' },
-	{ id: 'infrastructure', label: 'Infrastructure & Tools', icon: '🏗' },
-	{ id: 'practices', label: 'Practices & Patterns', icon: '📐' },
-];
-
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default function StackPage() {
+
+export default async function StackPage({
+	params,
+}: Readonly<{
+	params: Promise<{ lang: string }>;
+}>) {
 	if (!features.stack) {
 		notFound();
 	}
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+	const stackGroups = getStackGroups(lang);
+
+	const rings = [
+		{
+			id: 'adopt' as Ring,
+			label: isVi ? 'Áp dụng' : 'Adopt',
+			desc: isVi ? 'Dùng trong production.' : 'Use in production.',
+			color: 'text-emerald-600 dark:text-emerald-400',
+			dot: 'bg-emerald-500',
+			border: 'border-emerald-500/30',
+		},
+		{
+			id: 'trial' as Ring,
+			label: isVi ? 'Thử nghiệm' : 'Trial',
+			desc: isVi ? 'Đáng thử cho dự án mới.' : 'Worth pursuing on new projects.',
+			color: 'text-blue-600 dark:text-blue-400',
+			dot: 'bg-blue-500',
+			border: 'border-blue-500/30',
+		},
+		{
+			id: 'assess' as Ring,
+			label: isVi ? 'Đánh giá' : 'Assess',
+			desc: isVi ? 'Đáng làm PoC tìm hiểu.' : 'Worth a PoC.',
+			color: 'text-amber-600 dark:text-amber-400',
+			dot: 'bg-amber-500',
+			border: 'border-amber-500/30',
+		},
+		{
+			id: 'hold' as Ring,
+			label: isVi ? 'Tạm ngưng' : 'Hold',
+			desc: isVi ? 'Hạn chế cho dự án mới.' : 'Avoid for new projects.',
+			color: 'text-red-600 dark:text-red-400',
+			dot: 'bg-red-500',
+			border: 'border-red-500/30',
+		},
+	];
+
+	const quadrants = [
+		{ id: 'languages' as Quadrant, label: isVi ? 'Ngôn ngữ' : 'Languages', icon: '⌨' },
+		{
+			id: 'frameworks' as Quadrant,
+			label: isVi ? 'Frameworks & Thư viện' : 'Frameworks & Libraries',
+			icon: '⚙',
+		},
+		{
+			id: 'infrastructure' as Quadrant,
+			label: isVi ? 'Hạ tầng & Công cụ' : 'Infrastructure & Tools',
+			icon: '🏗',
+		},
+		{
+			id: 'practices' as Quadrant,
+			label: isVi ? 'Quy trình & Kiến trúc' : 'Practices & Patterns',
+			icon: '📐',
+		},
+	];
+
 	return (
 		<div className="mx-auto w-full max-w-4xl space-y-14">
 			{/* Original stack groups section */}
 			<div className="space-y-8">
 				<div className="space-y-2">
 					<p className="font-mono text-xs uppercase tracking-widest text-primary">stack</p>
-					<h1 className="text-2xl font-bold text-foreground">Tools, but with opinions attached</h1>
+					<h1 className="text-2xl font-bold text-foreground">
+						{isVi ? 'Công cụ & Quan điểm kỹ thuật' : 'Tools, but with opinions attached'}
+					</h1>
 					<p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-						Not a giant badge wall. Just the tools I default to, the ones I can rely on, and the
-						areas I am actively pushing deeper into.
+						{isVi
+							? 'Không chỉ là danh sách công nghệ. Đây là những công cụ tôi tin tưởng, sử dụng hàng ngày và tiếp tục nghiên cứu sâu hơn.'
+							: 'Not a giant badge wall. Just the tools I default to, the ones I can rely on, and the areas I am actively pushing deeper into.'}
 					</p>
 				</div>
 				<div className="space-y-4">
-					{STACK_GROUPS.map((group) => (
+					{stackGroups.map((group) => (
 						<StackGroup
 							key={group.title}
 							title={group.title}
@@ -296,10 +324,12 @@ export default function StackPage() {
 				<div className="space-y-3">
 					<p className="font-mono text-xs uppercase tracking-widest text-primary">tech radar</p>
 					<h2 className="text-xl font-bold text-foreground sm:text-2xl">
-						Adopt / Trial / Assess / Hold
+						{isVi ? 'Áp dụng / Thử nghiệm / Đánh giá / Tạm ngưng' : 'Adopt / Trial / Assess / Hold'}
 					</h2>
 					<p className="max-w-2xl text-sm leading-relaxed text-foreground/70">
-						My personal take on technology. Inspired by{' '}
+						{isVi
+							? 'Góc nhìn công nghệ cá nhân. Lấy cảm hứng từ '
+							: 'My personal take on technology. Inspired by '}
 						<a
 							href="https://www.thoughtworks.com/radar"
 							target="_blank"
@@ -312,7 +342,7 @@ export default function StackPage() {
 					</p>
 					{/* Legend */}
 					<div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-1">
-						{RINGS.map((r) => (
+						{rings.map((r) => (
 							<div key={r.id} className="flex items-center gap-1.5">
 								<span className={`h-2 w-2 rounded-full ${r.dot}`} />
 								<span className="text-xs">
@@ -325,12 +355,14 @@ export default function StackPage() {
 				</div>
 
 				{/* Quadrants */}
-				{QUADRANTS.map((q) => {
+				{quadrants.map((q) => {
 					const techs = RADAR.filter((t) => t.quadrant === q.id);
-					const byRing = RINGS.map((r) => ({
-						...r,
-						items: techs.filter((t) => t.ring === r.id),
-					})).filter((r) => r.items.length > 0);
+					const byRing = rings
+						.map((r) => ({
+							...r,
+							items: techs.filter((t) => t.ring === r.id),
+						}))
+						.filter((r) => r.items.length > 0);
 
 					return (
 						<section key={q.id} id={q.id} className="space-y-3">
@@ -373,14 +405,14 @@ export default function StackPage() {
 				{/* Flat tag view */}
 				<section className="space-y-3 border-t border-border pt-6">
 					<p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-						all · flat view
+						{isVi ? 'tất cả · góc nhìn phẳng' : 'all · flat view'}
 					</p>
 					<div className="flex flex-wrap gap-2">
 						{RADAR.sort((a, b) => {
 							const order: Ring[] = ['adopt', 'trial', 'assess', 'hold'];
 							return order.indexOf(a.ring) - order.indexOf(b.ring);
 						}).map((tech) => {
-							const r = RINGS.find((r) => r.id === tech.ring)!;
+							const r = rings.find((r) => r.id === tech.ring)!;
 							return (
 								<span
 									key={`${tech.quadrant}-${tech.name}`}
@@ -401,13 +433,13 @@ export default function StackPage() {
 					href="/"
 					className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
 				>
-					← home
+					{isVi ? '← trang chủ' : '← home'}
 				</Link>
 				<Link
 					href="/adr"
 					className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
 				>
-					→ architecture decisions
+					{isVi ? '→ quyết định kiến trúc' : '→ architecture decisions'}
 				</Link>
 			</div>
 		</div>

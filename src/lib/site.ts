@@ -105,6 +105,38 @@ export const STACK_GROUPS = [
 	},
 ] as const;
 
+export const getStackGroups = (lang: string) => [
+	{
+		title: lang === 'vi' ? 'công cụ mặc định' : 'reach for',
+		description:
+			lang === 'vi'
+				? 'Những công cụ tôi ưu tiên lựa chọn khi cần xây dựng hệ thống backend tin cậy và dễ bảo trì.'
+				: 'The tools I default to when I need reliable, maintainable backend systems.',
+		items: ['Java', 'Spring Boot', 'PostgreSQL', 'Redis', 'Docker', 'Linux'],
+	},
+	{
+		title: lang === 'vi' ? 'sử dụng thành thạo' : 'comfortable with',
+		description:
+			lang === 'vi'
+				? 'Các công cụ tôi có thể triển khai nhanh chóng khi bài toán yêu cầu.'
+				: 'Tools I can move quickly with once the problem calls for them.',
+		items: ['Python', 'FastAPI', 'Apache Kafka', 'Keycloak / OAuth2', 'Jenkins CI/CD', 'GitLab CI'],
+	},
+	{
+		title: lang === 'vi' ? 'đang nghiên cứu' : 'exploring now',
+		description:
+			lang === 'vi'
+				? 'Chủ đề đang đào sâu: rèn luyện tư duy thiết kế hệ thống thay vì chạy theo từ khóa công nghệ.'
+				: 'Current rabbit holes: sharpening system design instincts, not collecting buzzwords.',
+		items: [
+			'Event sourcing / CQRS',
+			'Distributed tracing',
+			'Observability patterns',
+			'Microservices resilience',
+		],
+	},
+];
+
 export const getInterestGroups = (lang: string) => [
 	{
 		title: lang === 'vi' ? 'Hệ thống vận hành êm ái' : 'systems that stay calm',

@@ -15,9 +15,13 @@ interface PostMeta {
 	readingTimeMin: number;
 }
 
-export default function ReadingListClient({ posts }: Readonly<{ posts: PostMeta[] }>) {
+export default function ReadingListClient({
+	posts,
+	lang,
+}: Readonly<{ posts: PostMeta[]; lang?: string }>) {
 	const [mounted, setMounted] = useState(false);
 	const { bookmarks, toggle } = useReadingList();
+	const isVi = lang === 'vi';
 
 	useEffect(() => {
 		setMounted(true);
@@ -26,7 +30,7 @@ export default function ReadingListClient({ posts }: Readonly<{ posts: PostMeta[
 	if (!mounted) {
 		return (
 			<div className="py-16 text-center font-mono text-xs text-muted-foreground/60">
-				loading saved posts...
+				{isVi ? 'đang tải bài viết đã lưu...' : 'loading saved posts...'}
 			</div>
 		);
 	}
@@ -38,16 +42,20 @@ export default function ReadingListClient({ posts }: Readonly<{ posts: PostMeta[
 			<div className="flex flex-col items-center gap-4 py-16 text-center">
 				<Bookmark className="h-10 w-10 text-muted-foreground/30" />
 				<div className="space-y-1">
-					<p className="text-sm text-muted-foreground">No saved posts yet.</p>
+					<p className="text-sm text-muted-foreground">
+						{isVi ? 'Chưa có bài viết nào được lưu.' : 'No saved posts yet.'}
+					</p>
 					<p className="text-xs text-muted-foreground/70">
-						Bookmark posts to find them here later.
+						{isVi
+							? 'Đánh dấu bài viết để tìm lại ở đây sau.'
+							: 'Bookmark posts to find them here later.'}
 					</p>
 				</div>
 				<Link
 					href="/blog"
 					className="mt-2 rounded border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground"
 				>
-					browse posts →
+					{isVi ? 'khám phá bài viết →' : 'browse posts →'}
 				</Link>
 			</div>
 		);

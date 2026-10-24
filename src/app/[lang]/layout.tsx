@@ -1,5 +1,5 @@
 import { Locale } from '@/lib/i18n/translations';
-import { i18n } from '@/lib/i18n/server';
+import { i18n, getDictionary } from '@/lib/i18n/server';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
@@ -108,6 +108,7 @@ export default async function RootLayout({
 	const lang: Locale = i18n.locales.includes(rawLang as Locale)
 		? (rawLang as Locale)
 		: i18n.defaultLocale;
+	const t = getDictionary(lang);
 	const posts = getAllPosts(lang);
 	const postPaths = posts.map((post) => `/blog/${post.category}/${post.fullPath}`);
 	const postFileMap: Record<string, string> = {};
@@ -325,13 +326,13 @@ export default async function RootLayout({
 												href="/"
 												className="text-sm text-muted-foreground transition-colors hover:text-foreground"
 											>
-												home
+												{t('nav.home')}
 											</Link>
 											<Link
 												href="/blog"
 												className="text-sm text-muted-foreground transition-colors hover:text-foreground"
 											>
-												blog
+												{t('nav.blog')}
 											</Link>
 										</nav>
 										{features.commandPalette && <CommandPaletteButton />}

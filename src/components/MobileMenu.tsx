@@ -30,6 +30,18 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [isOpen]);
 
+	const isVi = pathname?.startsWith('/vi');
+	const homeLabel = isVi ? 'trang chủ' : 'home';
+	const blogLabel = isVi ? 'bài viết' : 'blog';
+	const topicsLabel = isVi ? 'chủ đề' : 'topics';
+
+	const getMenuAriaLabel = () => {
+		if (isOpen) {
+			return isVi ? 'Đóng menu' : 'Close menu';
+		}
+		return isVi ? 'Mở menu' : 'Open menu';
+	};
+
 	return (
 		<>
 			<button
@@ -37,7 +49,7 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 				className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-border p-2.5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 				aria-expanded={isOpen}
 				aria-controls="mobile-nav-drawer"
-				aria-label={isOpen ? 'Close menu' : 'Open menu'}
+				aria-label={getMenuAriaLabel()}
 			>
 				{isOpen ? (
 					<X className="h-4 w-4 text-foreground" />
@@ -67,18 +79,18 @@ export default function MobileMenu({ categories }: Readonly<{ categories: Catego
 						tabIndex={isOpen ? 0 : -1}
 						className="flex min-h-[44px] items-center rounded px-3 py-2 font-mono text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
-						home
+						{homeLabel}
 					</Link>
 					<Link
 						href="/blog"
 						tabIndex={isOpen ? 0 : -1}
 						className="flex min-h-[44px] items-center rounded px-3 py-2 font-mono text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
-						blog
+						{blogLabel}
 					</Link>
 					<div className="my-2 border-t border-border" />
 					<p className="px-3 pb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
-						topics
+						{topicsLabel}
 					</p>
 					{categories.map((category) => (
 						<Link

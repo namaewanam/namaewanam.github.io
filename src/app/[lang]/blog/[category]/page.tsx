@@ -47,6 +47,13 @@ export async function generateMetadata({
 	};
 }
 
+function formatCategoryArticleCount(count: number, isVi: boolean): string {
+	if (isVi) {
+		return `${count} bài viết`;
+	}
+	return `${count} ${count === 1 ? 'article' : 'articles'}`;
+}
+
 export default async function CategoryPage({
 	params,
 }: Readonly<{
@@ -87,9 +94,12 @@ export default async function CategoryPage({
 		return a.localeCompare(b);
 	});
 
+	const isVi = lang === 'vi';
+	const dateLocale = isVi ? 'vi-VN' : 'en-US';
+
 	const breadcrumbs = [
-		{ name: 'Home', url: `${SITE_URL}/${lang}/` },
-		{ name: 'Blog', url: `${SITE_URL}/${lang}/blog/` },
+		{ name: isVi ? 'Trang chủ' : 'Home', url: `${SITE_URL}/${lang}/` },
+		{ name: isVi ? 'Bài viết' : 'Blog', url: `${SITE_URL}/${lang}/blog/` },
 		{ name: categoryName, url: `${SITE_URL}/${lang}/blog/${resolvedParams.category}/` },
 	];
 
@@ -102,23 +112,26 @@ export default async function CategoryPage({
 					href="/blog"
 					className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
 				>
-					← blog
+					{isVi ? '← bài viết' : '← blog'}
 				</Link>
 				<div>
-					<p className="mb-1 font-mono text-xs uppercase tracking-widest text-primary">category</p>
+					<p className="mb-1 font-mono text-xs uppercase tracking-widest text-primary">
+						{isVi ? 'chuyên mục' : 'category'}
+					</p>
 					<h1 className="text-2xl font-bold text-foreground">{categoryName.replace(/-/g, ' ')}</h1>
 					<p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
 						{categoryDescription}
 					</p>
 					<p className="mt-2 text-sm text-muted-foreground">
-						{posts.length} {posts.length === 1 ? 'article' : 'articles'}
+						{formatCategoryArticleCount(posts.length, isVi)}
 					</p>
 					{categoryMeta?.startHere && (
 						<Link
 							href={`/blog/${resolvedParams.category}/${categoryMeta.startHere.fullPath}`}
 							className="mt-2 inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
 						>
-							start here →<span className="text-foreground">{categoryMeta.startHere.title}</span>
+							{isVi ? 'bắt đầu tại đây →' : 'start here →'}
+							<span className="text-foreground">{categoryMeta.startHere.title}</span>
 						</Link>
 					)}
 				</div>
@@ -161,6 +174,11 @@ export default async function CategoryPage({
 													{String(post.order).padStart(2, '0')}.
 												</span>
 											)}
+											{(post.type === 'practice' || post.practiceFor) && (
+												<span className="mr-1.5 inline-flex items-center rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-primary">
+													{lang === 'vi' ? 'THỰC HÀNH' : 'LAB'}
+												</span>
+											)}
 											{post.title}
 										</span>
 										{post.description && (
@@ -180,7 +198,7 @@ export default async function CategoryPage({
 									</div>
 									{post.date && (
 										<span className="shrink-0 font-mono text-xs text-muted-foreground">
-											{new Date(post.date).toLocaleDateString('en-US', {
+											{new Date(post.date).toLocaleDateString(dateLocale, {
 												year: 'numeric',
 												month: 'short',
 											})}

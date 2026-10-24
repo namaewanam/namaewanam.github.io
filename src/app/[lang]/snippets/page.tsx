@@ -6,16 +6,37 @@ import { SNIPPETS } from '@/lib/snippets';
 import MarkdownContent from '@/components/MarkdownContent';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 
-export const metadata: Metadata = {
-	metadataBase: new URL(SITE_URL),
-	title: `snippets · ${SITE_NAME}`,
-	description: 'A collection of useful code snippets, boilerplates, and patterns.',
-};
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+	return {
+		metadataBase: new URL(SITE_URL),
+		title: `${isVi ? 'Đoạn mã' : 'snippets'} · ${SITE_NAME}`,
+		description: isVi
+			? 'Bộ sưu tập các đoạn mã hữu ích, boilerplate và mẫu thiết kế.'
+			: 'A collection of useful code snippets, boilerplates, and patterns.',
+	};
+}
 
-export default async function SnippetsPage() {
+export function generateStaticParams() {
+	return [{ lang: 'en' }, { lang: 'vi' }];
+}
+
+export default async function SnippetsPage({
+	params,
+}: Readonly<{
+	params: Promise<{ lang: string }>;
+}>) {
 	if (!features.snippets) {
 		notFound();
 	}
+	const { lang } = await params;
+	const isVi = lang === 'vi';
+
 	// Pre-render all markdown contents concurrently
 	const renderedSnippets = await Promise.all(
 		SNIPPETS.map(async (snippet) => {
@@ -28,14 +49,17 @@ export default async function SnippetsPage() {
 		<div className="mx-auto w-full max-w-3xl space-y-12">
 			<section className="space-y-4">
 				<div className="space-y-1">
-					<p className="font-mono text-xs uppercase tracking-widest text-primary">snippets</p>
+					<p className="font-mono text-xs uppercase tracking-widest text-primary">
+						{isVi ? 'đoạn mã' : 'snippets'}
+					</p>
 					<h1 className="text-2xl font-bold leading-tight text-foreground sm:text-3xl">
-						Code Library
+						{isVi ? 'Thư viện mã nguồn' : 'Code Library'}
 					</h1>
 				</div>
 				<p className="text-sm leading-relaxed text-foreground/80 sm:text-base">
-					A collection of useful code snippets, boilerplates, and patterns I frequently use. Feel
-					free to copy and paste.
+					{isVi
+						? 'Tập hợp các đoạn mã hữu ích, boilerplate và pattern thường dùng. Bạn có thể tự do sao chép và sử dụng.'
+						: 'A collection of useful code snippets, boilerplates, and patterns I frequently use. Feel free to copy and paste.'}
 				</p>
 			</section>
 

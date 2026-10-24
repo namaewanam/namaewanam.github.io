@@ -33,7 +33,12 @@ export default async function BlogPage({
 
 	return (
 		<div className="mx-auto w-full max-w-3xl">
-			<BlogClient posts={posts} categories={categories} allTags={allTags} />
+			<BlogClient
+				posts={posts}
+				categories={categories}
+				allTags={allTags}
+				lang={resolvedParams.lang}
+			/>
 		</div>
 	);
 }

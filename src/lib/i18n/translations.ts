@@ -8,6 +8,7 @@ export const translations = {
 		'nav.stack': 'stack',
 		'nav.now': 'now',
 		'nav.changelog': 'changelog',
+		'nav.topics': 'topics',
 		// Home page
 		'home.whoami': 'whoami',
 		'home.about': 'about',
@@ -29,9 +30,16 @@ export const translations = {
 		'home.contactDesc': 'Ping the inbox first. The side quests live below.',
 		// Blog
 		'blog.title': 'Writing',
+		'blog.subtitle':
+			'Articles about backend engineering, Go, Java, Spring Boot, and systems design',
+		'blog.searchPlaceholder': 'Search articles by title, content, tag...',
 		'blog.tags': '#tags',
 		'blog.directories': 'directories',
 		'blog.startHere': 'start here →',
+		// Tags
+		'tags.title': 'All Tags',
+		'tags.subtitle': 'Explore posts across all topics.',
+		'tags.posts': 'posts',
 		// Post
 		'post.prev': 'prev',
 		'post.next': 'next',
@@ -51,7 +59,14 @@ export const translations = {
 		'action.bookmarked': 'bookmarked',
 		// Reading list
 		'readingList.title': 'Reading List',
+		'readingList.subtitle': 'Posts you have bookmarked for later.',
 		'readingList.empty': 'No saved posts yet. Bookmark posts to find them here later.',
+		'readingList.browse': 'browse posts →',
+		// Changelog
+		'changelog.recentChanges': 'Recent changes',
+		'changelog.subtitle': 'Latest commits to this site, auto-generated from git history.',
+		// Now
+		'now.doingNow': "What I'm doing now",
 		// Stats
 		'stats.title': 'stats',
 		'stats.posts': 'posts',
@@ -148,6 +163,7 @@ export const translations = {
 		'nav.stack': 'công nghệ',
 		'nav.now': 'hiện tại',
 		'nav.changelog': 'nhật ký',
+		'nav.topics': 'chủ đề',
 		'home.whoami': 'giới thiệu',
 		'home.about': 'về tôi',
 		'home.interests': 'sở thích',
@@ -166,10 +182,19 @@ export const translations = {
 		'home.aboutP3':
 			'Chủ yếu làm về APIs, dịch vụ phân tán, và công cụ hạ tầng. Tôi đặc biệt quan tâm tới kiến trúc sạch, tính quan sát được, và độ ổn định dưới áp lực cao.',
 		'home.contactDesc': 'Hãy gửi email cho tôi trước. Mạng xã hội thì ở phía dưới.',
+		// Blog
 		'blog.title': 'Bài viết',
+		'blog.subtitle':
+			'Các bài viết về kỹ thuật backend, hệ thống phân tán, Go, Java và kiến trúc phần mềm.',
+		'blog.searchPlaceholder': 'Tìm kiếm bài viết theo tiêu đề, nội dung, tag...',
 		'blog.tags': '#thẻ',
 		'blog.directories': 'danh mục',
 		'blog.startHere': 'bắt đầu từ đây →',
+		// Tags
+		'tags.title': 'Tất cả Thẻ',
+		'tags.subtitle': 'Khám phá bài viết theo từng chủ đề.',
+		'tags.posts': 'bài viết',
+		// Post
 		'post.prev': 'trước',
 		'post.next': 'tiếp',
 		'post.backTo': '← quay lại',
@@ -185,7 +210,14 @@ export const translations = {
 		'action.bookmark': 'lưu lại',
 		'action.bookmarked': 'đã lưu',
 		'readingList.title': 'Danh sách đọc',
+		'readingList.subtitle': 'Các bài viết bạn đã lưu để đọc sau.',
 		'readingList.empty': 'Chưa có bài viết nào được lưu. Đánh dấu bài viết để tìm lại sau.',
+		'readingList.browse': 'khám phá bài viết →',
+		// Changelog
+		'changelog.recentChanges': 'Các thay đổi gần đây',
+		'changelog.subtitle': 'Các commit mới nhất của trang web, tự động tạo từ lịch sử git.',
+		// Now
+		'now.doingNow': 'Những việc tôi đang làm hiện tại',
 		'stats.title': 'thống kê',
 		'stats.posts': 'bài viết',
 		'stats.topics': 'chủ đề',

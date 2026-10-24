@@ -36,4 +36,8 @@ Các dạng database phổ biến hiện nay:
 ![Kiến trúc cơ bản của DBMS](./images/dbms-architecture.png "Kiến trúc cơ bản của DBMS")
 *Hình 1.1: Kiến trúc tổng quan các tầng của một DBMS (Transport, Query Processor, Execution Engine, Storage Engine)*
 
+Life cycle của một query trong DBMS: Client request -> Transport subsystem -> Query processor -> Execution Engine -> Storage engine -> Execution engine -> Transport subsystem -> Client response
+
+## Memory vs Disk Based DBMS {#memories-vs-disk-based-dbms}
+
 

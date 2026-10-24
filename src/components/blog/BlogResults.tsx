@@ -5,10 +5,12 @@ export default function BlogResults({
 	posts,
 	query,
 	activeTag,
+	isVi = false,
 }: Readonly<{
 	posts: BlogSearchPost[];
 	query: string;
 	activeTag: string;
+	isVi?: boolean;
 }>) {
 	if (posts.length === 0) {
 		return (
@@ -19,17 +21,22 @@ export default function BlogResults({
 			>
 				<p>
 					<span className="text-primary">→ </span>
-					no results for &ldquo;{query || activeTag || 'current filter'}&rdquo;
+					{isVi
+						? `không tìm thấy kết quả nào cho "${query || activeTag || 'bộ lọc hiện tại'}"`
+						: `no results for "${query || activeTag || 'current filter'}"`}
 				</p>
 				<Link
 					href="/blog"
 					className="mt-1 rounded border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
 				>
-					reset search / view all
+					{isVi ? 'xóa bộ lọc / xem tất cả' : 'reset search / view all'}
 				</Link>
 			</div>
 		);
 	}
+
+	const englishResultText = `${posts.length} ${posts.length === 1 ? 'result' : 'results'}`;
+	const resultText = isVi ? `${posts.length} kết quả` : englishResultText;
 
 	return (
 		<>
@@ -39,7 +46,7 @@ export default function BlogResults({
 					aria-atomic="true"
 					className="mb-3 font-mono text-[10px] text-muted-foreground"
 				>
-					{posts.length} result{posts.length !== 1 ? 's' : ''}
+					{resultText}
 					{activeTag && (
 						<>
 							{' '}
@@ -77,10 +84,13 @@ export default function BlogResults({
 							</span>
 							{post.date && (
 								<span className="font-mono text-[11px] text-muted-foreground">
-									{new Date(post.date).toLocaleDateString('en-US', {
-										year: 'numeric',
-										month: 'short',
-									})}
+									{new Date(post.date).toLocaleDateString(
+										isVi || post.lang === 'vi' ? 'vi-VN' : 'en-US',
+										{
+											year: 'numeric',
+											month: 'short',
+										}
+									)}
 								</span>
 							)}
 						</div>

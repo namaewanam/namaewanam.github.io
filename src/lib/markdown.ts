@@ -47,6 +47,9 @@ export interface Post {
 	difficulty?: 'beginner' | 'intermediate' | 'advanced';
 	featured?: boolean;
 	lang: string;
+	type?: 'theory' | 'practice';
+	practice?: string;
+	practiceFor?: string;
 }
 
 export interface Category {
@@ -135,10 +138,20 @@ function getGitLastUpdated(filePath: string): string | undefined {
 	}
 }
 
+function isPracticePost(post: Post): boolean {
+	return post.type === 'practice' || Boolean(post.practiceFor);
+}
+
 function sortPosts(posts: Post[]): Post[] {
 	return [...posts].sort((a, b) => {
 		if (a.order !== undefined && b.order !== undefined) {
-			return a.order - b.order;
+			if (a.order !== b.order) {
+				return a.order - b.order;
+			}
+			const aIsPractice = isPracticePost(a);
+			const bIsPractice = isPracticePost(b);
+			if (aIsPractice && !bIsPractice) return 1;
+			if (!aIsPractice && bIsPractice) return -1;
 		}
 		if (a.date && b.date) {
 			return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -351,6 +364,16 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 		const difficulty = parseDifficulty(data.difficulty);
 		if (difficulty) post.difficulty = difficulty;
 		if (data.featured) post.featured = Boolean(data.featured);
+		if (data.practice) post.practice = String(data.practice).trim();
+		if (data.practiceFor) post.practiceFor = String(data.practiceFor).trim();
+		if (data.type) {
+			const typeStr = String(data.type).toLowerCase();
+			if (typeStr === 'practice' || typeStr === 'theory') {
+				post.type = typeStr;
+			}
+		} else if (post.practiceFor) {
+			post.type = 'practice';
+		}
 
 		return post;
 	} catch (error) {
@@ -588,6 +611,54 @@ export function getPostBySlug(category: string, slug: string, lang: string = 'en
 	return null;
 }
 
+export function getPracticePost(
+	category: string,
+	currentPost: Post,
+	lang: string = 'en'
+): Post | null {
+	const posts = getPostsByCategory(category, lang);
+	if (currentPost.practice) {
+		const direct = resolvePostReference(posts, currentPost.practice);
+		if (direct) return direct;
+	}
+	const currentNormalized = normalizePostReference(currentPost.fullPath);
+	const currentSlugNormalized = normalizePostReference(currentPost.slug);
+	const reverse = posts.find((p) => {
+		if (!p.practiceFor) return false;
+		const ref = normalizePostReference(p.practiceFor);
+		return (
+			ref === currentNormalized ||
+			ref === currentSlugNormalized ||
+			ref === `${currentPost.category}/${currentNormalized}`
+		);
+	});
+	return reverse ?? null;
+}
+
+export function getTheoryPost(
+	category: string,
+	currentPost: Post,
+	lang: string = 'en'
+): Post | null {
+	const posts = getPostsByCategory(category, lang);
+	if (currentPost.practiceFor) {
+		const direct = resolvePostReference(posts, currentPost.practiceFor);
+		if (direct) return direct;
+	}
+	const currentNormalized = normalizePostReference(currentPost.fullPath);
+	const currentSlugNormalized = normalizePostReference(currentPost.slug);
+	const reverse = posts.find((p) => {
+		if (!p.practice) return false;
+		const ref = normalizePostReference(p.practice);
+		return (
+			ref === currentNormalized ||
+			ref === currentSlugNormalized ||
+			ref === `${currentPost.category}/${currentNormalized}`
+		);
+	});
+	return reverse ?? null;
+}
+
 export function getAdjacentPosts(
 	category: string,
 	currentPost: Post,
@@ -597,16 +668,43 @@ export function getAdjacentPosts(
 	const relevantPosts = currentPost.subcategory
 		? posts.filter((p) => p.subcategory === currentPost.subcategory)
 		: posts;
-	const currentIndex = relevantPosts.findIndex((p) => p.fullPath === currentPost.fullPath);
+
+	const isPractice = isPracticePost(currentPost);
+	if (isPractice) {
+		const theoryPost = getTheoryPost(category, currentPost, lang);
+		if (theoryPost) {
+			const theoryAdjacent = getAdjacentPosts(category, theoryPost, lang);
+			return {
+				previous: theoryPost,
+				next: theoryAdjacent.next,
+			};
+		}
+	}
+
+	// Filter out practice posts from the sequential list so theory posts flow continuously
+	const sequentialPosts = relevantPosts.filter((p) => !isPracticePost(p));
+	const currentIndex = sequentialPosts.findIndex((p) => p.fullPath === currentPost.fullPath);
 
 	if (currentIndex === -1) {
-		return { previous: null, next: null };
+		const fallbackIndex = relevantPosts.findIndex((p) => p.fullPath === currentPost.fullPath);
+		if (fallbackIndex === -1) {
+			return { previous: null, next: null };
+		}
+		return {
+			previous: fallbackIndex > 0 ? (relevantPosts[fallbackIndex - 1] ?? null) : null,
+			next:
+				fallbackIndex < relevantPosts.length - 1
+					? (relevantPosts[fallbackIndex + 1] ?? null)
+					: null,
+		};
 	}
 
 	return {
-		previous: currentIndex > 0 ? (relevantPosts[currentIndex - 1] ?? null) : null,
+		previous: currentIndex > 0 ? (sequentialPosts[currentIndex - 1] ?? null) : null,
 		next:
-			currentIndex < relevantPosts.length - 1 ? (relevantPosts[currentIndex + 1] ?? null) : null,
+			currentIndex < sequentialPosts.length - 1
+				? (sequentialPosts[currentIndex + 1] ?? null)
+				: null,
 	};
 }
 

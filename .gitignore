@@ -49,3 +49,6 @@ public/_content/post-metadata.json
 # Agent skills
 .agents/
 skills-lock.json
+
+# Superpowers brainstorming & scratch files
+.superpowers/

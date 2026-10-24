@@ -11,13 +11,15 @@ interface BlogClientProps {
 	posts: BlogSearchPost[];
 	categories: Category[];
 	allTags: { tag: string; count: number }[];
+	lang?: string;
 }
 
-export default function BlogClient({ posts, categories, allTags }: BlogClientProps) {
+export default function BlogClient({ posts, categories, allTags, lang }: BlogClientProps) {
 	const [query, setQuery] = useState('');
 	const [activeTag, setActiveTag] = useState('');
 	const searchRef = useRef<HTMLInputElement>(null);
 	const deferredQuery = useDeferredValue(query);
+	const isVi = lang === 'vi';
 
 	useEffect(() => {
 		const handleKeydown = (event: KeyboardEvent) => {
@@ -50,15 +52,23 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 		});
 	}, [activeTag, deferredQuery, posts]);
 
+	const englishArticles = `${posts.length} ${posts.length === 1 ? 'article' : 'articles'}`;
+	const articlesLabel = isVi ? `${posts.length} bài viết` : englishArticles;
+
+	const englishTopics = `${categories.length} ${categories.length === 1 ? 'topic' : 'topics'}`;
+	const topicsLabel = isVi ? `${categories.length} chủ đề` : englishTopics;
+
 	return (
 		<div className="space-y-8">
 			{/* Header */}
 			<div className="space-y-3">
 				<div className="space-y-1">
 					<p className="font-mono text-xs uppercase tracking-widest text-primary">blog</p>
-					<h1 className="text-xl font-bold text-foreground sm:text-2xl">Writing</h1>
+					<h1 className="text-xl font-bold text-foreground sm:text-2xl">
+						{isVi ? 'Bài viết' : 'Writing'}
+					</h1>
 					<p className="text-xs text-muted-foreground sm:text-sm">
-						{posts.length} articles · {categories.length} topics
+						{articlesLabel} · {topicsLabel}
 					</p>
 				</div>
 				<BlogRssBadge />
@@ -69,6 +79,7 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 				ref={searchRef}
 				query={query}
 				activeTag={activeTag}
+				isVi={isVi}
 				onQueryChange={(value) => {
 					setQuery(value);
 					setActiveTag('');
@@ -82,7 +93,7 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 			{/* Tags */}
 			<div className="space-y-2">
 				<p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-					#tags
+					#{isVi ? 'thẻ' : 'tags'}
 				</p>
 				<div className="flex flex-wrap gap-1.5">
 					{allTags.map(({ tag, count }) => (
@@ -111,44 +122,49 @@ export default function BlogClient({ posts, categories, allTags }: BlogClientPro
 			{/* Categories */}
 			<div className="space-y-2 border-b border-border pb-6">
 				<p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-					directories
+					{isVi ? 'danh mục' : 'directories'}
 				</p>
 				<div className="grid gap-2 sm:grid-cols-2">
-					{categories.map((cat) => (
-						<article
-							key={cat.slug}
-							className="rounded border border-border bg-card/30 px-3 py-2 transition-all hover:border-accent hover:bg-card/60"
-						>
-							<div className="flex items-baseline justify-between gap-3">
-								<Link
-									href={`/blog/${cat.slug}`}
-									className="font-mono text-[11px] text-foreground transition-colors hover:text-primary"
-								>
-									/{cat.slug}
-								</Link>
-								<span className="font-mono text-[10px] text-muted-foreground">
-									{cat.count} {cat.count === 1 ? 'post' : 'posts'}
-								</span>
-							</div>
-							<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-								{cat.description}
-							</p>
-							{cat.startHere && (
-								<Link
-									href={`/blog/${cat.slug}/${cat.startHere.fullPath}`}
-									className="mt-2 inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-								>
-									start here →<span className="text-foreground">{cat.startHere.title}</span>
-								</Link>
-							)}
-						</article>
-					))}
+					{categories.map((cat) => {
+						const englishPostCount = `${cat.count} ${cat.count === 1 ? 'post' : 'posts'}`;
+						const postCountLabel = isVi ? `${cat.count} bài viết` : englishPostCount;
+						return (
+							<article
+								key={cat.slug}
+								className="rounded border border-border bg-card/30 px-3 py-2 transition-all hover:border-accent hover:bg-card/60"
+							>
+								<div className="flex items-baseline justify-between gap-3">
+									<Link
+										href={`/blog/${cat.slug}`}
+										className="font-mono text-[11px] text-foreground transition-colors hover:text-primary"
+									>
+										/{cat.slug}
+									</Link>
+									<span className="font-mono text-[10px] text-muted-foreground">
+										{postCountLabel}
+									</span>
+								</div>
+								<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+									{cat.description}
+								</p>
+								{cat.startHere && (
+									<Link
+										href={`/blog/${cat.slug}/${cat.startHere.fullPath}`}
+										className="mt-2 inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+									>
+										{isVi ? 'bắt đầu từ đây →' : 'start here →'}
+										<span className="text-foreground">{cat.startHere.title}</span>
+									</Link>
+								)}
+							</article>
+						);
+					})}
 				</div>
 			</div>
 
 			{/* Results */}
 			<div>
-				<BlogResults posts={filtered} query={query} activeTag={activeTag} />
+				<BlogResults posts={filtered} query={query} activeTag={activeTag} isVi={isVi} />
 			</div>
 		</div>
 	);
