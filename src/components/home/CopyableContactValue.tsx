@@ -10,11 +10,13 @@ export default function CopyableContactValue({
 }: Readonly<{
 	displayValue: string;
 	copyValue: string;
-	href?: string;
-	secondaryLinks?: Array<{
-		label: string;
-		href: string;
-	}>;
+	href?: string | undefined;
+	secondaryLinks?:
+		| Array<{
+				label: string;
+				href: string;
+		  }>
+		| undefined;
 }>) {
 	const [copied, setCopied] = useState(false);
 	const statusId = `copy-status-${copyValue.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;

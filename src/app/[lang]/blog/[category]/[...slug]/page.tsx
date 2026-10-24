@@ -15,16 +15,23 @@ import { getBlogPostingSchema, getBreadcrumbSchema } from '@/lib/schema';
 
 export const dynamicParams = false;
 
-export async function generateStaticParams() {
+export function generateStaticParams() {
 	const categories = getCategories();
 	const params: { lang: string; category: string; slug: string[] }[] = [];
 
 	categories.forEach((category) => {
-		const posts = getPostsByCategory(category.slug);
-		posts.forEach((post) => {
+		const postsEn = getPostsByCategory(category.slug, 'en');
+		const postsVi = getPostsByCategory(category.slug, 'vi');
+		const allCategoryPosts = [...postsEn, ...postsVi];
+		const seen = new Set<string>();
+		allCategoryPosts.forEach((post) => {
+			if (seen.has(post.fullPath)) return;
+			seen.add(post.fullPath);
 			const slugParts = post.fullPath.split('/');
-			params.push({ lang: 'en', category: category.slug, slug: slugParts });
-			params.push({ lang: 'vi', category: category.slug, slug: slugParts });
+			params.push(
+				{ lang: 'en', category: category.slug, slug: slugParts },
+				{ lang: 'vi', category: category.slug, slug: slugParts }
+			);
 		});
 	});
 
@@ -88,9 +95,9 @@ export async function generateMetadata({
 
 export default async function PostPage({
 	params,
-}: {
+}: Readonly<{
 	params: Promise<{ lang: string; category: string; slug: string[] }>;
-}) {
+}>) {
 	const resolvedParams = await params;
 	const fullSlug = resolvedParams.slug.join('/');
 	const post = getPostBySlug(resolvedParams.category, fullSlug, resolvedParams.lang);
@@ -100,7 +107,7 @@ export default async function PostPage({
 	}
 
 	// Pre-render markdown to HTML at build time
-	const html = await renderMarkdown(post.content);
+	const html = await renderMarkdown(post.content, { category: post.category });
 	const headings = extractHeadings(html);
 
 	// Adjacent posts for prev/next navigation
@@ -142,6 +149,7 @@ export default async function PostPage({
 				headings={headings}
 				adjacentPosts={adjacentPosts}
 				relatedPosts={relatedPosts}
+				requestedLang={lang}
 				{...(seriesInfo ? { seriesInfo } : {})}
 			/>
 		</>

@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import matter from 'gray-matter';
 import { getCategoryDescription, getCategoryStartHerePath } from '@/lib/site';
 
@@ -13,7 +13,7 @@ function isSeriesFile(filename: string): boolean {
 }
 
 function parseSeriesFilename(filename: string): { isSeries: boolean; lang?: string } {
-	const match = filename.match(SERIES_FILE_PATTERN);
+	const match = SERIES_FILE_PATTERN.exec(filename);
 	if (!match) return { isSeries: false };
 	const lang = match[1]?.toLowerCase();
 	return {
@@ -125,7 +125,7 @@ function computeCodePercent(content: string): number {
 
 function getGitLastUpdated(filePath: string): string | undefined {
 	try {
-		const result = execSync(`git log -1 --format=%cI -- "${filePath}"`, {
+		const result = execFileSync('git', ['log', '-1', '--format=%cI', '--', filePath], {
 			encoding: 'utf8',
 			stdio: ['pipe', 'pipe', 'ignore'],
 		}).trim();
@@ -153,10 +153,10 @@ function buildTags(posts: Post[]): { tag: string; count: number }[] {
 	posts.forEach((post) => {
 		if (post.tags) {
 			post.tags.forEach((tag) => {
-				tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+				tagMap.set(tag, (tagMap.get(tag) ?? 0) + 1);
 			});
 		}
-		tagMap.set(post.category, (tagMap.get(post.category) || 0) + 1);
+		tagMap.set(post.category, (tagMap.get(post.category) ?? 0) + 1);
 	});
 
 	return Array.from(tagMap.entries())
@@ -216,12 +216,16 @@ function loadLastUpdatedMap(): Map<string, string> {
 	return nextMap;
 }
 
+function trimSlashes(str: string): string {
+	let start = 0;
+	while (start < str.length && str[start] === '/') start++;
+	let end = str.length;
+	while (end > start && str[end - 1] === '/') end--;
+	return str.slice(start, end);
+}
+
 function normalizePostReference(reference: string): string {
-	return reference
-		.replace(/\.(en|vi)\.md$/i, '')
-		.replace(/\.md$/i, '')
-		.replace(/^\/+|\/+$/g, '')
-		.toLowerCase();
+	return trimSlashes(reference.replace(/\.(en|vi)\.md$/i, '').replace(/\.md$/i, '')).toLowerCase();
 }
 
 function resolvePostReference(posts: Post[], reference?: string): Post | null {
@@ -236,6 +240,27 @@ function resolvePostReference(posts: Post[], reference?: string): Post | null {
 				`${post.category}/${post.fullPath}`.toLowerCase() === normalized
 		) ?? null
 	);
+}
+
+function parseStringList(value: unknown): string[] | undefined {
+	if (Array.isArray(value)) {
+		return value.map((item) => String(item).trim()).filter(Boolean);
+	}
+	if (typeof value === 'string') {
+		return value
+			.split(',')
+			.map((item) => item.trim())
+			.filter(Boolean);
+	}
+	return undefined;
+}
+
+function parseDifficulty(value: unknown): 'beginner' | 'intermediate' | 'advanced' | undefined {
+	const str = String(value).toLowerCase();
+	if (str === 'beginner' || str === 'intermediate' || str === 'advanced') {
+		return str;
+	}
+	return undefined;
 }
 
 function readSeriesMetadata(seriesPath: string): SeriesMetadata | null {
@@ -254,40 +279,16 @@ function readSeriesMetadata(seriesPath: string): SeriesMetadata | null {
 			metadata.nextRecommended = normalizePostReference(String(data.nextRecommended));
 		}
 		if (data.difficulty) metadata.difficulty = String(data.difficulty);
-		if (data.prerequisites) {
-			if (Array.isArray(data.prerequisites)) {
-				metadata.prerequisites = data.prerequisites
-					.map((item) => String(item).trim())
-					.filter(Boolean);
-			} else if (typeof data.prerequisites === 'string') {
-				metadata.prerequisites = data.prerequisites
-					.split(',')
-					.map((item) => item.trim())
-					.filter(Boolean);
-			}
-		}
-		if (data.youWillUnderstand) {
-			if (Array.isArray(data.youWillUnderstand)) {
-				metadata.youWillUnderstand = data.youWillUnderstand
-					.map((item) => String(item).trim())
-					.filter(Boolean);
-			} else if (typeof data.youWillUnderstand === 'string') {
-				metadata.youWillUnderstand = data.youWillUnderstand
-					.split(',')
-					.map((item) => item.trim())
-					.filter(Boolean);
-			}
-		}
-		if (data.useItFor) {
-			if (Array.isArray(data.useItFor)) {
-				metadata.useItFor = data.useItFor.map((item) => String(item).trim()).filter(Boolean);
-			} else if (typeof data.useItFor === 'string') {
-				metadata.useItFor = data.useItFor
-					.split(',')
-					.map((item) => item.trim())
-					.filter(Boolean);
-			}
-		}
+
+		const prerequisites = parseStringList(data.prerequisites);
+		if (prerequisites) metadata.prerequisites = prerequisites;
+
+		const youWillUnderstand = parseStringList(data.youWillUnderstand);
+		if (youWillUnderstand) metadata.youWillUnderstand = youWillUnderstand;
+
+		const useItFor = parseStringList(data.useItFor);
+		if (useItFor) metadata.useItFor = useItFor;
+
 		if (trimmedContent) metadata.content = trimmedContent;
 
 		return metadata;
@@ -309,12 +310,12 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 		const fileContents = fs.readFileSync(fullPath, 'utf8');
 		const { data, content } = matter(fileContents);
 
-		const langMatch = relativePath.match(/\.(en|vi)\.md$/);
-		const lang = (langMatch ? langMatch[1] : 'en') || 'en';
+		const langMatch = /\.(en|vi)\.md$/.exec(relativePath);
+		const lang = (langMatch ? langMatch[1] : 'en') ?? 'en';
 		const cleanRelativePath = relativePath.replace(/\.(en|vi)\.md$/, '.md');
 
 		const pathParts = cleanRelativePath.replace(/\.md$/, '').split(path.sep);
-		const slug = pathParts[pathParts.length - 1] ?? '';
+		const slug = pathParts.at(-1) ?? '';
 		const subcategory = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
 		const urlPath = cleanRelativePath
 			.replace(/\.md$/, '')
@@ -323,18 +324,7 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 			.join('/');
 		const postKey = `${category.toLowerCase()}/${urlPath}`;
 
-		let tags: string[] = [];
-		if (data.tags) {
-			if (Array.isArray(data.tags)) {
-				tags = (data.tags as unknown[]).map((t) => String(t).toLowerCase().trim());
-			} else if (typeof data.tags === 'string') {
-				tags = data.tags
-					.split(',')
-					.map((t: string) => t.toLowerCase().trim())
-					.filter(Boolean);
-			}
-		}
-
+		const tags = parseStringList(data.tags)?.map((t) => t.toLowerCase()) ?? [];
 		const readingTimeMin = computeReadingTime(content);
 		const codePercent = computeCodePercent(content);
 		const lastUpdated = loadLastUpdatedMap().get(postKey) ?? getGitLastUpdated(fullPath);
@@ -358,12 +348,8 @@ function getPostByPath(category: string, relativePath: string): Post | null {
 		if (data.description) post.description = String(data.description);
 		if (data.order !== undefined) post.order = Number(data.order);
 		if (lastUpdated) post.lastUpdated = lastUpdated;
-		if (
-			data.difficulty &&
-			['beginner', 'intermediate', 'advanced'].includes(String(data.difficulty))
-		) {
-			post.difficulty = String(data.difficulty) as 'beginner' | 'intermediate' | 'advanced';
-		}
+		const difficulty = parseDifficulty(data.difficulty);
+		if (difficulty) post.difficulty = difficulty;
 		if (data.featured) post.featured = Boolean(data.featured);
 
 		return post;
@@ -459,7 +445,7 @@ function buildContentIndex(): ContentIndex {
 				const localizedSeries = readSeriesMetadata(path.join(categoryPath, entry));
 				if (localizedSeries) {
 					categorySeriesMap.set(parsed.lang, {
-						...(defaultSeries ?? {}),
+						...defaultSeries,
 						...localizedSeries,
 						lang: parsed.lang,
 					});
@@ -515,40 +501,52 @@ function getContentIndex(): ContentIndex {
 	return cachedContentIndex;
 }
 
-export function getAllPosts(lang: string = 'en'): Post[] {
-	const all = getContentIndex().allPosts;
-	const result: Post[] = [];
-	for (const p of all) {
-		if (p.lang === lang) {
-			result.push(p);
-		} else if (p.lang === 'en' && lang !== 'en') {
-			const hasRequestedLang = all.some(
-				(other) => other.fullPath === p.fullPath && other.lang === lang
-			);
-			if (!hasRequestedLang) {
-				result.push(p);
-			}
+function filterByLanguageWithFallback<
+	T extends { lang: string; fullPath: string; category: string },
+>(items: T[], requestedLang: string): T[] {
+	const byPostKey = new Map<string, T[]>();
+	for (const item of items) {
+		const key = `${item.category}/${item.fullPath}`.toLowerCase();
+		const list = byPostKey.get(key) ?? [];
+		list.push(item);
+		byPostKey.set(key, list);
+	}
+
+	const result: T[] = [];
+	const fallbackLang = requestedLang === 'en' ? 'vi' : 'en';
+
+	for (const group of byPostKey.values()) {
+		// 1. Exact match for requested language
+		const exact = group.find((item) => item.lang === requestedLang);
+		if (exact) {
+			result.push(exact);
+			continue;
+		}
+
+		// 2. Try alternate supported language
+		const fallback = group.find((item) => item.lang === fallbackLang);
+		if (fallback) {
+			result.push(fallback);
+			continue;
+		}
+
+		// 3. Fall back to any available version
+		if (group[0]) {
+			result.push(group[0]);
 		}
 	}
-	return sortPosts(result);
+
+	return result;
+}
+
+export function getAllPosts(lang: string = 'en'): Post[] {
+	const all = getContentIndex().allPosts;
+	return sortPosts(filterByLanguageWithFallback(all, lang));
 }
 
 export function getBlogSearchPosts(lang: string = 'en'): BlogSearchPost[] {
 	const all = getContentIndex().blogSearchPosts;
-	const result: BlogSearchPost[] = [];
-	for (const p of all) {
-		if (p.lang === lang) {
-			result.push(p);
-		} else if (p.lang === 'en' && lang !== 'en') {
-			const hasRequestedLang = all.some(
-				(other) => other.fullPath === p.fullPath && other.lang === lang
-			);
-			if (!hasRequestedLang) {
-				result.push(p);
-			}
-		}
-	}
-	return result;
+	return filterByLanguageWithFallback(all, lang);
 }
 
 export function getPostsByCategory(category: string, lang: string = 'en'): Post[] {
@@ -569,9 +567,10 @@ export function getSeriesMetadata(category: string, lang: string = 'en'): Series
 	const defaultSeries = categorySeries.get('default');
 	if (defaultSeries) return defaultSeries;
 
-	// 3. Fall back to 'en'
-	const enSeries = categorySeries.get('en');
-	if (enSeries) return enSeries;
+	// 3. Fall back to alternate language ('en' -> 'vi' or 'vi' -> 'en')
+	const fallbackLang = normalizedLang === 'en' ? 'vi' : 'en';
+	const fallbackSeries = categorySeries.get(fallbackLang);
+	if (fallbackSeries) return fallbackSeries;
 
 	// 4. Return any available series metadata
 	return categorySeries.values().next().value ?? null;
@@ -579,11 +578,13 @@ export function getSeriesMetadata(category: string, lang: string = 'en'): Series
 
 export function getPostBySlug(category: string, slug: string, lang: string = 'en'): Post | null {
 	const index = getContentIndex();
-	const post = index.postByKey.get(`${lang}/${category.toLowerCase()}/${slug.toLowerCase()}`);
+	const catKey = category.toLowerCase();
+	const slugKey = slug.toLowerCase();
+	const post = index.postByKey.get(`${lang}/${catKey}/${slugKey}`);
 	if (post) return post;
-	if (lang !== 'en') {
-		return index.postByKey.get(`en/${category.toLowerCase()}/${slug.toLowerCase()}`) ?? null;
-	}
+	const fallbackLang = lang === 'en' ? 'vi' : 'en';
+	const fallbackPost = index.postByKey.get(`${fallbackLang}/${catKey}/${slugKey}`);
+	if (fallbackPost) return fallbackPost;
 	return null;
 }
 
@@ -609,8 +610,16 @@ export function getAdjacentPosts(
 	};
 }
 
-export function getCategories(): Category[] {
-	return getContentIndex().categories;
+export function getCategories(lang?: string): Category[] {
+	const categories = getContentIndex().categories;
+	if (!lang) return categories;
+	return categories.map((cat) => {
+		const posts = getPostsByCategory(cat.slug, lang);
+		return {
+			...cat,
+			count: posts.length,
+		};
+	});
 }
 
 export function getRelatedPosts(currentPost: Post, limit = 3, lang: string = 'en'): Post[] {

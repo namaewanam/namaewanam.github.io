@@ -19,10 +19,46 @@ import {
 import JsonLd from '@/components/seo/JsonLd';
 import { getPersonSchema, getWebSiteSchema } from '@/lib/schema';
 
+interface ContactItem {
+	label: string;
+	value: string;
+	copyValue?: string;
+	href?: string;
+	secondaryLinks?: Array<{ label: string; href: string }>;
+}
+
+function renderContactValue(c: ContactItem) {
+	if (c.copyValue) {
+		return (
+			<CopyableContactValue
+				displayValue={c.value}
+				copyValue={c.copyValue}
+				href={c.href}
+				secondaryLinks={c.secondaryLinks}
+			/>
+		);
+	}
+
+	if (c.href) {
+		return (
+			<a
+				href={c.href}
+				target={c.href.startsWith('mailto') ? undefined : '_blank'}
+				rel={c.href.startsWith('mailto') ? undefined : 'noopener noreferrer'}
+				className="break-all text-xs text-foreground underline underline-offset-2 transition-colors hover:text-primary"
+			>
+				{c.value}
+			</a>
+		);
+	}
+
+	return <span className="text-xs text-foreground">{c.value}</span>;
+}
+
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default async function Home({ params }: { params: Promise<{ lang: string }> }) {
+export default async function Home({ params }: Readonly<{ params: Promise<{ lang: string }> }>) {
 	const resolvedParams = await params;
 	const rawLang = resolvedParams?.lang;
 	const lang: Locale = i18n.locales.includes(rawLang as Locale)
@@ -30,7 +66,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 		: i18n.defaultLocale;
 	const t = getDictionary(lang);
 	const posts = getAllPosts(lang);
-	const categories = getCategories();
+	const categories = getCategories(lang);
 	const recentPosts = posts.slice(0, 5);
 	const featuredPosts = getFeaturedPosts(posts);
 	const contacts: Array<{
@@ -316,25 +352,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
 					{contacts.map((c) => (
 						<div key={c.label} className="flex items-baseline gap-3 font-mono text-sm">
 							<span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
-							{c.copyValue ? (
-								<CopyableContactValue
-									displayValue={c.value}
-									copyValue={c.copyValue}
-									{...(c.href ? { href: c.href } : {})}
-									{...(c.secondaryLinks ? { secondaryLinks: c.secondaryLinks } : {})}
-								/>
-							) : c.href ? (
-								<a
-									href={c.href}
-									target={c.href.startsWith('mailto') ? undefined : '_blank'}
-									rel={c.href.startsWith('mailto') ? undefined : 'noopener noreferrer'}
-									className="break-all text-xs text-foreground underline underline-offset-2 transition-colors hover:text-primary"
-								>
-									{c.value}
-								</a>
-							) : (
-								<span className="text-xs text-foreground">{c.value}</span>
-							)}
+							{renderContactValue(c)}
 						</div>
 					))}
 				</div>

@@ -42,6 +42,9 @@ export default function GiscusComments({
 	useEffect(() => {
 		if (!repo || !repoId || !categoryId || !containerRef.current) return;
 
+		const container = containerRef.current;
+		container.innerHTML = '';
+
 		const isDark = document.documentElement.classList.contains('dark');
 		// Built-in Giscus themes: clean, well-polished, no custom CSS needed
 		const theme = isDark ? 'dark_dimmed' : 'light';
@@ -63,14 +66,14 @@ export default function GiscusComments({
 		script.crossOrigin = 'anonymous';
 		script.async = true;
 
-		containerRef.current.appendChild(script);
+		container.appendChild(script);
 
 		// Update theme when site theme changes
 		const observer = new MutationObserver(() => {
 			const newTheme = document.documentElement.classList.contains('dark')
 				? 'dark_dimmed'
 				: 'light';
-			const iframe = document.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+			const iframe = container.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
 			if (iframe?.contentWindow) {
 				iframe.contentWindow.postMessage(
 					{ giscus: { setConfig: { theme: newTheme } } },
@@ -83,6 +86,7 @@ export default function GiscusComments({
 
 		return () => {
 			observer.disconnect();
+			container.innerHTML = '';
 		};
 	}, [
 		repo,

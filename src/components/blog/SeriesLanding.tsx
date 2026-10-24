@@ -16,12 +16,15 @@ export default function SeriesLanding({
 	seriesHtml?: string;
 }>) {
 	const totalMinutes = posts.reduce((sum, post) => sum + post.readingTimeMin, 0);
+	const trimSlashes = (str: string) => {
+		let start = 0;
+		while (start < str.length && str[start] === '/') start++;
+		let end = str.length;
+		while (end > start && str[end - 1] === '/') end--;
+		return str.slice(start, end);
+	};
 	const normalizeReference = (reference: string) =>
-		reference
-			.replace(/\.(en|vi)\.md$/i, '')
-			.replace(/\.md$/i, '')
-			.replace(/^\/+|\/+$/g, '')
-			.toLowerCase();
+		trimSlashes(reference.replace(/\.(en|vi)\.md$/i, '').replace(/\.md$/i, '')).toLowerCase();
 	const resolveReference = (reference?: string) =>
 		reference
 			? (posts.find(

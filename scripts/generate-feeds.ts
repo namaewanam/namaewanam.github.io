@@ -160,9 +160,34 @@ async function generatePostOgImages(posts: Post[]): Promise<void> {
 	console.log(`✓ Generated ${posts.length} post OG image(s)`);
 }
 
+function syncDocsAssets(sourceDir = docsDir, targetDir = path.join(publicDir, 'docs')): void {
+	if (!fs.existsSync(sourceDir)) return;
+	const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+
+	for (const entry of entries) {
+		const srcPath = path.join(sourceDir, entry.name);
+		const destPath = path.join(targetDir, entry.name);
+
+		if (entry.isDirectory()) {
+			syncDocsAssets(srcPath, destPath);
+		} else if (!entry.name.endsWith('.md')) {
+			fs.mkdirSync(targetDir, { recursive: true });
+			fs.copyFileSync(srcPath, destPath);
+
+			const relDir = path.relative(docsDir, sourceDir);
+			const lowerTargetDir = path.join(publicDir, 'docs', relDir.toLowerCase());
+			if (lowerTargetDir !== targetDir) {
+				fs.mkdirSync(lowerTargetDir, { recursive: true });
+				fs.copyFileSync(srcPath, path.join(lowerTargetDir, entry.name));
+			}
+		}
+	}
+}
+
 // Run
 
 async function main() {
+	syncDocsAssets();
 	generatePostMetadata();
 	const { getAllPosts } = await import('../src/lib/markdown');
 	const posts = getAllPosts();

@@ -155,12 +155,14 @@ export default function PostForm({
 					</div>
 
 					<div className="max-h-40 divide-y divide-border/40 overflow-y-auto font-mono text-xs">
-						{isLoadingFile ? (
+						{isLoadingFile && (
 							<div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
 								<Loader2 className="h-4 w-4 animate-spin" />
 								<span>{tr('editor.loadingPost', 'Loading post content...')}</span>
 							</div>
-						) : filteredTree.length > 0 ? (
+						)}
+						{!isLoadingFile &&
+							filteredTree.length > 0 &&
 							filteredTree.map((path) => (
 								<button
 									key={path}
@@ -174,8 +176,8 @@ export default function PostForm({
 								>
 									{path}
 								</button>
-							))
-						) : (
+							))}
+						{!isLoadingFile && filteredTree.length === 0 && (
 							<div className="py-2 text-center text-muted-foreground">
 								{tr('editor.noMatchingFiles', 'No matching markdown files found.')}
 							</div>

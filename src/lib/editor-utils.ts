@@ -100,11 +100,12 @@ export function parsePost(rawContent: string): {
 	}
 
 	const today = new Date().toISOString().split('T')[0] ?? '';
-	const dateStr = data.date
-		? typeof data.date === 'string'
-			? data.date
-			: (new Date(data.date).toISOString().split('T')[0] ?? today)
-		: today;
+	let dateStr = today;
+	if (typeof data.date === 'string') {
+		dateStr = data.date;
+	} else if (data.date) {
+		dateStr = new Date(data.date).toISOString().split('T')[0] ?? today;
+	}
 
 	return {
 		metadata: {

@@ -162,10 +162,10 @@ export function applyPlantUmlTheme(source: string, dark: boolean): string {
 	if (!trimmedSource) return trimmedSource;
 
 	const injectedDirectives = [
-		/^\s*skinparam\s+maxMessageSize\b/im.test(trimmedSource)
+		/^[ \t]*skinparam[ \t]+maxMessageSize\b/im.test(trimmedSource)
 			? null
 			: 'skinparam maxMessageSize 150',
-		/^\s*autonumber\b/im.test(trimmedSource) ? null : 'autonumber',
+		/^[ \t]*autonumber\b/im.test(trimmedSource) ? null : 'autonumber',
 	]
 		.filter(Boolean)
 		.join('\n');
@@ -181,7 +181,10 @@ export function applyPlantUmlTheme(source: string, dark: boolean): string {
 export async function getPlantUmlSvgUrl(source: string, dark = false): Promise<string> {
 	const { deflateRaw } = await import('pako');
 	const root = process.env.NEXT_PUBLIC_PLANTUML_SERVER_URL ?? 'https://www.plantuml.com/plantuml';
-	const normalizedRoot = root.replace(/\/+$/, '');
+	let normalizedRoot = root;
+	while (normalizedRoot.endsWith('/')) {
+		normalizedRoot = normalizedRoot.slice(0, -1);
+	}
 	const encoded = encodePlantUmlSourceWith(applyPlantUmlTheme(source, dark), deflateRaw);
 
 	return normalizedRoot.endsWith('/svg')

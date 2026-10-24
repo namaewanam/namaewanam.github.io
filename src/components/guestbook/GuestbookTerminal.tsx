@@ -18,7 +18,7 @@ interface TerminalLine {
 	id: number;
 	type: 'input' | 'output' | 'error' | 'success' | 'system';
 	text: string;
-	url?: string | undefined;
+	url?: string;
 }
 
 const STORAGE_KEY = 'namaewanam_guestbook_local_v1';
@@ -168,7 +168,11 @@ export default function GuestbookTerminal() {
 				addLine('success', `  "${newEntry.message}"`);
 
 				// Provide GitHub Discussion link so it can be preserved permanently
-				const ghIssueUrl = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/discussions/new?category=general&title=${encodeURIComponent(`Guestbook: ${newEntry.name}`)}&body=${encodeURIComponent(`### Guestbook Signature\n\n- **Name:** ${newEntry.name}\n- **Message:** ${newEntry.message}\n- **Date:** ${newEntry.date}`)}`;
+				const titleParam = encodeURIComponent(`Guestbook: ${newEntry.name}`);
+				const bodyParam = encodeURIComponent(
+					`### Guestbook Signature\n\n- **Name:** ${newEntry.name}\n- **Message:** ${newEntry.message}\n- **Date:** ${newEntry.date}`
+				);
+				const ghIssueUrl = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/discussions/new?category=general&title=${titleParam}&body=${bodyParam}`;
 				addLine(
 					'system',
 					'→ Want to persist your signature permanently on GitHub Discussions? [Click here to submit]',

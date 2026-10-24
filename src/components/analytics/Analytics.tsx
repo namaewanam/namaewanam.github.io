@@ -1,3 +1,5 @@
+import Script from 'next/script';
+
 /**
  * Lightweight, privacy-first web analytics component.
  * Automatically activates Cloudflare Web Analytics or Umami when their
@@ -17,13 +19,15 @@ export default function Analytics() {
 	return (
 		<>
 			{cfToken && (
-				<script
-					defer
+				<Script
+					strategy="afterInteractive"
 					src="https://static.cloudflareinsights.com/beacon.min.js"
 					data-cf-beacon={`{"token": "${cfToken}"}`}
 				/>
 			)}
-			{umamiWebsiteId && <script defer src={umamiSrc} data-website-id={umamiWebsiteId} />}
+			{umamiWebsiteId && (
+				<Script strategy="afterInteractive" src={umamiSrc} data-website-id={umamiWebsiteId} />
+			)}
 		</>
 	);
 }

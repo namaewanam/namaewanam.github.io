@@ -23,10 +23,12 @@ export const metadata: Metadata = {
 export function generateStaticParams() {
 	return [{ lang: 'en' }, { lang: 'vi' }];
 }
-export default async function BlogPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function BlogPage({
+	params,
+}: Readonly<{ params: Promise<{ lang: string }> }>) {
 	const resolvedParams = await params;
 	const posts = getBlogSearchPosts(resolvedParams.lang);
-	const categories = getCategories();
+	const categories = getCategories(resolvedParams.lang);
 	const allTags = getAllTags(resolvedParams.lang);
 
 	return (

@@ -141,7 +141,6 @@ export default function ShortcutHelp() {
 				event.preventDefault();
 				event.stopPropagation();
 				contentRef.current?.scrollTo({ top: contentRef.current.scrollHeight, behavior: 'smooth' });
-				return;
 			}
 		}
 

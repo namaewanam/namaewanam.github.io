@@ -288,7 +288,8 @@ const FETCH_LINES = [
 
 export function normalizePath(input: string, cwd: string): string {
 	const raw = input.trim();
-	const candidate = raw.startsWith('/') ? raw : `${cwd === ROOT ? '' : cwd}/${raw}`;
+	const baseDir = cwd === ROOT ? '' : cwd;
+	const candidate = raw.startsWith('/') ? raw : `${baseDir}/${raw}`;
 	const parts = candidate.split('/');
 	const stack: string[] = [];
 
@@ -328,7 +329,8 @@ export function isStaticAssetHref(href: string): boolean {
 export function isNonLocalizedRoute(href: string): boolean {
 	if (isExternalHref(href)) return true;
 	if (isStaticAssetHref(href)) return true;
-	const clean = href.replace(/[?#].*$/, '');
+	const queryOrHashIndex = href.search(/[?#]/);
+	const clean = queryOrHashIndex >= 0 ? href.slice(0, queryOrHashIndex) : href;
 	return clean === '/resume' || clean.startsWith('/feeds/');
 }
 
@@ -529,7 +531,8 @@ export function resolveCommand(input: string) {
 		};
 	}
 
-	const expanded = `${aliasExpansion}${argsText ? ` ${argsText}` : ''}`.trim();
+	const argsSuffix = argsText ? ` ${argsText}` : '';
+	const expanded = `${aliasExpansion}${argsSuffix}`.trim();
 	const [expandedCommand = '', ...expandedRest] = expanded.split(/\s+/);
 
 	return {
@@ -657,6 +660,23 @@ function completeCommandHelp(input: string): CompletionResult {
 	};
 }
 
+function calculateRelativeBase(baseDir: string, cwd: string): string {
+	if (baseDir === cwd || baseDir === ROOT) {
+		return '';
+	}
+	if (baseDir.startsWith(`${cwd}/`)) {
+		return baseDir.slice(cwd.length + 1);
+	}
+	return baseDir;
+}
+
+function buildCompletedPath(prefixPath: string, name: string, isLeadingSlash: boolean): string {
+	if (prefixPath && prefixPath !== '/') {
+		return `${prefixPath}/${name}`;
+	}
+	return isLeadingSlash ? `/${name}` : name;
+}
+
 function completePathArgument(input: string, cwd: string, index: TerminalIndex): CompletionResult {
 	const spaceIndex = input.indexOf(' ');
 	if (spaceIndex === -1) return { nextInput: input, suggestions: [] };
@@ -687,27 +707,21 @@ function completePathArgument(input: string, cwd: string, index: TerminalIndex):
 
 	const baseInput = `${command} `;
 	const isAbsolute = trimmedArg.startsWith('/');
-	const relativeBase =
-		baseDir === cwd
-			? ''
-			: baseDir.startsWith(`${cwd}/`)
-				? baseDir.slice(cwd.length + 1)
-				: baseDir === ROOT
-					? ''
-					: baseDir;
-	const prefixPath = isAbsolute ? (baseDir === ROOT ? '' : baseDir) : relativeBase;
+	const relativeBase = calculateRelativeBase(baseDir, cwd);
+	const absoluteBase = baseDir === ROOT ? '' : baseDir;
+	const prefixPath = isAbsolute ? absoluteBase : relativeBase;
+	const isLeadingSlash = trimmedArg.startsWith('/');
 
 	if (matches.length === 1) {
 		const only = matches[0];
 		if (!only) {
 			return { nextInput: input, suggestions: [] };
 		}
-		const completedPath =
-			prefixPath && prefixPath !== '/'
-				? `${prefixPath}/${formatCompletionName(only)}`
-				: trimmedArg.startsWith('/')
-					? `/${formatCompletionName(only)}`
-					: formatCompletionName(only);
+		const completedPath = buildCompletedPath(
+			prefixPath,
+			formatCompletionName(only),
+			isLeadingSlash
+		);
 		return {
 			nextInput: `${baseInput}${completedPath}${only.type === 'dir' ? '' : ' '}`,
 			suggestions: [],
@@ -718,11 +732,7 @@ function completePathArgument(input: string, cwd: string, index: TerminalIndex):
 	const prefix = longestCommonPrefix(formatted);
 	const nextArg =
 		prefix.length > partialName.length
-			? prefixPath && prefixPath !== '/'
-				? `${prefixPath}/${prefix}`
-				: trimmedArg.startsWith('/')
-					? `/${prefix}`
-					: prefix
+			? buildCompletedPath(prefixPath, prefix, isLeadingSlash)
 			: trimmedArg;
 
 	return {

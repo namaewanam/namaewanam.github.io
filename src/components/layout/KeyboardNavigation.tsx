@@ -22,6 +22,12 @@ function isTypingField(target: EventTarget | null): boolean {
 	);
 }
 
+function stripTrailingSlashes(str: string): string {
+	let end = str.length;
+	while (end > 0 && str[end - 1] === '/') end--;
+	return str.slice(0, end);
+}
+
 export default function KeyboardNavigation({
 	postPaths = [],
 	postFileMap = {},
@@ -81,7 +87,7 @@ export default function KeyboardNavigation({
 	// Extract article slug from pathname if on an article page (category/slug)
 	const currentArticleSlug = (() => {
 		if (!pathname) return null;
-		const clean = pathname.replace(/^\/(?:en|vi)\/blog\//, '').replace(/\/+$/, '');
+		const clean = stripTrailingSlashes(pathname.replace(/^\/(?:en|vi)\/blog\//, ''));
 		const parts = clean.split('/');
 		if (parts.length >= 2 && parts[0] && parts[1]) {
 			return `${parts[0]}/${parts.slice(1).join('/')}`;
@@ -96,7 +102,7 @@ export default function KeyboardNavigation({
 		}
 
 		// Clean path: strip language prefix (/en or /vi) and trailing slashes
-		const cleanPath = pathname.replace(/^\/(?:en|vi)/, '').replace(/\/+$/, '') || '/';
+		const cleanPath = stripTrailingSlashes(pathname.replace(/^\/(?:en|vi)/, '')) || '/';
 
 		// 1. Direct match in postFileMap
 		if (postFileMap && postFileMap[cleanPath]) {
@@ -106,7 +112,7 @@ export default function KeyboardNavigation({
 		// 2. ADR match (/adr/0001-...)
 		const adrMatch = cleanPath.match(/^\/adr\/(.+)$/);
 		if (adrMatch && adrMatch[1]) {
-			const adrSlug = adrMatch[1].replace(/\.md$/, '').replace(/\/+$/, '');
+			const adrSlug = stripTrailingSlashes(adrMatch[1].replace(/\.md$/, ''));
 			return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/adr/${adrSlug}.md`;
 		}
 
@@ -114,7 +120,7 @@ export default function KeyboardNavigation({
 		const blogMatch = cleanPath.match(/^\/blog\/([^/]+)\/(.+)$/);
 		if (blogMatch && blogMatch[1] && blogMatch[2]) {
 			const cat = blogMatch[1];
-			const slug = blogMatch[2].replace(/\.md$/, '').replace(/\/+$/, '');
+			const slug = stripTrailingSlashes(blogMatch[2].replace(/\.md$/, ''));
 			return `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/blob/main/docs/${cat}/${slug}.md`;
 		}
 
@@ -898,7 +904,6 @@ export default function KeyboardNavigation({
 			if (event.key === 'p') {
 				event.preventDefault();
 				handleToggleSpeech();
-				return;
 			}
 		}
 

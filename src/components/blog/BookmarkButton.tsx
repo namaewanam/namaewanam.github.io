@@ -8,6 +8,13 @@ interface BookmarkButtonProps {
 	size?: 'sm' | 'md';
 }
 
+function getBookmarkAriaLabel(active: boolean, isMd: boolean): string {
+	if (active) {
+		return isMd ? 'Remove saved bookmark' : 'Remove bookmark';
+	}
+	return isMd ? 'Save bookmark' : 'Add bookmark';
+}
+
 /**
  * Bookmark toggle button for saving posts to the reading list.
  */
@@ -32,15 +39,7 @@ export default function BookmarkButton({ slug, size = 'sm' }: Readonly<BookmarkB
 					: 'border-border text-muted-foreground hover:border-primary hover:text-foreground'
 			}`}
 			aria-pressed={active}
-			aria-label={
-				active
-					? size === 'md'
-						? 'Remove saved bookmark'
-						: 'Remove bookmark'
-					: size === 'md'
-						? 'Save bookmark'
-						: 'Add bookmark'
-			}
+			aria-label={getBookmarkAriaLabel(active, size === 'md')}
 		>
 			<Icon className={sizeClasses} />
 			{size === 'md' && (active ? 'saved' : 'save')}

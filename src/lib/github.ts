@@ -32,7 +32,7 @@ export function toBase64Unicode(str: string): string {
 	let binary = '';
 	for (let i = 0; i < bytes.length; i += chunkSize) {
 		const chunk = bytes.subarray(i, i + chunkSize);
-		binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+		binary += String.fromCharCode(...chunk);
 	}
 	return btoa(binary);
 }

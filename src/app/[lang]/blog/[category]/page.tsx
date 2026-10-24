@@ -49,9 +49,9 @@ export async function generateMetadata({
 
 export default async function CategoryPage({
 	params,
-}: {
+}: Readonly<{
 	params: Promise<{ lang: string; category: string }>;
-}) {
+}>) {
 	const resolvedParams = await params;
 	const lang = resolvedParams.lang || 'en';
 	const posts = getPostsByCategory(resolvedParams.category, lang);
@@ -67,7 +67,7 @@ export default async function CategoryPage({
 	const categoryDescription = getCategoryDescription(resolvedParams.category);
 	const seriesMetadata = getSeriesMetadata(resolvedParams.category, lang);
 	const seriesHtml = seriesMetadata?.content
-		? await renderMarkdown(seriesMetadata.content)
+		? await renderMarkdown(seriesMetadata.content, { category: resolvedParams.category })
 		: undefined;
 
 	// Group posts by subcategory

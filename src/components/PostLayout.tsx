@@ -18,6 +18,12 @@ interface SeriesInfo {
 	posts: Post[];
 }
 
+const DIFFICULTY_ICONS: Record<string, string> = {
+	beginner: '○',
+	intermediate: '◑',
+	advanced: '●',
+};
+
 export default function PostLayout({
 	post,
 	html,
@@ -25,6 +31,7 @@ export default function PostLayout({
 	adjacentPosts,
 	relatedPosts,
 	seriesInfo,
+	requestedLang,
 }: Readonly<{
 	post: Post;
 	html: string;
@@ -32,6 +39,7 @@ export default function PostLayout({
 	adjacentPosts?: AdjacentPosts;
 	relatedPosts?: Post[];
 	seriesInfo?: SeriesInfo;
+	requestedLang?: string;
 }>) {
 	const showLastUpdated =
 		post.lastUpdated &&
@@ -95,6 +103,15 @@ export default function PostLayout({
 					</div>
 				)}
 
+				{requestedLang && post.lang !== requestedLang && (
+					<div className="rounded border border-border/80 bg-card/60 px-3.5 py-2.5 font-mono text-xs text-muted-foreground">
+						<span className="text-primary">ℹ </span>
+						{requestedLang === 'en'
+							? 'This article is currently only available in Vietnamese.'
+							: 'Bài viết này hiện chỉ có bản tiếng Anh.'}
+					</div>
+				)}
+
 				{/* Post Header */}
 				<header className="space-y-3 border-b border-border pb-6">
 					<div className="flex flex-wrap items-center gap-2">
@@ -147,12 +164,7 @@ export default function PostLayout({
 							<>
 								<span className="text-border">·</span>
 								<span className="difficulty-badge" data-level={post.difficulty}>
-									{post.difficulty === 'beginner'
-										? '○'
-										: post.difficulty === 'intermediate'
-											? '◑'
-											: '●'}{' '}
-									{post.difficulty}
+									{DIFFICULTY_ICONS[post.difficulty] ?? '○'} {post.difficulty}
 								</span>
 							</>
 						)}

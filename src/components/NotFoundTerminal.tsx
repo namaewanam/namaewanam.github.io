@@ -227,15 +227,19 @@ export default function NotFoundTerminal({
 				}
 
 				appendHistory(
-					children.map((child) => ({
-						text:
-							child.type === 'dir'
-								? `${child.name}/`
-								: child.type === 'link'
-									? `${child.name} -> ${index.entryMap.get(child.path)?.href ?? child.path}`
-									: `${child.name}${child.description ? `  # ${child.description}` : ''}`,
-						tone: 'output' as const,
-					}))
+					children.map((child) => {
+						if (child.type === 'dir') {
+							return { text: `${child.name}/`, tone: 'output' as const };
+						}
+						if (child.type === 'link') {
+							return {
+								text: `${child.name} -> ${index.entryMap.get(child.path)?.href ?? child.path}`,
+								tone: 'output' as const,
+							};
+						}
+						const suffix = child.description ? `  # ${child.description}` : '';
+						return { text: `${child.name}${suffix}`, tone: 'output' as const };
+					})
 				);
 				break;
 			}
@@ -318,11 +322,12 @@ export default function NotFoundTerminal({
 			case 'open': {
 				const target = argsText ? normalizePath(argsText, cwd) : cwd;
 				const cleanTarget = target.replace(/^\/(?:en|vi)(?=\/|$)/, '') || '/';
-				const specifiedLocale = target.startsWith('/vi')
-					? 'vi'
-					: target.startsWith('/en')
-						? 'en'
-						: undefined;
+				let specifiedLocale: 'vi' | 'en' | undefined;
+				if (target.startsWith('/vi')) {
+					specifiedLocale = 'vi';
+				} else if (target.startsWith('/en')) {
+					specifiedLocale = 'en';
+				}
 
 				if (specifiedLocale && specifiedLocale !== lang) {
 					setLang(specifiedLocale);
