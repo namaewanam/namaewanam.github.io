@@ -227,10 +227,17 @@ export default function CodeCopyInjector({
 				const img = document.createElement('img');
 				img.src = content.src;
 				img.alt = content.alt;
+				const naturalW = content.naturalWidth || 800;
+				const isSmall = naturalW > 0 && naturalW < 768;
+				const targetW = isSmall
+					? Math.min(window.innerWidth * 0.94, Math.max(naturalW * 2, 768))
+					: undefined;
+
 				img.style.cssText =
-					'max-width:92vw;max-height:88vh;border-radius:6px;display:block;' +
-					'box-shadow:0 25px 60px rgba(0,0,0,0.4);';
-				img.addEventListener('click', (e) => e.stopPropagation());
+					'max-width:94vw;max-height:88vh;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block;' +
+					'box-shadow:0 25px 60px rgba(0,0,0,0.5);cursor:zoom-out;' +
+					(targetW ? `min-width:${Math.round(targetW)}px;` : '');
+				img.addEventListener('click', dismiss);
 				overlay.insertBefore(img, close);
 				return;
 			}
@@ -419,7 +426,7 @@ export default function CodeCopyInjector({
 					}
 					code.innerHTML = lines
 						.map((line) => {
-							const plain = line.replace(/<[^>]*>/g, '').trimStart();
+							const plain = line.replace(/<[^<>]*>/g, '').trimStart();
 							let diffClass = '';
 							if (isDiff) {
 								if (plain.startsWith('+') && !plain.startsWith('+++')) {
@@ -750,6 +757,16 @@ export default function CodeCopyInjector({
 			});
 			heading.appendChild(anchor);
 		});
+
+		if (window.location.hash) {
+			const hashId = decodeURIComponent(window.location.hash.slice(1));
+			const targetEl = document.getElementById(hashId);
+			if (targetEl) {
+				requestAnimationFrame(() => {
+					targetEl.scrollIntoView({ behavior: 'smooth' });
+				});
+			}
+		}
 
 		container.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
 			if (img.closest('.lightbox-overlay')) return;

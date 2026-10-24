@@ -49,9 +49,59 @@ function transformCallouts(html: string): string {
 	});
 }
 
-export async function renderMarkdown(content: string): Promise<string> {
-	const result = await processor.process(content);
-	return transformCallouts(String(result));
+function addImagePerformanceAttributes(html: string): string {
+	return html.replace(/<img\b([^>]*?)(\/?>)/gi, (_, attrs: string, closing: string) => {
+		let updated = attrs;
+		if (!/\bloading=/i.test(updated)) {
+			updated = ` loading="lazy"${updated}`;
+		}
+		if (!/\bdecoding=/i.test(updated)) {
+			updated = ` decoding="async"${updated}`;
+		}
+		return `<img${updated}${closing}`;
+	});
+}
+
+export async function renderMarkdown(
+	content: string,
+	options?: { category?: string }
+): Promise<string> {
+	let processed = content;
+	if (options?.category) {
+		const category = options.category;
+		// Rewrite markdown images with relative path ./images/ or images/ to /docs/<category>/images/
+		// Supports optional title: ![Alt](./images/pic.png "Image Title")
+		processed = processed
+			.replace(
+				/!\[([^\]]*)\]\((?:\.\/)?images\/([^\s)]+)(?:\s+(".*?"|'.*?'))?\)/g,
+				(_, alt, filename, title) => {
+					const titlePart = title ? ` ${title}` : '';
+					return `![${alt}](/docs/${category}/images/${filename}${titlePart})`;
+				}
+			)
+			.replace(/(src=["'])(?:\.\/)?images\/([^"'\s]+)(["'])/gi, `$1/docs/${category}/images/$2$3`);
+	}
+
+	// Support custom heading IDs: ## Heading Text {#custom-id}
+	processed = processed
+		.split('\n')
+		.map((line) => {
+			if (!line.startsWith('#')) return line;
+			const trimmed = line.trimEnd();
+			if (!trimmed.endsWith('}')) return line;
+			const idStart = trimmed.lastIndexOf('{#');
+			if (idStart === -1) return line;
+			const hashesMatch = line.match(/^#{1,6}\s+/);
+			if (!hashesMatch) return line;
+			const level = hashesMatch[0].trim().length;
+			const id = trimmed.slice(idStart + 2, -1).trim();
+			const title = trimmed.slice(hashesMatch[0].length, idStart).trim();
+			return `<h${level} id="${id}">${title}</h${level}>`;
+		})
+		.join('\n');
+
+	const result = await processor.process(processed);
+	return addImagePerformanceAttributes(transformCallouts(String(result)));
 }
 
 export interface Heading {
@@ -66,13 +116,13 @@ export interface Heading {
  */
 export function extractHeadings(html: string): Heading[] {
 	const headings: Heading[] = [];
-	const regex = /<h([23])\s+id="([^"]*)"[^>]*>(.*?)<\/h[23]>/gi;
+	const regex = /<h([23])\s+id="([^"]*)"[^>]*>(.*?)<\/h\1>/gi;
 	let match;
 	while ((match = regex.exec(html)) !== null) {
 		const level = Number(match[1]) as 2 | 3;
 		const id = match[2] ?? '';
 		// Strip any inner HTML tags from the heading text
-		const text = (match[3] ?? '').replace(/<[^>]*>/g, '').trim();
+		const text = (match[3] ?? '').replace(/<[^<>]*>/g, '').trim();
 		if (id && text) {
 			headings.push({ id, text, level });
 		}
