@@ -28,6 +28,7 @@ const nextConfig = {
 	turbopack: {},
 	trailingSlash: true,
 	experimental: {
+		agentUpgrade: 'security',
 		optimizePackageImports: ['lucide-react'],
 	},
 	...(process.env.NODE_ENV !== 'production' && {
