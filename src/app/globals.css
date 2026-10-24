@@ -975,12 +975,15 @@ a[data-footnote-ref]:hover {
 
 .lightbox-overlay img,
 .lightbox-overlay svg {
-	max-width: 92vw;
+	max-width: 94vw;
 	max-height: 88vh;
-	border-radius: 6px;
-	box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
-	cursor: default;
-	pointer-events: none;
+	width: auto;
+	height: auto;
+	object-fit: contain;
+	border-radius: 8px;
+	box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+	cursor: zoom-out;
+	pointer-events: auto;
 }
 
 .lightbox-close {
@@ -1001,8 +1004,53 @@ a[data-footnote-ref]:hover {
 	opacity: 1;
 }
 
-/* Make zoomable images look clickable */
-.prose img,
+/* Make zoomable images look clickable and scale to post width */
+.prose img {
+	width: 100%;
+	height: auto;
+	max-width: 100%;
+	display: block;
+	margin: 1.5rem auto;
+	border-radius: 0.5rem;
+	cursor: zoom-in;
+	transition: opacity 0.15s ease;
+}
+
+.prose img:hover {
+	opacity: 0.95;
+}
+
+/* Image figure and caption */
+.prose figure {
+	margin: 2rem 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.prose figure img {
+	margin-bottom: 0.5rem;
+}
+
+.prose figcaption {
+	text-align: center;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: hsl(var(--muted-foreground));
+	margin-top: 0.25rem;
+}
+
+/* Automatic caption styling for italic line right below an image */
+.prose p:has(> img) + p > em:only-child {
+	display: block;
+	text-align: center;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: hsl(var(--muted-foreground));
+	margin-top: -0.75rem;
+	margin-bottom: 1.5rem;
+}
+
 .mermaid-diagram,
 .plantuml-diagram {
 	cursor: zoom-in;

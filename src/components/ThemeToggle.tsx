@@ -2,64 +2,50 @@
 
 import { useTheme } from './ThemeProvider';
 
+function getAriaLabel(mounted: boolean, theme: string): string {
+	if (!mounted) return 'Toggle theme';
+	return theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+function MoonIcon() {
+	return (
+		<svg className="h-4 w-4 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+			/>
+		</svg>
+	);
+}
+
+function SunIcon() {
+	return (
+		<svg className="h-4 w-4 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+			/>
+		</svg>
+	);
+}
+
 export default function ThemeToggle() {
 	const { theme, toggleTheme, mounted } = useTheme();
+	const isDark = mounted && theme === 'dark';
 
 	return (
 		<button
 			onClick={toggleTheme}
 			className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-border p-2.5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-			aria-label={
-				mounted ? `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode` : 'Toggle theme'
-			}
+			aria-label={getAriaLabel(mounted, theme)}
 			suppressHydrationWarning
 		>
-			{/* Render a fixed icon during SSR/pre-mount to avoid hydration mismatch.
-			    The ThemeScript already sets the correct class on <html>,
-			    so the visual theme is correct even before this updates. */}
-			{!mounted ? (
-				<svg
-					className="h-4 w-4 text-foreground"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-				>
-					<path
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						strokeWidth={2}
-						d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-					/>
-				</svg>
-			) : theme === 'light' ? (
-				<svg
-					className="h-4 w-4 text-foreground"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-				>
-					<path
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						strokeWidth={2}
-						d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-					/>
-				</svg>
-			) : (
-				<svg
-					className="h-4 w-4 text-foreground"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-				>
-					<path
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						strokeWidth={2}
-						d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-					/>
-				</svg>
-			)}
+			{/* Render a fixed icon during SSR/pre-mount to avoid hydration mismatch */}
+			{isDark ? <SunIcon /> : <MoonIcon />}
 		</button>
 	);
 }

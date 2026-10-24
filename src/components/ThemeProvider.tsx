@@ -7,6 +7,7 @@ import {
 	useLayoutEffect,
 	useState,
 	useCallback,
+	useMemo,
 } from 'react';
 
 type Theme = 'light' | 'dark';
@@ -46,16 +47,7 @@ function readSavedTheme(): Theme {
 	return 'light';
 }
 
-/**
- * Inline script that runs before React hydration.
- * Sets the correct class on <html> to prevent FOUC,
- * but does NOT affect React's server-rendered output.
- */
-const themeScript = `(function(){try{var t=localStorage.getItem('theme');var d=t||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(d)}catch(e){}})()`;
-
-export function ThemeScript() {
-	return <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />;
-}
+export { ThemeScript } from './ThemeScript';
 
 // Universal layout effect hook safe for SSR
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -129,11 +121,12 @@ export function ThemeProvider({ children }: Readonly<{ children: React.ReactNode
 		});
 	}, []);
 
-	return (
-		<ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
-			{children}
-		</ThemeContext.Provider>
+	const contextValue = useMemo(
+		() => ({ theme, toggleTheme, mounted }),
+		[theme, toggleTheme, mounted]
 	);
+
+	return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
