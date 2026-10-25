@@ -131,7 +131,7 @@ export default function BlogClient({ posts, categories, allTags, lang }: BlogCli
 						return (
 							<article
 								key={cat.slug}
-								className="rounded border border-border bg-card/30 px-3 py-2 transition-all hover:border-accent hover:bg-card/60"
+								className="rounded-lg border border-border bg-card/30 px-3.5 py-2.5 transition-all duration-200 ease-out hover:border-primary hover:bg-card/60 hover:shadow-sm"
 							>
 								<div className="flex items-baseline justify-between gap-3">
 									<Link
@@ -164,7 +164,21 @@ export default function BlogClient({ posts, categories, allTags, lang }: BlogCli
 
 			{/* Results */}
 			<div>
-				<BlogResults posts={filtered} query={query} activeTag={activeTag} isVi={isVi} />
+				<BlogResults
+					posts={filtered}
+					query={query}
+					activeTag={activeTag}
+					isVi={isVi}
+					popularTags={allTags.slice(0, 6)}
+					onSelectTag={(tag) => {
+						setActiveTag(tag);
+						setQuery('');
+					}}
+					onReset={() => {
+						setQuery('');
+						setActiveTag('');
+					}}
+				/>
 			</div>
 		</div>
 	);

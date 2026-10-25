@@ -1,36 +1,85 @@
 import Link from '@/components/LocalizedLink';
 import type { BlogSearchPost } from '@/lib/markdown';
 
+interface BlogResultsProps {
+	posts: BlogSearchPost[];
+	query: string;
+	activeTag: string;
+	isVi?: boolean;
+	popularTags?: { tag: string; count: number }[];
+	onSelectTag?: (tag: string) => void;
+	onReset?: () => void;
+}
+
 export default function BlogResults({
 	posts,
 	query,
 	activeTag,
 	isVi = false,
-}: Readonly<{
-	posts: BlogSearchPost[];
-	query: string;
-	activeTag: string;
-	isVi?: boolean;
-}>) {
+	popularTags = [],
+	onSelectTag,
+	onReset,
+}: Readonly<BlogResultsProps>) {
 	if (posts.length === 0) {
+		const currentFilter = query || activeTag || (isVi ? 'bộ lọc hiện tại' : 'current filter');
+
 		return (
 			<div
 				role="status"
 				aria-live="polite"
-				className="flex flex-col items-center gap-3 py-12 text-center font-mono text-sm text-muted-foreground"
+				className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border/80 bg-card/30 px-6 py-12 text-center font-mono"
 			>
-				<p>
-					<span className="text-primary">→ </span>
-					{isVi
-						? `không tìm thấy kết quả nào cho "${query || activeTag || 'bộ lọc hiện tại'}"`
-						: `no results for "${query || activeTag || 'current filter'}"`}
-				</p>
-				<Link
-					href="/blog"
-					className="mt-1 rounded border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-				>
-					{isVi ? 'xóa bộ lọc / xem tất cả' : 'reset search / view all'}
-				</Link>
+				<div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+					<span className="text-lg" aria-hidden="true">
+						⌕
+					</span>
+				</div>
+				<div className="space-y-1">
+					<p className="text-sm text-foreground">
+						{isVi
+							? `Không tìm thấy bài viết nào cho "${currentFilter}"`
+							: `No articles found matching "${currentFilter}"`}
+					</p>
+					<p className="text-xs text-muted-foreground">
+						{isVi
+							? 'Hãy thử tìm kiếm với từ khóa khác hoặc duyệt theo các thẻ gợi ý bên dưới.'
+							: 'Try a different search query or explore one of the popular topics below.'}
+					</p>
+				</div>
+
+				{popularTags.length > 0 && (
+					<div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+						{popularTags.map(({ tag }) => (
+							<button
+								key={tag}
+								type="button"
+								onClick={() => onSelectTag?.(tag)}
+								className="rounded border border-border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground transition-all hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+							>
+								#{tag}
+							</button>
+						))}
+					</div>
+				)}
+
+				<div className="pt-2">
+					{onReset ? (
+						<button
+							type="button"
+							onClick={onReset}
+							className="inline-flex min-h-[40px] items-center justify-center rounded border border-border px-4 py-1.5 text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+						>
+							{isVi ? '← Xem tất cả bài viết' : '← Reset filter & view all'}
+						</button>
+					) : (
+						<Link
+							href="/blog"
+							className="inline-flex min-h-[40px] items-center justify-center rounded border border-border px-4 py-1.5 text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+						>
+							{isVi ? '← Xem tất cả bài viết' : '← Reset filter & view all'}
+						</Link>
+					)}
+				</div>
 			</div>
 		);
 	}

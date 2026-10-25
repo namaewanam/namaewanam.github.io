@@ -423,9 +423,10 @@ function buildCategoryStartHere(
 }
 
 function buildContentIndex(): ContentIndex {
-	const categoryDirs = fs
-		.readdirSync(postsDirectory)
-		.filter((entry) => fs.statSync(path.join(postsDirectory, entry)).isDirectory());
+	const categoryDirs = fs.readdirSync(postsDirectory).filter((entry) => {
+		if (entry.startsWith('.') || entry === 'superpowers') return false;
+		return fs.statSync(path.join(postsDirectory, entry)).isDirectory();
+	});
 	const allPosts: Post[] = [];
 	const categories: Category[] = [];
 	const postsByCategory = new Map<string, Post[]>();

@@ -108,6 +108,7 @@ export default async function RootLayout({
 	const lang: Locale = i18n.locales.includes(rawLang as Locale)
 		? (rawLang as Locale)
 		: i18n.defaultLocale;
+	const isVi = lang === 'vi';
 	const t = getDictionary(lang);
 	const posts = getAllPosts(lang);
 	const postPaths = posts.map((post) => `/blog/${post.category}/${post.fullPath}`);
@@ -298,6 +299,12 @@ export default async function RootLayout({
 			className={`${sans.variable} ${mono.variable} antialiased`}
 		>
 			<body suppressHydrationWarning className="font-sans antialiased">
+				<a
+					href="#main-content"
+					className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-primary focus:bg-background focus:px-4 focus:py-2 focus:font-mono focus:text-xs focus:text-primary focus:shadow-lg focus:outline-none"
+				>
+					{isVi ? 'Chuyển đến nội dung chính' : 'Skip to main content'}
+				</a>
 				<ThemeScript />
 
 				<ThemeProvider>
@@ -352,7 +359,7 @@ export default async function RootLayout({
 						</header>
 
 						{/* Main Content */}
-						<main className="w-full flex-1 px-4 py-8 sm:px-6 md:py-12">
+						<main id="main-content" className="w-full flex-1 px-4 py-8 sm:px-6 md:py-12">
 							<PageTransition>{children}</PageTransition>
 						</main>
 

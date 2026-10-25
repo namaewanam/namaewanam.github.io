@@ -77,6 +77,14 @@ export default function KeyboardNavigation({
 		}
 	}, [pathname, showToast]);
 
+	// Clean up pending timers on unmount
+	useEffect(() => {
+		return () => {
+			if (timerRef.current) clearTimeout(timerRef.current);
+			if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+		};
+	}, []);
+
 	const localize = useCallback(
 		(path: string) => {
 			return `/${lang}${path === '/' ? '' : path}`;
@@ -187,17 +195,16 @@ export default function KeyboardNavigation({
 
 	// Toggle Zen Mode
 	const handleToggleZenMode = useCallback(() => {
-		setIsZenMode((prev) => {
-			const next = !prev;
-			if (next) {
-				document.body.classList.add('zen-mode');
-				showToast('Zen Mode: ON (press z to exit)');
-			} else {
-				document.body.classList.remove('zen-mode');
-				showToast('Zen Mode: OFF');
-			}
-			return next;
-		});
+		const isCurrentlyZen = document.body.classList.contains('zen-mode');
+		const next = !isCurrentlyZen;
+		if (next) {
+			document.body.classList.add('zen-mode');
+			showToast('Zen Mode: ON (press z to exit)');
+		} else {
+			document.body.classList.remove('zen-mode');
+			showToast('Zen Mode: OFF');
+		}
+		setIsZenMode(next);
 	}, [showToast]);
 
 	// Adjust Page & Article Font Size
@@ -730,6 +737,11 @@ export default function KeyboardNavigation({
 				}
 			}
 
+			if (pendingKey === 'z' && event.key !== 'z') {
+				if (timerRef.current) clearTimeout(timerRef.current);
+				setPendingKey(null);
+			}
+
 			// Single-Key Triggers & Multi-key Prefixes
 			if (event.key === 'g' && !event.shiftKey) {
 				event.preventDefault();
@@ -798,8 +810,17 @@ export default function KeyboardNavigation({
 				return;
 			}
 
-			// Center Viewport: zz
+			// Center Viewport: zz / Toggle Zen Mode: z
 			if (event.key === 'z') {
+				// If currently in Zen mode, exit immediately on 'z'
+				if (document.body.classList.contains('zen-mode')) {
+					event.preventDefault();
+					if (timerRef.current) clearTimeout(timerRef.current);
+					setPendingKey(null);
+					handleToggleZenMode();
+					return;
+				}
+
 				if (pendingKey === 'z') {
 					if (timerRef.current) clearTimeout(timerRef.current);
 					setPendingKey(null);
@@ -813,7 +834,7 @@ export default function KeyboardNavigation({
 				timerRef.current = setTimeout(() => {
 					setPendingKey(null);
 					handleToggleZenMode();
-				}, 400);
+				}, 350);
 				return;
 			}
 
@@ -910,7 +931,6 @@ export default function KeyboardNavigation({
 		window.addEventListener('keydown', handleKeyDown);
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
-			if (timerRef.current) clearTimeout(timerRef.current);
 		};
 	}, [
 		pendingKey,

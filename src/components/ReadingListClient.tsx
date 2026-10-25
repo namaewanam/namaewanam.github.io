@@ -39,23 +39,25 @@ export default function ReadingListClient({
 
 	if (savedPosts.length === 0) {
 		return (
-			<div className="flex flex-col items-center gap-4 py-16 text-center">
-				<Bookmark className="h-10 w-10 text-muted-foreground/30" />
+			<div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border/80 bg-card/30 px-6 py-16 text-center">
+				<div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+					<Bookmark className="h-6 w-6" aria-hidden="true" />
+				</div>
 				<div className="space-y-1">
-					<p className="text-sm text-muted-foreground">
-						{isVi ? 'Chưa có bài viết nào được lưu.' : 'No saved posts yet.'}
+					<p className="text-sm font-medium text-foreground">
+						{isVi ? 'Chưa có bài viết nào được lưu' : 'No saved posts yet'}
 					</p>
-					<p className="text-xs text-muted-foreground/70">
+					<p className="max-w-xs text-xs text-muted-foreground">
 						{isVi
-							? 'Đánh dấu bài viết để tìm lại ở đây sau.'
-							: 'Bookmark posts to find them here later.'}
+							? 'Nhấn biểu tượng đánh dấu ở bất kỳ bài viết nào để lưu và đọc lại tại đây.'
+							: 'Click the bookmark icon on any article to save it here for later.'}
 					</p>
 				</div>
 				<Link
 					href="/blog"
-					className="mt-2 rounded border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground"
+					className="mt-2 inline-flex min-h-[40px] items-center justify-center rounded border border-border px-4 py-2 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 				>
-					{isVi ? 'khám phá bài viết →' : 'browse posts →'}
+					{isVi ? 'Khám phá bài viết →' : 'Browse articles →'}
 				</Link>
 			</div>
 		);

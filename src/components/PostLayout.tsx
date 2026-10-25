@@ -1,11 +1,13 @@
 import Link from '@/components/LocalizedLink';
 import MarkdownContent from '@/components/MarkdownContent';
 import TableOfContents from '@/components/TableOfContents';
+import MobileTableOfContents from '@/components/MobileTableOfContents';
 import BookmarkButton from '@/components/blog/BookmarkButton';
 import PostReactions from '@/components/blog/PostReactions';
 import RelatedPosts from '@/components/blog/RelatedPosts';
 import ShareButtons from '@/components/blog/ShareButtons';
 import QuoteToShareTooltip from '@/components/blog/QuoteToShareTooltip';
+import ZenModeToggle from '@/components/blog/ZenModeToggle';
 import GiscusComments from '@/components/GiscusComments';
 import { features } from '@/lib/features';
 import { GISCUS_REPO, GISCUS_REPO_ID, GISCUS_CATEGORY, GISCUS_CATEGORY_ID } from '@/lib/site';
@@ -83,7 +85,7 @@ export default function PostLayout({
 	const hasTableOfContents = headings.length > 0;
 
 	return (
-		<div className="lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start lg:gap-16">
+		<div className="post-layout-grid lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start lg:gap-16">
 			<div className="min-w-0 space-y-8 lg:max-w-3xl">
 				{/* Breadcrumb */}
 				<nav className="flex items-center gap-1.5 overflow-x-auto font-mono text-xs text-muted-foreground">
@@ -151,23 +153,26 @@ export default function PostLayout({
 
 				{/* Post Header */}
 				<header className="space-y-3 border-b border-border pb-6">
-					<div className="flex flex-wrap items-center gap-2">
-						<Link
-							href={`/blog/${post.category}`}
-							className="rounded border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-primary"
-						>
-							#{post.categoryName.toLowerCase()}
-						</Link>
-						{(post.type === 'practice' || post.practiceFor) && (
-							<span className="rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
-								{isVi ? '🧪 THỰC HÀNH' : '🧪 PRACTICE LAB'}
-							</span>
-						)}
-						{post.tags?.map((t) => (
-							<span key={t} className="font-mono text-xs text-muted-foreground/60">
-								#{t}
-							</span>
-						))}
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<div className="flex flex-wrap items-center gap-2">
+							<Link
+								href={`/blog/${post.category}`}
+								className="rounded border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground transition-all hover:border-primary hover:text-primary"
+							>
+								#{post.categoryName.toLowerCase()}
+							</Link>
+							{(post.type === 'practice' || post.practiceFor) && (
+								<span className="rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+									{isVi ? '🧪 THỰC HÀNH' : '🧪 PRACTICE LAB'}
+								</span>
+							)}
+							{post.tags?.map((t) => (
+								<span key={t} className="font-mono text-xs text-muted-foreground/60">
+									#{t}
+								</span>
+							))}
+						</div>
+						<ZenModeToggle isVi={isVi} />
 					</div>
 
 					{/* Date + Reading time + Code % */}
@@ -238,6 +243,11 @@ export default function PostLayout({
 							</Link>
 						</span>
 					</div>
+				)}
+
+				{/* Mobile Table of Contents */}
+				{features.tableOfContents && hasTableOfContents && (
+					<MobileTableOfContents headings={headings} isVi={isVi} />
 				)}
 
 				{/* Post Content */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ArrowUp } from 'lucide-react';
 
 /**
  * Back-to-top button. Appears after scrolling past 400px.
@@ -21,18 +22,7 @@ export default function BackToTop() {
 			className={`back-to-top ${visible ? 'visible' : ''}`}
 			aria-label="Back to top"
 		>
-			<svg
-				width="16"
-				height="16"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<path d="m18 15-6-6-6 6" />
-			</svg>
+			<ArrowUp className="h-4 w-4" aria-hidden="true" />
 		</button>
 	);
 }
