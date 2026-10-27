@@ -15,15 +15,13 @@ function getZenLabel(isZen: boolean, isVi?: boolean): string {
 	return 'Zen Mode';
 }
 
-function getZenTitle(isZen: boolean, isVi?: boolean): string {
+function getZenAccessibleName(isZen: boolean, isVi?: boolean): string {
 	if (isZen) {
-		return isVi
-			? 'Thoát chế độ tập trung (hoặc nhấn phím z)'
-			: 'Exit distraction-free reading mode (or press z)';
+		return isVi ? 'Thoát Zen (nhấn phím z)' : 'Exit Zen (or press z)';
 	}
 	return isVi
-		? 'Chế độ đọc tập trung (hoặc nhấn phím z)'
-		: 'Distraction-free reading mode (or press z)';
+		? 'Zen Mode - Đọc tập trung (nhấn phím z)'
+		: 'Zen Mode - Distraction-free reading (or press z)';
 }
 
 /**
@@ -55,15 +53,15 @@ export default function ZenModeToggle({ isVi, className = '' }: Readonly<ZenMode
 	};
 
 	const label = getZenLabel(isZen, isVi);
-	const title = getZenTitle(isZen, isVi);
+	const accessibleName = getZenAccessibleName(isZen, isVi);
 
 	return (
 		<button
 			type="button"
 			onClick={toggleZen}
 			aria-pressed={isZen}
-			title={title}
-			aria-label={title}
+			title={accessibleName}
+			aria-label={accessibleName}
 			className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-xs transition-all active:scale-95 ${
 				isZen
 					? 'border-primary bg-primary/10 text-primary shadow-sm'
