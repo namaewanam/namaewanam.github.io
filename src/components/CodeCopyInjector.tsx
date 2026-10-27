@@ -151,36 +151,81 @@ export default function CodeCopyInjector({
 			document.body.appendChild(overlay);
 
 			const buildSvgWrap = (svgEl: SVGSVGElement) => {
-				// Read natural dimensions before removing attributes
-				const naturalW =
-					parseFloat(svgEl.getAttribute('width') ?? '0') || svgEl.viewBox?.baseVal?.width || 800;
-				const naturalH =
-					parseFloat(svgEl.getAttribute('height') ?? '0') || svgEl.viewBox?.baseVal?.height || 600;
+				// Read natural dimensions from viewBox or un-percentaged attributes
+				let naturalW = 0;
+				let naturalH = 0;
 
-				// Ensure viewBox is set so the browser can scale correctly
+				if (
+					svgEl.viewBox?.baseVal &&
+					svgEl.viewBox.baseVal.width > 0 &&
+					svgEl.viewBox.baseVal.height > 0
+				) {
+					naturalW = svgEl.viewBox.baseVal.width;
+					naturalH = svgEl.viewBox.baseVal.height;
+				} else {
+					const vb = svgEl.getAttribute('viewBox');
+					if (vb) {
+						const parts = vb
+							.trim()
+							.split(/[\s,]+/)
+							.map(Number);
+						if (parts.length === 4 && parts[2]! > 0 && parts[3]! > 0) {
+							naturalW = parts[2]!;
+							naturalH = parts[3]!;
+						}
+					}
+				}
+
+				if (!naturalW) {
+					const rawW = svgEl.getAttribute('width');
+					if (rawW && !rawW.includes('%')) {
+						naturalW = parseFloat(rawW) || 0;
+					}
+				}
+				if (!naturalH) {
+					const rawH = svgEl.getAttribute('height');
+					if (rawH && !rawH.includes('%')) {
+						naturalH = parseFloat(rawH) || 0;
+					}
+				}
+
+				if (!naturalW || !naturalH) {
+					naturalW = 800;
+					naturalH = 600;
+				}
+
 				if (!svgEl.getAttribute('viewBox')) {
 					svgEl.setAttribute('viewBox', `0 0 ${naturalW} ${naturalH}`);
 				}
 				svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-				// Compute scale to fit within 88vh × 92vw, with a minimum scale of 1
-				// so small diagrams display at least at their natural size
-				const maxW = window.innerWidth * 0.86;
-				const maxH = window.innerHeight * 0.82;
-				const scale = Math.min(1, maxW / naturalW, maxH / naturalH);
+				const maxW = window.innerWidth * 0.9;
+				const maxH = window.innerHeight * 0.84;
+				const fitScale = Math.min(maxW / naturalW, maxH / naturalH);
+				let scale: number;
+				if (fitScale >= 1) {
+					// Diagram is smaller than viewport: scale up to comfortably fit, up to 2.5x
+					scale = Math.min(fitScale, 2.5);
+				} else {
+					// Diagram is larger than viewport: scale down to fit viewport nicely, minimum 0.7x
+					scale = Math.max(fitScale, 0.7);
+				}
+
 				const displayW = Math.round(naturalW * scale);
 				const displayH = Math.round(naturalH * scale);
 
 				svgEl.setAttribute('width', String(displayW));
 				svgEl.setAttribute('height', String(displayH));
-				svgEl.style.cssText = 'display:block;max-width:100%;';
+				svgEl.style.cssText = `width:${displayW}px;height:${displayH}px;max-width:none;display:block;flex-shrink:0;`;
 
 				const wrap = document.createElement('div');
+				wrap.className = 'not-prose';
 				wrap.style.cssText =
 					'display:flex;align-items:center;justify-content:center;' +
-					'background:hsl(var(--card) / 0.4);padding:2rem;border-radius:8px;' +
+					'background:hsl(var(--card));padding:2rem;border-radius:12px;' +
 					'border:1px solid hsl(var(--border));overflow:auto;' +
-					`max-width:92vw;max-height:88vh;`;
+					'box-shadow:0 25px 60px rgba(0,0,0,0.3);' +
+					'max-width:94vw;max-height:88vh;';
 				wrap.appendChild(svgEl);
 				wrap.addEventListener('click', (e) => e.stopPropagation());
 				overlay.insertBefore(wrap, close);
@@ -512,6 +557,8 @@ export default function CodeCopyInjector({
 				dark
 					? {
 							darkMode: true,
+							fontFamily: 'var(--font-sans), system-ui, -apple-system, sans-serif',
+							fontSize: '14px',
 							background: 'transparent',
 							primaryColor: '#3d2a18',
 							secondaryColor: '#2e1e10',
@@ -524,6 +571,7 @@ export default function CodeCopyInjector({
 							secondaryTextColor: '#f0ead6',
 							tertiaryTextColor: '#f0ead6',
 							textColor: '#f0ead6',
+							nodeTextColor: '#f0ead6',
 							titleColor: '#fccb26',
 							lineColor: '#9c876a',
 							edgeLabelBackground: '#2a1c0d',
@@ -554,6 +602,8 @@ export default function CodeCopyInjector({
 						}
 					: {
 							darkMode: false,
+							fontFamily: 'var(--font-sans), system-ui, -apple-system, sans-serif',
+							fontSize: '14px',
 							background: 'transparent',
 							primaryColor: '#fef3d8',
 							secondaryColor: '#fde8b8',
@@ -564,6 +614,7 @@ export default function CodeCopyInjector({
 							primaryTextColor: '#2a1f0e',
 							secondaryTextColor: '#2a1f0e',
 							textColor: '#2a1f0e',
+							nodeTextColor: '#2a1f0e',
 							titleColor: '#c27a1a',
 							lineColor: '#6b5c44',
 							edgeLabelBackground: '#fdf5e8',
@@ -594,6 +645,13 @@ export default function CodeCopyInjector({
 						startOnLoad: false,
 						theme: 'base',
 						themeVariables: getMermaidVars(dark),
+						flowchart: {
+							htmlLabels: true,
+							padding: 18,
+							nodeSpacing: 45,
+							rankSpacing: 45,
+							curve: 'basis',
+						},
 						securityLevel: 'antiscript',
 					});
 
@@ -633,6 +691,13 @@ export default function CodeCopyInjector({
 						startOnLoad: false,
 						theme: 'base',
 						themeVariables: getMermaidVars(isDark),
+						flowchart: {
+							htmlLabels: true,
+							padding: 18,
+							nodeSpacing: 45,
+							rankSpacing: 45,
+							curve: 'basis',
+						},
 						securityLevel: 'antiscript',
 					});
 
@@ -647,7 +712,7 @@ export default function CodeCopyInjector({
 							const { svg } = await mermaid.render(uid, diagram);
 							const wrapper = document.createElement('div');
 							wrapper.className =
-								'mermaid-diagram relative group my-6 flex justify-center overflow-x-auto rounded border border-border bg-card/40 p-4';
+								'mermaid-diagram not-prose relative group my-6 flex justify-center overflow-x-auto rounded border border-border bg-card/40 p-4';
 							wrapper.setAttribute('role', 'img');
 							wrapper.setAttribute('aria-label', 'Diagram');
 							wrapper.setAttribute('data-src', diagram);

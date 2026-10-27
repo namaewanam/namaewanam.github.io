@@ -973,8 +973,8 @@ a[data-footnote-ref]:hover {
 	}
 }
 
-.lightbox-overlay img,
-.lightbox-overlay svg {
+.lightbox-overlay > img,
+.lightbox-overlay > svg {
 	max-width: 94vw;
 	max-height: 88vh;
 	width: auto;
@@ -1053,16 +1053,48 @@ a[data-footnote-ref]:hover {
 
 .mermaid-diagram,
 .plantuml-diagram {
-	cursor: zoom-in;
-}
-
-/* Diagram action bar */
-
-.mermaid-diagram,
-.plantuml-diagram {
 	position: relative;
 	flex-direction: column;
 	cursor: default;
+}
+
+/* Fix Mermaid text clipping and foreignObject layout */
+.mermaid-diagram {
+	line-height: 1.35;
+}
+
+.mermaid-diagram svg {
+	line-height: 1.35;
+	max-width: 100%;
+}
+
+.mermaid-diagram svg foreignObject {
+	overflow: visible !important;
+}
+
+.mermaid-diagram svg foreignObject div,
+.mermaid-diagram svg foreignObject span,
+.mermaid-diagram svg .nodeLabel,
+.mermaid-diagram svg .label,
+.mermaid-diagram svg .edgeLabel,
+.mermaid-diagram svg text {
+	line-height: 1.35 !important;
+}
+
+.mermaid-diagram svg .node foreignObject div {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	line-height: 1.35 !important;
+	white-space: nowrap;
+}
+
+.mermaid-diagram svg .edgeLabel {
+	background-color: hsl(var(--card)) !important;
+	padding: 2px 6px !important;
+	border-radius: 4px;
 }
 
 .diagram-actions {
