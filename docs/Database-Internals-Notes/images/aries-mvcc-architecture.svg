@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 420" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <rect width="860" height="420" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">ARIES Crash Recovery (3 Pha) &amp; MVCC Tuple Versioning</text>
+
+  <!-- ARIES Timeline -->
+  <rect x="30" y="52" width="800" height="168" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="50" y="76" font-size="14" font-weight="700" fill="#0f172a">1. ARIES Recovery Timeline (WAL Rule: flushedLSN &gt;= pageLSN trước khi ghi Data Page)</text>
+
+  <rect x="50" y="92" width="235" height="108" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="167" y="115" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Pha 1: Analysis (Quét xuôi)</text>
+  <text x="167" y="136" text-anchor="middle" font-size="11" fill="#1e3a8a">Từ Last Checkpoint ──► Cuối WAL</text>
+  <text x="167" y="156" text-anchor="middle" font-size="11" fill="#1e3a8a">• Khôi phục ATT (Active Tx Table)</text>
+  <text x="167" y="176" text-anchor="middle" font-size="11" fill="#1e3a8a">• Khôi phục DPT (min RecLSN)</text>
+
+  <rect x="312" y="92" width="235" height="108" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="430" y="115" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Pha 2: Redo (Repeating History)</text>
+  <text x="430" y="136" text-anchor="middle" font-size="11" fill="#14532d">Từ min(RecLSN) ──► Cuối WAL</text>
+  <text x="430" y="156" text-anchor="middle" font-size="11" fill="#14532d">• Tái hiện MỌI thay đổi (kể cả Loser)</text>
+  <text x="430" y="176" text-anchor="middle" font-size="11" fill="#14532d">• Bỏ qua nếu disk PageLSN &gt;= LSN</text>
+
+  <rect x="575" y="92" width="235" height="108" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="692" y="115" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">Pha 3: Undo (Quét ngược)</text>
+  <text x="692" y="136" text-anchor="middle" font-size="11" fill="#78350f">Từ Cuối WAL ◄── về đầu Loser Tx</text>
+  <text x="692" y="156" text-anchor="middle" font-size="11" fill="#78350f">• Đảo ngược các giao dịch chưa Commit</text>
+  <text x="692" y="176" text-anchor="middle" font-size="11" fill="#78350f">• Ghi CLR (UndoNextLSN) chống lặp</text>
+
+  <!-- MVCC Chain -->
+  <rect x="30" y="236" width="800" height="160" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="50" y="262" font-size="14" font-weight="700" fill="#0f172a">2. MVCC Snapshot Isolation: Chuỗi phiên bản Tuple (Đọc không chặn Ghi, Ghi không chặn Đọc)</text>
+
+  <rect x="55" y="282" width="220" height="90" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="165" y="305" text-anchor="middle" font-size="13" font-weight="700" fill="#334155">Tuple V1 (Phiên bản cũ)</text>
+  <text x="165" y="326" text-anchor="middle" font-size="12" font-family="monospace" fill="#0f172a">xmin=100 | xmax=105</text>
+  <text x="165" y="346" text-anchor="middle" font-size="12" font-family="monospace" fill="#475569">balance = 500 | ctid=(0,2)</text>
+  <text x="165" y="364" text-anchor="middle" font-size="11" fill="#0284c7">Tx 102 (Snapshot 102) đọc V1</text>
+
+  <path d="M 275 327 L 335 327" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="305" y="318" text-anchor="middle" font-size="11" font-weight="700" fill="#2563eb">UPDATE</text>
+
+  <rect x="335" y="282" width="220" height="90" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="445" y="305" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Tuple V2 (Hiện hành)</text>
+  <text x="445" y="326" text-anchor="middle" font-size="12" font-family="monospace" fill="#14532d">xmin=105 | xmax=∞ (0)</text>
+  <text x="445" y="346" text-anchor="middle" font-size="12" font-family="monospace" fill="#14532d">balance = 800 | ctid=(0,2)</text>
+  <text x="445" y="364" text-anchor="middle" font-size="11" fill="#15803d">Tx &gt;= 105 nhìn thấy V2</text>
+
+  <rect x="580" y="282" width="230" height="90" rx="6" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+  <text x="695" y="305" text-anchor="middle" font-size="13" font-weight="700" fill="#6b21a8">Garbage Collection (GC)</text>
+  <text x="695" y="326" text-anchor="middle" font-size="11" fill="#581c87">Khi mọi Active Tx đều &gt; 105:</text>
+  <text x="695" y="345" text-anchor="middle" font-size="11" fill="#581c87">• Postgres: VACUUM thu hồi V1</text>
+  <text x="695" y="363" text-anchor="middle" font-size="11" fill="#581c87">• InnoDB: Purge Undo Log</text>
+</svg>

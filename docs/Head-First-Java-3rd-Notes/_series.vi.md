@@ -6,28 +6,28 @@ nextRecommended: head-first-java-chapter2
 difficulty: Beginner
 prerequisites:
   - Tư duy lập trình cơ bản (biến, rẽ nhánh, vòng lặp)
-  - Chưa cần bất kỳ kinh nghiệm nào về Java hay OOP
+  - Chưa cần kinh nghiệm trước về Java hay OOP
 youWillUnderstand:
   - Bản chất máy ảo Java (JVM), Bytecode, và mô hình bộ nhớ (Stack vs Heap, Garbage Collection)
   - 4 trụ cột lập trình hướng đối tượng (OOP: Encapsulation, Inheritance, Polymorphism, Abstraction)
   - Collections Framework, Generics, Lambdas và Streams API (Modern Java)
-  - Xử lý ngoại lệ (Exception Handling), File I/O, Serialization và NIO.2
-  - Lập trình mạng (Sockets) và Đa luồng (Threads, Race Conditions, Synchronization, Concurrency Issues)
+  - Cơ chế Exception Handling, File I/O, Serialization và NIO.2
+  - Lập trình mạng (Sockets) và Concurrency (Threads, Race Conditions, Synchronization, Atomic & Immutability)
 useItFor:
   - Xây dựng nền tảng Core Java bài bản từ gốc rễ
   - Nắm vững tư duy thiết kế phần mềm hướng đối tượng thực chiến
-  - Chuẩn bị phỏng vấn kỹ thuật vị trí Java / Backend Software Engineer
+  - Hệ thống hóa kiến thức trọng tâm cho vị trí Java / Backend Software Engineer
 ---
 
-Series này là tập hợp các ghi chú, mental models và tóm tắt kiến thức của mình khi đọc cuốn sách **Head First Java (3rd Edition)** của các tác giả **Kathy Sierra, Bert Bates** và **Trisha Gee** (Java Champion).
+Series này tổng hợp các ghi chú, mental models và tóm tắt kiến thức cốt lõi khi đọc cuốn sách **Head First Java (3rd Edition)** của **Kathy Sierra, Bert Bates** và **Trisha Gee** (Java Champion).
 
-### Lời khuyên khi theo dõi Series:
-1. Sách tiếp cận theo phong cách "Não bộ" (Brain-Friendly), nhiều hình ảnh minh họa và câu đố. Bạn nên kết hợp đọc sách gốc để có trải nghiệm thị giác trọn vẹn nhất.
+### Lưu ý khi theo dõi Series:
+1. Sách gốc tiếp cận theo phong cách trực quan (Brain-Friendly) với nhiều sơ đồ và bài tập tình huống. Nên kết hợp đọc sách gốc để nắm trọn vẹn ngữ cảnh.
 2. Nên đọc theo đúng trình tự từ **Chương 1 đến Chương 18** vì kiến thức các chương sau xây dựng trực tiếp trên nền tảng của các chương trước.
 
 ---
 
-### Danh sách 18 chương học:
+### Danh sách 18 chương:
 
 1. **[Chương 1 - Breaking the Surface: dive in: a quick dip](./head-first-java-chapter1)**
 2. **[Chương 2 - A Trip to Objectville: classes and objects](./head-first-java-chapter2)**

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { renderMarkdown } from '@/lib/mdx';
 import { Loader2 } from 'lucide-react';
+import 'katex/dist/katex.min.css';
 
 interface MarkdownPreviewProps {
 	markdown: string;

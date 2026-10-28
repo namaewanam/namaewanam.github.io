@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 360" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <rect width="860" height="360" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">Decorator Pattern Stream Chaining &amp; Object Graph Serialization</text>
+
+  <!-- Stream Pipeline -->
+  <rect x="30" y="58" width="800" height="125" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="50" y="82" font-size="14" font-weight="700" fill="#0f172a">1. Chuỗi Stream nối tiếp (Chain Stream + Connection Stream)</text>
+
+  <rect x="50" y="98" width="175" height="65" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="137" y="125" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Java Object (Heap)</text>
+  <text x="137" y="146" text-anchor="middle" font-size="11" font-family="monospace" fill="#14532d">writeObject(player)</text>
+
+  <line x1="225" y1="130" x2="265" y2="130" stroke="#334155" stroke-width="2"/>
+
+  <rect x="265" y="98" width="235" height="65" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="382" y="122" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">ObjectOutputStream</text>
+  <text x="382" y="142" text-anchor="middle" font-size="11" fill="#1e3a8a">(Chain Stream: Băm Object ──► Bytes)</text>
+
+  <line x1="500" y1="130" x2="540" y2="130" stroke="#334155" stroke-width="2"/>
+
+  <rect x="540" y="98" width="265" height="65" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="672" y="122" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">FileOutputStream ("save.ser")</text>
+  <text x="672" y="142" text-anchor="middle" font-size="11" fill="#78350f">(Connection Stream: Ghi Byte xuống đĩa)</text>
+
+  <!-- Object Graph & transient -->
+  <rect x="30" y="200" width="800" height="135" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="50" y="226" font-size="14" font-weight="700" fill="#0f172a">2. Đệ quy Object Graph &amp; Từ khóa transient</text>
+
+  <rect x="55" y="242" width="230" height="75" rx="6" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+  <text x="170" y="265" text-anchor="middle" font-size="12" font-weight="700" fill="#6b21a8">GameCharacter (Serializable)</text>
+  <text x="170" y="285" text-anchor="middle" font-size="11" font-family="monospace" fill="#581c87">serialVersionUID = 1L</text>
+  <text x="170" y="303" text-anchor="middle" font-size="11" font-family="monospace" fill="#581c87">level = 50 (Được lưu)</text>
+
+  <rect x="320" y="242" width="225" height="75" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="432" y="265" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Weapon (Serializable)</text>
+  <text x="432" y="285" text-anchor="middle" font-size="11" fill="#14532d">Tự động tuần tự hóa đệ quy</text>
+  <text x="432" y="303" text-anchor="middle" font-size="11" fill="#14532d">theo toàn bộ Object Graph</text>
+
+  <rect x="580" y="242" width="225" height="75" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="692" y="265" text-anchor="middle" font-size="12" font-weight="700" fill="#b91c1c">transient Socket / Password</text>
+  <text x="692" y="285" text-anchor="middle" font-size="11" fill="#7f1d1d">Bỏ qua khi ghi file!</text>
+  <text x="692" y="303" text-anchor="middle" font-size="11" fill="#7f1d1d">Khi đọc lên nhận null / 0 / false</text>
+</svg>

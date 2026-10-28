@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 380" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <rect width="840" height="380" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="420" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">Static (Cấp độ Class) vs Instance (Cấp độ Object) &amp; Integer Cache [-128..127]</text>
+
+  <!-- Left: Static vs Instance -->
+  <rect x="35" y="58" width="380" height="295" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="225" y="84" text-anchor="middle" font-size="14" font-weight="700" fill="#1e40af">1. Biến static dùng chung vs Biến Instance riêng lẻ</text>
+
+  <rect x="60" y="102" width="330" height="72" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="225" y="125" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Class Duck (Metaspace / Class Memory)</text>
+  <text x="225" y="148" text-anchor="middle" font-size="12" font-family="monospace" font-weight="700" fill="#1d4ed8">static int duckCount = 2; (Chỉ có 1 bản)</text>
+
+  <rect x="60" y="205" width="155" height="90" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="137" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Duck #1 (Heap)</text>
+  <text x="137" y="255" text-anchor="middle" font-size="12" font-family="monospace" fill="#14532d">size = 10</text>
+
+  <rect x="235" y="205" width="155" height="90" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="312" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Duck #2 (Heap)</text>
+  <text x="312" y="255" text-anchor="middle" font-size="12" font-family="monospace" fill="#14532d">size = 25</text>
+
+  <line x1="137" y1="205" x2="195" y2="174" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="4,3"/>
+  <line x1="312" y1="205" x2="255" y2="174" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="4,3"/>
+  <text x="225" y="325" text-anchor="middle" font-size="11" fill="#475569">Phương thức static không có con trỏ this (không gọi trực tiếp size)</text>
+
+  <!-- Right: Integer Cache -->
+  <rect x="435" y="58" width="370" height="295" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="620" y="84" text-anchor="middle" font-size="14" font-weight="700" fill="#92400e">2. Bẫy Autoboxing &amp; IntegerCache [-128..127]</text>
+
+  <rect x="455" y="105" width="330" height="105" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="620" y="128" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Trong khoảng [-128, 127]: Trỏ chung IntegerCache</text>
+  <text x="620" y="152" text-anchor="middle" font-size="12" font-family="monospace" fill="#14532d">Integer a = 127; Integer b = 127;</text>
+  <text x="620" y="175" text-anchor="middle" font-size="12" font-family="monospace" font-weight="700" fill="#15803d">a == b ──► true (Cùng địa chỉ trong Cache)</text>
+
+  <rect x="455" y="225" width="330" height="110" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="620" y="248" text-anchor="middle" font-size="12" font-weight="700" fill="#b91c1c">Ngoài khoảng [-128, 127]: Cấp phát Object mới!</text>
+  <text x="620" y="272" text-anchor="middle" font-size="12" font-family="monospace" fill="#7f1d1d">Integer c = 128; Integer d = 128;</text>
+  <text x="620" y="295" text-anchor="middle" font-size="12" font-family="monospace" font-weight="700" fill="#dc2626">c == d ──► false! (Luôn dùng c.equals(d))</text>
+  <text x="620" y="318" text-anchor="middle" font-size="11" fill="#7f1d1d">Unboxing biến Wrapper = null sẽ ném NullPointerException</text>
+</svg>

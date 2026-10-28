@@ -1,9 +1,11 @@
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import rehypeSlug from 'rehype-slug';
 
@@ -12,15 +14,17 @@ import rehypeSlug from 'rehype-slug';
  * This removes the need to ship react-markdown, remark-*,
  * and rehype-* to the client — saving ~150 kB of JS.
  *
- * The output is static HTML with syntax-highlighted code blocks.
+ * The output is static HTML with syntax-highlighted code blocks and KaTeX math.
  * Only the copy button remains a client component.
  */
 const processor = unified()
 	.use(remarkParse)
 	.use(remarkGfm)
+	.use(remarkMath)
 	.use(remarkRehype, { allowDangerousHtml: true })
 	.use(rehypeRaw)
 	.use(rehypeSlug)
+	.use(rehypeKatex, { strict: false })
 	.use(rehypeHighlight, { detect: true, ignoreMissing: true })
 	.use(rehypeStringify);
 

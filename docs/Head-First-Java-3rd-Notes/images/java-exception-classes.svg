@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="339"
+   height="226"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.1 "
+   sodipodi:docname="Java exception classes.svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="5.6568542"
+     inkscape:cx="379.99098"
+     inkscape:cy="27.949112"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     showguides="true"
+     inkscape:guide-bbox="true"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:window-width="1280"
+     inkscape:window-height="750"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-81.875,-54.736343)">
+    <path
+       style="color:#000000;fill:#e6e6e6;fill-opacity:0.53968257;stroke:none;stroke-width:1;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       d="m 84.70313,59.82854 0,205.08566 15.90625,0 0,16.72995 97.59375,0 0,-16.72995 222.84375,0 0,-205.08566 -336.34375,0 z"
+       id="rect3913-7"
+       inkscape:connector-curvature="0" />
+    <path
+       style="color:#000000;fill:#ffffff;stroke:#2a7fff;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;fill-opacity:1"
+       d="m 82.375,56.278145 0,205.085655 15.90625,0 0,16.72995 97.59375,0 0,-16.72995 222.84375,0 0,-205.085655 -336.34375,0 z"
+       id="rect3913"
+       inkscape:connector-curvature="0" />
+    <rect
+       style="color:#000000;fill:#808080;fill-opacity:0.17460315;stroke:none;stroke-width:1;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       id="rect3777"
+       width="74.953316"
+       height="24.04163"
+       x="121.62236"
+       y="19.646145"
+       transform="translate(81.875,55.78125)" />
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:#2a7fff;stroke-width:1.04335415"
+       id="rect2985"
+       width="75.656853"
+       height="23.5"
+       x="200"
+       y="71.362183" />
+    <a
+       xlink:href="http://download.oracle.com/javase/7/docs/api/java/lang/Throwable.html"
+       target="_blank"
+       id="a8">
+      <text
+         xml:space="preserve"
+         style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#2a7fff;fill-opacity:1;stroke:none;font-family:Sans"
+         x="238.15039"
+         y="87.362183"
+         id="text2987"
+         sodipodi:linespacing="125%"><tspan
+           sodipodi:role="line"
+           id="tspan2989"
+           x="238.15039"
+           y="87.362183"
+           style="font-size:12px;text-align:center;text-anchor:middle;fill:#2a7fff">Throwable</tspan></text>
+    </a>
+    <path
+       style="fill:none;stroke:#2a7fff;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 230.58333,102.75187 10.33334,0 -5.06419,-6.73873 z"
+       id="path2991"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc" />
+    <path
+       style="fill:none;stroke:#2a7fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 235.5,102.86218 0,26.5"
+       id="path3761"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="fill:none;stroke:#2a7fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 139,129.36218 191.5,0"
+       id="path3765"
+       inkscape:connector-curvature="0" />
+    <path
+       style="color:#000000;fill:none;stroke:#2a7fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       d="m 139.5,129.61218 0,26.5"
+       id="path3761-8"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="color:#000000;fill:none;stroke:#2a7fff;stroke-width:1.00921988px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       d="m 330,129.69797 0,26.99091"
+       id="path3761-8-0"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" />
+    <rect
+       style="color:#000000;fill:#7e8080;fill-opacity:0.17460315;stroke:none;stroke-width:1;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       id="rect3777-1"
+       width="67.882248"
+       height="24.04163"
+       x="107.31909"
+       y="160.10516" />
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:#2a7fff"
+       id="rect2985-2"
+       width="69.5"
+       height="23.5"
+       x="103.96425"
+       y="156.44444" />
+    <a
+       xlink:href="http://download.oracle.com/javase/7/docs/api/java/lang/Error.html"
+       target="_blank"
+       id="a18">
+      <text
+         xml:space="preserve"
+         style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#2a7fff;fill-opacity:1;stroke:none;font-family:Sans"
+         x="138.11464"
+         y="172.44444"
+         id="text2987-3"
+         sodipodi:linespacing="125%"><tspan
+           sodipodi:role="line"
+           id="tspan2989-7"
+           x="138.11464"
+           y="172.44444"
+           style="font-size:12px;text-align:center;text-anchor:middle;fill:#2a7fff">Error</tspan></text>
+    </a>
+    <rect
+       style="color:#000000;fill:#7e8080;fill-opacity:0.17460315;stroke:none;stroke-width:1;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       id="rect3777-1-7"
+       width="67.882248"
+       height="24.04163"
+       x="297.66388"
+       y="160.98732" />
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:#2a7fff"
+       id="rect2985-2-2"
+       width="69.5"
+       height="23.5"
+       x="293.5206"
+       y="157.15154" />
+    <a
+       xlink:href="http://download.oracle.com/javase/7/docs/api/java/lang/Exception.html"
+       target="_blank"
+       id="a23">
+      <text
+         xml:space="preserve"
+         style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#2a7fff;fill-opacity:1;stroke:none;font-family:Sans"
+         x="329.67099"
+         y="173.15154"
+         id="text2987-3-1"
+         sodipodi:linespacing="125%"><tspan
+           sodipodi:role="line"
+           id="tspan2989-7-8"
+           x="329.67099"
+           y="173.15154"
+           style="font-size:12px;text-align:center;text-anchor:middle;fill:#2a7fff">Exception</tspan></text>
+    </a>
+    <path
+       style="fill:none;stroke:#2a7fff;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 324.83333,188.67639 10.33334,0 -5.06419,-6.73873 z"
+       id="path2991-8"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc" />
+    <path
+       style="fill:none;stroke:#2a7fff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 329.75,188.7867 0,26.5"
+       id="path3761-7"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" />
+    <rect
+       style="color:#000000;fill:#7e8080;fill-opacity:0.17460315;stroke:none;stroke-width:1;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       id="rect3777-1-7-1"
+       width="136.4716"
+       height="24.04163"
+       x="266.42984"
+       y="219.67717" />
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:#2a7fff;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:none"
+       id="rect2985-2-2-6"
+       width="136.92706"
+       height="23.5"
+       x="262.62457"
+       y="214.61218" />
+    <a
+       xlink:href="http://download.oracle.com/javase/7/docs/api/java/lang/RuntimeException.html"
+       target="_blank"
+       id="a30">
+      <text
+         xml:space="preserve"
+         style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#2a7fff;fill-opacity:1;stroke:none;font-family:Sans"
+         x="329.90039"
+         y="230.61218"
+         id="text2987-3-1-4"
+         sodipodi:linespacing="125%"><tspan
+           sodipodi:role="line"
+           id="tspan2989-7-8-1"
+           x="329.90039"
+           y="230.61218"
+           style="font-size:12px;text-align:center;text-anchor:middle;fill:#2a7fff">RuntimeException</tspan></text>
+    </a>
+    <a
+       xlink:href="http://download.oracle.com/javase/7/docs/api/java/lang/package-summary.html"
+       target="_blank"
+       id="a35">
+      <text
+         xml:space="preserve"
+         style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#2a7fff;fill-opacity:1;stroke:none;font-family:Sans"
+         x="147.74431"
+         y="269.16199"
+         id="text2987-3-1-4-8"
+         sodipodi:linespacing="125%"><tspan
+           sodipodi:role="line"
+           id="tspan2989-7-8-1-0"
+           x="147.74431"
+           y="269.16199"
+           style="font-size:12px;text-align:center;text-anchor:middle;fill:#2a7fff">java.lang</tspan></text>
+    </a>
+  </g>
+</svg>

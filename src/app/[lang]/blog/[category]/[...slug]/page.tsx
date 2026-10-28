@@ -14,6 +14,7 @@ import PostLayout from '@/components/PostLayout';
 import { SITE_NAME, SITE_URL, toPostOgSlug } from '@/lib/site';
 import JsonLd from '@/components/seo/JsonLd';
 import { getBlogPostingSchema, getBreadcrumbSchema } from '@/lib/schema';
+import 'katex/dist/katex.min.css';
 
 export const dynamicParams = false;
 

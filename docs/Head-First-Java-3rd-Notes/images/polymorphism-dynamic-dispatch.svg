@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 370" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <rect width="840" height="370" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="420" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">Đa hình (Polymorphism):Animal a = new Dog() — Compile-time vs Runtime</text>
+
+  <!-- Compile-time Box -->
+  <rect x="35" y="65" width="365" height="270" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="217" y="92" text-anchor="middle" font-size="15" font-weight="700" fill="#1e40af">1. Compile-Time (Kiểu biến tham chiếu)</text>
+  <text x="217" y="116" text-anchor="middle" font-size="13" font-family="monospace" font-weight="700" fill="#1d4ed8">Animal a</text>
+
+  <rect x="55" y="135" width="325" height="180" rx="6" fill="#ffffff" stroke="#3b82f6"/>
+  <text x="217" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a8a">Trình biên dịch (javac) chỉ nhìn kiểu Animal:</text>
+  <text x="217" y="185" text-anchor="middle" font-size="11" font-family="monospace" fill="#166534">a.makeNoise(); // Hợp lệ (có trong Animal)</text>
+  <text x="217" y="207" text-anchor="middle" font-size="11" font-family="monospace" fill="#166534">a.eat();       // Hợp lệ (có trong Animal)</text>
+  <text x="217" y="230" text-anchor="middle" font-size="11" font-family="monospace" fill="#dc2626">a.fetchBall(); // LỖI BIÊN DỊCH! (Animal ko có)</text>
+  <line x1="75" y1="248" x2="360" y2="248" stroke="#cbd5e1"/>
+  <text x="217" y="270" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Lưu ý: Field, static &amp; private method</text>
+  <text x="217" y="288" text-anchor="middle" font-size="11" fill="#475569">luôn gắn cứng (Static Binding) theo kiểu Animal!</text>
+
+  <!-- Arrow -->
+  <line x1="400" y1="200" x2="440" y2="200" stroke="#0f172a" stroke-width="2.5"/>
+
+  <!-- Runtime Box -->
+  <rect x="440" y="65" width="365" height="270" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="622" y="92" text-anchor="middle" font-size="15" font-weight="700" fill="#166534">2. Runtime (Kiểu đối tượng thực trên Heap)</text>
+  <text x="622" y="116" text-anchor="middle" font-size="13" font-family="monospace" font-weight="700" fill="#15803d">= new Dog()</text>
+
+  <rect x="460" y="135" width="325" height="180" rx="6" fill="#ffffff" stroke="#16a34a"/>
+  <text x="622" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="#14532d">JVM Dynamic Method Dispatch (vtable):</text>
+  <text x="622" y="185" text-anchor="middle" font-size="11" fill="#166534">Khi chạy lệnh a.makeNoise(), JVM kiểm tra</text>
+  <text x="622" y="205" text-anchor="middle" font-size="11" fill="#166534">đối tượng thực tế trên Heap là Dog và gọi</text>
+  <text x="622" y="227" text-anchor="middle" font-size="12" font-family="monospace" font-weight="700" fill="#15803d">Dog.makeNoise() ──► "Gâu gâu!"</text>
+  <line x1="480" y1="248" x2="765" y2="248" stroke="#cbd5e1"/>
+  <text x="622" y="270" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Downcast an toàn (Java 16+ Pattern Matching):</text>
+  <text x="622" y="288" text-anchor="middle" font-size="11" font-family="monospace" fill="#334155">if (a instanceof Dog d) { d.fetchBall(); }</text>
+</svg>

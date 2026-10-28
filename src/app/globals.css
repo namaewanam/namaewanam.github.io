@@ -1203,3 +1203,10 @@ article .prose {
 		font-size 0.15s ease,
 		zoom 0.15s ease;
 }
+
+/* KaTeX math blocks */
+.katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.5rem 0;
+}

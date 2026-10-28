@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 400" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <rect width="860" height="400" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">Phi-Accrual Failure Detector &amp; Giao thức SWIM Indirect Ping</text>
+
+  <!-- Left: Phi Accrual Curve -->
+  <rect x="30" y="55" width="390" height="320" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="225" y="80" text-anchor="middle" font-size="14" font-weight="700" fill="#1e40af">1. Thang đo nghi ngờ liên tục φ(t_now)</text>
+  <text x="225" y="100" text-anchor="middle" font-size="11" fill="#475569">φ(t) = -log10(P_later(t - T_last)) thích nghi theo độ trễ mạng</text>
+
+  <!-- Axes -->
+  <line x1="75" y1="290" x2="385" y2="290" stroke="#334155" stroke-width="2"/>
+  <line x1="75" y1="290" x2="75" y2="125" stroke="#334155" stroke-width="2"/>
+  <text x="235" y="315" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">Thời gian chờ từ nhịp tim cuối Δt (ms) ──►</text>
+  <text x="55" y="210" text-anchor="middle" font-size="12" font-weight="700" fill="#334155" transform="rotate(-90 55 210)">Chỉ số φ(t)</text>
+
+  <!-- Threshold lines -->
+  <line x1="75" y1="165" x2="380" y2="165" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="330" y="157" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">Φ = 8 (Ngưỡng khai tử)</text>
+
+  <line x1="75" y1="220" x2="380" y2="220" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="320" y="212" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">Φ = 3 (Ngừng gửiRead mới)</text>
+
+  <!-- Curve -->
+  <path d="M 75 288 Q 190 282, 245 220 T 325 130" fill="none" stroke="#2563eb" stroke-width="3"/>
+  <text x="225" y="348" text-anchor="middle" font-size="11" fill="#1e3a8a">Cassandra / Akka dùng cửa sổ trượt lưu μ và σ² của Heartbeat</text>
+
+  <!-- Right: SWIM Protocol -->
+  <rect x="440" y="55" width="390" height="320" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="635" y="80" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">2. Giao thức SWIM: Indirect Ping &amp; Suspect State</text>
+  <text x="635" y="100" text-anchor="middle" font-size="11" fill="#475569">Tránh báo tử nhầm khi đường truyền trực tiếp A ──► B bị nghẽn</text>
+
+  <!-- Nodes -->
+  <circle cx="505" cy="200" r="32" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="505" y="205" text-anchor="middle" font-size="14" font-weight="700" fill="#1e40af">Node A</text>
+
+  <circle cx="765" cy="200" r="32" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="765" y="205" text-anchor="middle" font-size="14" font-weight="700" fill="#92400e">Node B</text>
+
+  <circle cx="635" cy="135" r="26" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="635" y="140" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Node C</text>
+
+  <circle cx="635" cy="265" r="26" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="635" y="270" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Node D</text>
+
+  <!-- Direct link failed -->
+  <line x1="537" y1="200" x2="733" y2="200" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+  <text x="635" y="192" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">1. Direct Ping Timeout (X)</text>
+
+  <!-- Indirect links -->
+  <line x1="530" y1="180" x2="612" y2="145" stroke="#16a34a" stroke-width="2"/>
+  <line x1="658" y1="145" x2="740" y2="180" stroke="#16a34a" stroke-width="2"/>
+  <line x1="530" y1="220" x2="612" y2="255" stroke="#16a34a" stroke-width="2"/>
+  <line x1="658" y1="255" x2="740" y2="220" stroke="#16a34a" stroke-width="2"/>
+
+  <text x="635" y="325" text-anchor="middle" font-size="11" font-weight="600" fill="#14532d">2. A nhờ k nút trung gian (C, D) gửi ping-req(B) kiểm chứng chéo</text>
+  <text x="635" y="348" text-anchor="middle" font-size="11" fill="#334155">3. Nếu vẫn thất bại: Đánh dấu SUSPECT (chờ ân xá trước khi DEAD)</text>
+</svg>

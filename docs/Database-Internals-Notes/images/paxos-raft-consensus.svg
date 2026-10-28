@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 420" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <rect width="860" height="420" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="430" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">Đồng thuận phân tán: Basic Paxos (2 Pha) &amp; Raft Log Replication</text>
+
+  <!-- Left: Basic Paxos -->
+  <rect x="30" y="55" width="390" height="340" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="225" y="80" text-anchor="middle" font-size="15" font-weight="700" fill="#1e40af">1. Basic Paxos (Quorum f + 1 trên 2f + 1)</text>
+
+  <rect x="50" y="98" width="350" height="125" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="225" y="120" text-anchor="middle" font-size="13" font-weight="700" fill="#1d4ed8">Pha 1: Prepare / Promise (Thăm dò &amp; Khóa Ballot)</text>
+  <text x="225" y="142" text-anchor="middle" font-size="11" font-family="monospace" fill="#1e3a8a">Proposer ──► Prepare(n) ──► Đa số Acceptor</text>
+  <text x="225" y="164" text-anchor="middle" font-size="11" fill="#1e3a8a">• Nếu n &gt; max_ballot: Hứa từ chối mọi Ballot &lt; n</text>
+  <text x="225" y="184" text-anchor="middle" font-size="11" fill="#1e3a8a">• Trả về (accepted_ballot, accepted_value) cao nhất đã nhận</text>
+  <text x="225" y="204" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">• Bắt buộc kế thừa v của Ballot lớn nhất nếu đã tồn tại!</text>
+
+  <rect x="50" y="238" width="350" height="135" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="225" y="260" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Pha 2: Accept / Accepted (Chốt giá trị)</text>
+  <text x="225" y="282" text-anchor="middle" font-size="11" font-family="monospace" fill="#14532d">Proposer ──► Accept(n, v) ──► Đa số Acceptor</text>
+  <text x="225" y="304" text-anchor="middle" font-size="11" fill="#14532d">• Acceptor chấp nhận nếu chưa hứa với Ballot nào &gt; n</text>
+  <text x="225" y="324" text-anchor="middle" font-size="11" fill="#14532d">• Multi-Paxos: Bầu Leader ổn định để bỏ qua Pha 1</text>
+  <text x="225" y="348" text-anchor="middle" font-size="11" font-weight="700" fill="#166534">Chỉ cần 1 RTT (Accept/Accepted) cho mỗi lệnh ghi tiếp theo</text>
+
+  <!-- Right: Raft -->
+  <rect x="440" y="55" width="390" height="340" rx="8" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+  <text x="635" y="80" text-anchor="middle" font-size="15" font-weight="700" fill="#92400e">2. Raft: Strong Leader &amp; Log Matching</text>
+
+  <!-- State transition -->
+  <rect x="460" y="100" width="95" height="42" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="507" y="125" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">Follower</text>
+
+  <rect x="587" y="100" width="95" height="42" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="634" y="125" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">Candidate</text>
+
+  <rect x="715" y="100" width="95" height="42" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="762" y="125" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">Leader</text>
+
+  <line x1="555" y1="121" x2="587" y2="121" stroke="#334155" stroke-width="2"/>
+  <line x1="682" y1="121" x2="715" y2="121" stroke="#334155" stroke-width="2"/>
+
+  <!-- Log replication -->
+  <rect x="460" y="162" width="350" height="210" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="635" y="185" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Replicated Log &amp; Election Safety Rule</text>
+
+  <text x="475" y="215" font-size="11" font-weight="700" font-family="monospace" fill="#166534">Leader   : [T1:x=1] [T1:y=2] [T2:x=5] [T3:z=9]</text>
+  <text x="475" y="242" font-size="11" font-weight="700" font-family="monospace" fill="#1e40af">Follower1: [T1:x=1] [T1:y=2] [T2:x=5] [T3:z=9] (Ack)</text>
+  <text x="475" y="269" font-size="11" font-weight="700" font-family="monospace" fill="#64748b">Follower2: [T1:x=1] [T1:y=2] [T2:x=5]  (Lagging)</text>
+
+  <line x1="475" y1="286" x2="795" y2="286" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="635" y="308" text-anchor="middle" font-size="11" fill="#334155">• Leader chỉ Commit mục thuộc Term hiện tại khi đã nhân bản</text>
+  <text x="635" y="326" text-anchor="middle" font-size="11" fill="#334155">  lên quá bán (Majority Quorum) các nút trong cụm.</text>
+  <text x="635" y="346" text-anchor="middle" font-size="11" font-weight="600" fill="#b91c1c">• Bầu cử: Chỉ bầu cho Candidate có (lastLogTerm, lastLogIndex) mới hơn.</text>
+</svg>
