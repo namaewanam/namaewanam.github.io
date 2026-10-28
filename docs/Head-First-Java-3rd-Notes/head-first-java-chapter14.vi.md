@@ -55,8 +55,6 @@ public class MyDrawPanel extends JPanel {
 
 Trong lập trình hướng sự kiện (Event-driven programming), chương trình không chạy một mạch từ trên xuống dưới rồi thoát, mà chờ tương tác từ người dùng. Cơ chế sự kiện của Java Swing chính là hình mẫu điển hình của **Observer Design Pattern**, xoay quanh 3 thành phần:
 
-![Mô hình Event-Driven GUI và Observer Pattern trong Java Swing](./images/swing-observer-event-loop.svg)
-
 1. **Event Source (Nguồn phát sự kiện)**: Các thành phần giao diện như `JButton`, `JCheckBox`, `JTextField`. Nó biết khi nào người dùng click chuột hay gõ phím và chịu trách nhiệm thông báo cho các đối tượng đã đăng ký lắng nghe.
 2. **Listener (Bộ lắng nghe)**: Đối tượng quan tâm đến sự kiện. Để nhận thông báo, class lắng nghe phải thực thi một **Listener Interface** tương ứng (ví dụ: `ActionListener`, `MouseListener`, `KeyListener`) — đây chính là bản quy ước (contract) đảm bảo có hàm xử lý sự kiện.
 3. **Event Object (Đối tượng sự kiện)**: Gói tin chứa chi tiết về sự kiện vừa xảy ra (như `ActionEvent` mang theo thời điểm bấm nút, `MouseEvent` mang tọa độ chuột `x, y`), được truyền làm tham số vào method của Listener.

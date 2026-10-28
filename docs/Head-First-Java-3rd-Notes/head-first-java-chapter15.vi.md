@@ -45,10 +45,10 @@ Mỗi Container (`JFrame`, `JPanel`) đều gắn với một bộ quản lý b�
 
 ## Bộ ba Layout Managers kinh điển (The Big Three) {#the-big-three}
 
-![So sánh trực quan 3 trình quản lý bố cục kinh điển trong Swing: BorderLayout, FlowLayout và BoxLayout](./images/swing-layout-managers.svg)
-
 ### 1. `BorderLayout` (Mặc định của `JFrame`) {#border-layout}
 Chia khung chứa thành 5 vùng riêng biệt: **`NORTH`**, **`SOUTH`**, **`EAST`**, **`WEST`**, và **`CENTER`**. Mỗi vùng chỉ chứa được **đúng 1 component** (nếu muốn đặt nhiều nút vào một vùng, cần gom chúng vào một `JPanel` trước).
+
+![Bố cục 5 vùng NORTH, SOUTH, WEST, CENTER, EAST của BorderLayout trong Java Swing](./images/oracle-borderlayout-demo.png)
 
 Quy tắc tính kích thước quan trọng của `BorderLayout`:
 - **`NORTH` và `SOUTH`**: Được tôn trọng **chiều cao ưa thích (`preferred height`)**, nhưng bị kéo giãn **chiều rộng (`width`)** cho bằng toàn bộ bề ngang của khung chứa.
@@ -79,10 +79,14 @@ public class BorderLayoutDemo {
 ### 2. `FlowLayout` (Mặc định của `JPanel`) {#flow-layout}
 Sắp xếp các thành phần giống cơ chế gõ văn bản (word-wrap): xếp lần lượt **từ trái sang phải** theo thứ tự được thêm vào; khi hết chỗ trên một hàng, nó tự động đẩy thành phần tiếp theo **xuống dòng mới**.
 
+![Minh họa cách sắp xếp các nút bấm từ trái sang phải của FlowLayout](./images/oracle-flowlayout-demo.png)
+
 - **Quy tắc kích thước**: Mọi component nằm trong `FlowLayout` đều được giữ **nguyên vẹn cả chiều rộng lẫn chiều cao ưa thích (`getPreferredSize()`)** của mình, không bị kéo biến dạng.
 
 ### 3. `BoxLayout` (Xếp chồng thẳng hàng ngang hoặc dọc) {#box-layout}
 Khác với `FlowLayout`, **`BoxLayout`** cho phép ép các thành phần phải xếp thành một cột dọc (`BoxLayout.Y_AXIS`) ngay cả khi bề ngang vẫn còn thừa chỗ để nằm chung một dòng.
+
+![Minh họa cách xếp chồng các nút bấm theo trục dọc của BoxLayout](./images/oracle-boxlayout-demo.png)
 
 - **Quy tắc kích thước**: Giống `FlowLayout`, nó tôn trọng kích thước ưa thích của từng thành phần, nhưng buộc các thành phần xếp nối tiếp theo trục đã chọn (`X_AXIS` hoặc `Y_AXIS`).
 

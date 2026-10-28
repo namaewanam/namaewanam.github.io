@@ -40,7 +40,7 @@ Khi một giao dịch cần cập nhật hoặc chèn dữ liệu vào một Lea
 2. Vì địa chỉ trang con đã đổi từ `C` sang `C'`, nút cha `Internal B` cũng không được sửa tại chỗ mà phải được sao chép sang trang mới **`Internal B'`** trỏ tới `C'` (đồng thời vẫn giữ nguyên con trỏ tới các trang con khác không thay đổi).
 3. Quá trình sao chép dây chuyền này (**Path Copying**) lan truyền ngược lên tới tận gốc, tạo ra một nút gốc hoàn toàn mới **`Root A'`** tại thời điểm giao dịch `COMMIT`.
 
-![So sánh kiến trúc Copy-on-Write B-Tree (Path Copying) và Lock-Free Bw-Tree (Mapping Table + CAS Delta Chain)](./images/cow-vs-bwtree.svg)
+![Minh họa cơ chế Path Copying trên cây bất biến (Persistent / Copy-on-Write Tree)](./images/persistent-cow-tree.svg)
 
 ```mermaid
 flowchart TD

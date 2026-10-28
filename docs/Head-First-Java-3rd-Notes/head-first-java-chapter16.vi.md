@@ -35,7 +35,7 @@ Khi chương trình tắt đi, toàn bộ các object trên vùng nhớ Heap đ�
 
 API I/O truyền thống của Java (`java.io`) được thiết kế dựa trên sự kết hợp giữa hai loại luồng (Streams):
 
-![Chuỗi nối tiếp Stream (Chain Stream + Connection Stream) và tuần tự hóa đồ thị đối tượng với từ khóa transient](./images/serialization-decorator-streams.svg)
+![Quá trình tuần tự hóa (Serialization) chuyển đổi đối tượng trong bộ nhớ thành luồng byte](./images/serialization-stream.png)
 
 1. **Connection Stream (Luồng kết nối mức thấp)**: Đại diện cho kết nối vật lý trực tiếp tới nguồn hoặc đích (ổ cứng, socket mạng) và chỉ biết đọc/ghi từng byte thô. Ví dụ: `FileOutputStream`, `FileInputStream`, `FileWriter`, `FileReader`.
 2. **Chain Stream (Luồng mắc xích mức cao)**: Không thể tự kết nối trực tiếp tới file, mà phải **mắc nối (chain)** vào một luồng khác. Nó cung cấp các thao tác mức cao (như biến object thành byte, hoặc gom buffer dữ liệu để đọc từng dòng chữ). Ví dụ: `ObjectOutputStream`, `BufferedReader`, `BufferedWriter`.

@@ -95,7 +95,7 @@ System.out.println(list.get(0));        // "B"
 
 ## Bảng so sánh chi tiết: Mảng thường (`String[]`) vs `ArrayList<String>` {#array-vs-arraylist}
 
-![So sánh cấu trúc bộ nhớ của Mảng tĩnh cố định (Array) và ArrayList tự động co giãn](./images/array-vs-arraylist-memory.svg)
+![Hệ thống các Interface cốt lõi của thư viện chuẩn Java Collections Framework](./images/oracle-collections-core.gif)
 
 ```mermaid
 flowchart LR

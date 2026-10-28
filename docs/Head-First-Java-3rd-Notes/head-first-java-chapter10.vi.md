@@ -62,7 +62,7 @@ public class Duck {
 
 ## Biến `static`, Hằng số `static final` và 3 ý nghĩa của `final` {#static-variables-and-final}
 
-![So sánh vùng nhớ biến static cấp Class với biến Instance trên Heap và cơ chế Integer Cache từ -128 đến 127](./images/static-vs-instance-integer-cache.svg)
+![Sơ đồ UML minh họa thành phần static cấp độ Class và constructor private](./images/singleton-uml-static.svg)
 
 ```mermaid
 flowchart TB

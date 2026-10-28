@@ -68,7 +68,7 @@ Hai thuật ngữ **Parameter** và **Argument** thường bị dùng lẫn lộ
 > [!IMPORTANT]
 > **Java LUÔN LUÔN là Pass-by-Value (Truyền theo giá trị / Pass-by-Copy)**. Java hoàn toàn KHÔNG có Pass-by-Reference như C++ hay C# (`ref`/`out`). Khi truyền bất kỳ biến nào vào `method`, JVM luôn **sao chép các bit** nằm trong chiếc cốc (biến) của nơi gọi sang chiếc cốc mới (parameter) của `method`.
 
-![Cơ chế Java Pass-by-Value trên Stack và Heap: Sao chép giá trị Primitive vs Sao chép Remote Reference](./images/pass-by-value-stack-heap.svg)
+![Cấu trúc các khung ngăn xếp (Call Stack Frames) lưu trữ tham số và biến cục bộ khi gọi phương thức](./images/call-stack-layout.svg)
 
 Sự nhầm lẫn thường gặp xuất phát từ việc không phân biệt rõ giữa **sao chép giá trị nguyên thủy (primitive)** và **sao chép chiếc điều khiển từ xa (`reference`)**:
 
@@ -140,6 +140,8 @@ flowchart LR
 ## Nguyên tắc cốt lõi: Đóng gói dữ liệu (Encapsulation) {#encapsulation}
 
 Nếu để lộ các biến `instance` (như `dog.size = -10;`), bất kỳ đoạn code nào bên ngoài cũng có thể gán những giá trị vô lý (chó nặng âm 10 kg!) làm hỏng trạng thái của hệ thống.
+
+![Sơ đồ minh họa nguyên lý đóng gói dữ liệu (Encapsulation) trong lập trình hướng đối tượng](./images/uml-encapsulation.svg)
 
 **Encapsulation (Đóng gói)** giúp xây một bức tường bảo vệ xung quanh dữ liệu của `object` và bắt buộc mọi giao tiếp phải đi qua cổng kiểm soát:
 

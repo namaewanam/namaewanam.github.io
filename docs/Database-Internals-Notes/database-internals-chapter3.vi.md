@@ -26,6 +26,9 @@ Khác với các định dạng văn bản như JSON hay CSV vốn tốn kém ch
 
 ### 1. Kiểu số nguyên và thứ tự Byte (Endianness)
 Số nguyên có kích thước cố định (`INT8` = `1 byte`, `INT16` = `2 bytes`, `INT32` = `4 bytes`, `INT64` = `8 bytes`) được biểu diễn theo hai quy ước thứ tự byte:
+
+![So sánh thứ tự lưu trữ byte 32-bit giữa Big-Endian và Little-Endian](./images/endianness-32bit.svg)
+
 - **Big-Endian (Most Significant Byte - MSB first)**: Byte có trọng số lớn đứng đầu. Ví dụ số `0x12345678` được lưu theo thứ tự `12 34 56 78`. Điểm mạnh quan trọng của Big-Endian trong cơ sở dữ liệu là cho phép so sánh hai mảng byte từ trái sang phải bằng hàm `memcmp` mà vẫn giữ nguyên thứ tự giá trị số học (đối với số không dấu).
 - **Little-Endian (Least Significant Byte - LSB first)**: Byte có trọng số nhỏ đứng đầu (`78 56 34 12`). Phù hợp với kiến trúc CPU `x86_64`, cho phép đọc trực tiếp từ bộ nhớ vào thanh ghi CPU mà không cần đảo byte (byte swap).
 
@@ -72,8 +75,6 @@ Nếu mọi bản ghi đều có kích thước cố định (Fixed-size records
 
 ### Giải pháp: Slotted Page (PostgreSQL, InnoDB)
 **Slotted Page** tách biệt vị trí định danh logic của bản ghi khỏi vị trí byte vật lý thông qua một mảng con trỏ trung gian gọi là **Slot Array** (hay **Line Pointer Directory** trong PostgreSQL).
-
-![Cấu trúc Slotted Page (8 KB) và định dạng nhị phân của Data Leaf Cell](./images/slotted-page-layout.svg)
 
 ```mermaid
 flowchart TD

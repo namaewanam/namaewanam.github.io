@@ -36,6 +36,8 @@ Các khái niệm cốt lõi trong Buffer Manager:
 
 Khi Buffer Pool đầy và cần nạp một Page mới từ đĩa, hệ thống phải chọn một Page hiện có (với `pin_count == 0`) để trục xuất.
 
+![Minh họa hoạt động của thuật toán thay thế trang LRU (Least Recently Used) trong bộ nhớ đệm](./images/lru-cache-eviction.png)
+
 ### 1. Điểm yếu chí mạng của LRU thuần túy (Pure LRU)
 Thuật toán **LRU (Least Recently Used)** dùng một danh sách liên kết đôi, đưa mọi trang vừa được truy cập lên đầu danh sách (`Head`) và trục xuất trang ở cuối danh sách (`Tail`). Trong cơ sở dữ liệu, Pure LRU có hai điểm yếu lớn:
 1. **Ô nhiễm bộ nhớ đệm do quét bảng (Sequential Scan Cache Pollution)**: Một câu truy vấn báo cáo chạy `SELECT * FROM logs` (Full Table Scan) đọc qua hàng triệu trang dữ liệu chỉ dùng đúng `1` lần sẽ đẩy toàn bộ các trang chỉ mục nóng (Hot Index Pages) ra khỏi Buffer Pool!
@@ -75,8 +77,6 @@ Mỗi bản ghi nhật ký trong tệp WAL được gắn một số thứ tự 
 ## Thuật toán khôi phục ARIES (3 giai đoạn) {#aries-recovery}
 
 Khi sử dụng chính sách **STEAL + NO-FORCE**, tại thời điểm máy chủ mất điện đột ngột, đĩa cứng sẽ rơi vào trạng thái hỗn loạn: vừa thiếu các thay đổi của những giao dịch đã `COMMIT` (do `NO-FORCE`), vừa chứa sẵn các thay đổi rác của những giao dịch chưa kịp kết thúc (do `STEAL`). Thuật toán **ARIES (Algorithms for Recovery and Isolation Exploiting Semantics)** khôi phục lại trạng thái nhất quán qua `3` giai đoạn tuần tự:
-
-![Quy trình khôi phục sự cố 3 pha của ARIES và chuỗi phiên bản MVCC Tuple](./images/aries-mvcc-architecture.svg)
 
 ```mermaid
 flowchart LR

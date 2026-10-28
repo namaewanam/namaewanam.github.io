@@ -65,7 +65,7 @@ Trong các thiết kế truyền thống, bộ phát hiện lỗi sử dụng m�
 
 Để giải quyết triệt để điểm yếu của ngưỡng cố định và kết quả nhị phân (`Alive`/`Dead`), Hayashibara và cộng sự (`2004`) đã đề xuất **$\Phi$-Accrual Failure Detector (Phi-Accrual)** — thuật toán hiện được sử dụng làm nền tảng trong **Apache Cassandra**, **ScyllaDB** và **Akka Cluster**.
 
-![Đường cong nghi ngờ liên tục của Phi-Accrual Failure Detector và giao thức SWIM Indirect Ping](./images/phi-accrual-swim.svg)
+![Phân phối chuẩn với độ lệch chuẩn sigma dùng để ước lượng xác suất trễ nhịp tim trong Phi-Accrual Detector](./images/normal-distribution-sigma.svg)
 
 ### Tư tưởng cốt lõi: Thay thế Boolean bằng Thang đo nghi ngờ liên tục ($\varphi$)
 

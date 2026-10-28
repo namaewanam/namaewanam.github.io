@@ -36,7 +36,7 @@ Khi thiết kế một chương trình mới, thay vì lao vào gõ code Java ng
 - Con tàu (`SimpleStartup`) chiếm **3 ô liên tiếp** trên mảng (ví dụ: `[2, 3, 4]`).
 - Người chơi nhập vào một tọa độ dự đoán (`userGuess`), `method` `checkYourself(int userGuess)` sẽ kiểm tra và trả về `"miss"` (trượt), `"hit"` (trúng), hoặc `"kill"` (chìm tàu khi bắn trúng đủ 3 lần).
 
-![Mô hình mảng 1 chiều trong Simple Startup Game và sự khác biệt giữa ++i và i++](./images/simple-startup-loop-flow.svg)
+![Cấu trúc mảng 1 chiều đánh chỉ số từ 0 trong bộ nhớ Java](./images/oracle-array-indices.gif)
 
 ```mermaid
 flowchart LR

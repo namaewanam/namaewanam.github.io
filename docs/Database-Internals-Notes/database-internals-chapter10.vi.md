@@ -76,6 +76,8 @@ sequenceDiagram
 - **Invitation Algorithm (Thuật toán Lời mời)**: Được thiết kế cho môi trường có thể bị phân mảnh mạng. Mỗi nút khi bị cô lập có thể tự tạo một nhóm gồm chính nó làm Leader. Định kỳ, các Leader của các nhóm khác nhau sẽ gửi bản tin `INVITATION` để mời nhóm khác **hợp nhất (*merge*)** lại thành một nhóm lớn hơn dưới sự điều phối của chỉ có đúng `1` Leader chung.
 - **Ring Algorithm (Thuật toán Vòng tròn logic - Chang & Roberts)**: Các nút được sắp xếp thành một vòng tròn logic (`N_1 -> N_2 -> ... -> N_k -> N_1`). Khi phát hiện mất Leader, nút khởi xướng tạo một bản tin `ELECTION` chứa ID của mình và chuyển tiếp theo chiều kim đồng hồ cho nút kế tiếp còn sống. Mỗi nút trên đường đi đều thêm ID của mình vào danh sách trong bản tin (hoặc chỉ giữ lại ID lớn nhất). Khi bản tin đi hết một vòng quay về nút khởi xướng, nút có ID lớn nhất trong danh sách sẽ được công bố làm Leader mới qua một vòng bản tin `ELECTED`.
 
+![Cấu trúc liên kết vòng tròn (Ring Topology) dùng trong thuật toán bầu chọn Ring Election](./images/ring-topology-election.png)
+
 | Thuật toán | Cấu trúc liên kết | Độ phức tạp tin nhắn | Hạn chế chính khi áp dụng thực tế |
 | :--- | :--- | :--- | :--- |
 | **Bully Algorithm** | Mạng kết nối đầy đủ (All-to-All) | `O(N^2)` (trường hợp xấu) | Dễ gây Split-Brain khi có Network Partition; nhạy cảm với Flapping ở node có ID cao. |
@@ -88,8 +90,6 @@ sequenceDiagram
 ## Thảm họa Split-Brain và Cơ chế bảo vệ bằng Fencing Token {#split-brain-and-fencing-tokens}
 
 Ngay cả khi hệ thống sử dụng thuật toán bầu chọn an toàn dựa trên đa số phiếu (*Quorum*), việc **bầu ra được một Leader hợp lệ không có nghĩa là Leader cũ đã thực sự dừng hoạt động**. Đây là nguồn gốc của một trong những lỗi phá hủy dữ liệu nguy hiểm trong hệ thống phân tán: **Split-Brain do tiến trình bị tạm dừng (Process Pause / Zombie Leader)**.
-
-![Cơ chế Monotonic Fencing Token chặn lệnh ghi trễ từ Zombie Leader sau đợt GC Pause](./images/fencing-tokens-split-brain.svg)
 
 ### Kịch bản thực tế: GC Pause biến Leader cũ thành Zombie Leader
 

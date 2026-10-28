@@ -37,7 +37,7 @@ Một câu hỏi kinh điển khi hiện thực hóa B-Tree: *Nếu các Cell d�
 
 Nếu phải sắp xếp lại và dịch chuyển toàn bộ các Data Cell nặng hàng kilobyte mỗi khi chèn một khóa mới vào giữa trang, chi phí sao chép bộ nhớ (`memmove`) sẽ rất lớn. Thay vào đó, Storage Engine **giữ nguyên vị trí vật lý của các Data Cell** ở đáy trang, và **chỉ duy trì thứ tự tăng dần theo khóa trên mảng Slot Offset Array** (còn gọi là **Indirection Vector**).
 
-![Tìm kiếm nhị phân trên Indirection Vector và so sánh tách trang Right-Only vs Random UUIDv4](./images/indirection-vector-split.svg)
+![Minh họa quá trình chèn khóa và tách nút (Node Split) trong B-Tree](./images/btree-insertion-split.png)
 
 ```mermaid
 flowchart LR

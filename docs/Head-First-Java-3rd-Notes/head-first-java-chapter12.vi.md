@@ -98,7 +98,7 @@ str -> System.out.println(str)          //     System.out::println
 
 Một **Stream Pipeline** luôn được cấu thành từ **3 phần**:
 
-![Kiến trúc Java Stream Pipeline và cơ chế Lazy Evaluation (Loop Fusion)](./images/streams-lazy-pipeline.svg)
+![Dây chuyền xử lý dữ liệu qua các bước filter, sorted, map và collect trong Java Streams](./images/oracle-streams-pipeline.jpg)
 
 ```mermaid
 flowchart LR

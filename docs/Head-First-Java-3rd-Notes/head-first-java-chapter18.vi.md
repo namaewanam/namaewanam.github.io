@@ -41,7 +41,7 @@ public class BankAccount {
 
 Kịch bản thảm họa (**Race Condition** dạng *Check-Then-Act*) diễn ra như sau:
 
-![Kịch bản Race Condition của Ryan và Monica so sánh với cơ chế khóa Monitor Lock (synchronized) và CAS (AtomicInteger)](./images/race-condition-cas-monitor.svg)
+![Minh họa xung đột thời gian (Race Condition) khi hai luồng cùng đọc và ghi đè lên một vùng nhớ chung](./images/race-condition-timeline.svg)
 
 ```mermaid
 sequenceDiagram

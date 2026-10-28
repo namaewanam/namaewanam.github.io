@@ -99,7 +99,7 @@ Thông thường khi khởi tạo `object`, kiểu của biến `reference` và 
 
 Nhưng với **Đa hình (Polymorphism)**, **kiểu của biến `reference` có thể là `Superclass`, còn `object` thực tế trên Heap là bất kỳ `Subclass` nào của nó**:
 
-![Cơ chế Đa hình trong Java: Kiểm tra kiểu biến tham chiếu lúc Compile-time vs Dynamic Dispatch lúc Runtime](./images/polymorphism-dynamic-dispatch.svg)
+![Cây phân cấp kế thừa từ Superclass xuống các Subclass trong Java](./images/oracle-inheritance-hierarchy.gif)
 
 ```java
 // Chiếc điều khiển mang nhãn Animal, nhưng điều khiển đối tượng Dog trên Heap!

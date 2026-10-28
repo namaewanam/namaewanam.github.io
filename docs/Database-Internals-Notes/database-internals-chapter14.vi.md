@@ -52,8 +52,6 @@ Truyền phát thông điệp (**Broadcast**) và Đồng thuận (**Consensus**
 
 Được Leslie Lamport thiết kế, **Paxos** là thuật toán đồng thuận nền tảng cho các hệ thống chịu lỗi dừng (**Crash-Fault Tolerant - CFT**) với $2f + 1$ node (chịu được tối đa $f$ node sập).
 
-![Tổng quan kiến trúc đồng thuận Basic Paxos (2 Pha) và Raft Log Replication](./images/paxos-raft-consensus.svg)
-
 ### Ba vai trò trong Paxos
 Trong thực tế, mỗi máy chủ vật lý thường kiêm nhiệm cả 3 vai trò:
 - **Proposer**: Nhận yêu cầu từ Client, khởi xướng đề xuất giá trị $v$ kèm theo số thứ tự lượt bầu chọn (**Ballot / Proposal Number $n$**).

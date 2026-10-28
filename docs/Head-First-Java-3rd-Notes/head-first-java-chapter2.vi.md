@@ -39,7 +39,7 @@ Mở đầu chương 2, sách kể câu chuyện kinh điển về cuộc đua t
 
 Người mới học thường dễ đánh đồng Class và Object, nhưng hình ảnh ẩn dụ trong sách giúp phân tách rất rõ:
 
-![So sánh bản thiết kế Class và các thực thể Object độc lập trên Garbage-Collected Heap](./images/class-vs-object-heap.svg)
+![Sơ đồ lớp UML minh họa bản thiết kế Class gồm phần dữ liệu (State) và phương thức (Behavior)](./images/uml-class-bankaccount.svg)
 
 | Khái niệm | Hình ảnh ẩn dụ | Bản chất trong Java |
 | :--- | :--- | :--- |
