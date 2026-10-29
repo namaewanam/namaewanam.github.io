@@ -280,6 +280,7 @@ export default function CodeCopyInjector({
 
 				img.style.cssText =
 					'max-width:94vw;max-height:88vh;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block;' +
+					'background-color:hsl(56 45% 94%);padding:1rem;' +
 					'box-shadow:0 25px 60px rgba(0,0,0,0.5);cursor:zoom-out;' +
 					(targetW ? `min-width:${Math.round(targetW)}px;` : '');
 				img.addEventListener('click', dismiss);

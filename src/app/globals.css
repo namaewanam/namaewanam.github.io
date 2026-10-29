@@ -986,6 +986,11 @@ a[data-footnote-ref]:hover {
 	pointer-events: auto;
 }
 
+.lightbox-overlay > img {
+	background-color: hsl(56 45% 94%);
+	padding: 1rem;
+}
+
 .lightbox-close {
 	position: fixed;
 	top: 1.25rem;
@@ -1014,6 +1019,15 @@ a[data-footnote-ref]:hover {
 	border-radius: 0.5rem;
 	cursor: zoom-in;
 	transition: opacity 0.15s ease;
+}
+
+.prose img:not(.plantuml-diagram img) {
+	background-color: hsl(56 55% 96%);
+	padding: 0.75rem;
+}
+
+.dark .prose img:not(.plantuml-diagram img) {
+	background-color: hsl(56 45% 94%);
 }
 
 .prose img:hover {
