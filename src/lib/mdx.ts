@@ -42,15 +42,26 @@ const CALLOUT_ICONS: Record<string, string> = {
 };
 
 function transformCallouts(html: string): string {
-	const pattern =
-		/\u003cblockquote\u003e\s*\u003cp\u003e\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION|ARCHITECTURE|GOTCHA|TRADEOFF|PRODUCTION|DEEP-DIVE)\]([\s\S]*?)\u003c\/p\u003e\s*\u003c\/blockquote\u003e/gi;
+	return html.replace(
+		/\u003cblockquote\u003e([\s\S]*?)\u003c\/blockquote\u003e/gi,
+		(fullMatch, innerHtml: string) => {
+			const headerMatch = innerHtml.match(
+				/^\s*\u003cp\u003e\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION|ARCHITECTURE|GOTCHA|TRADEOFF|PRODUCTION|DEEP-DIVE)\]/i
+			);
+			if (!headerMatch) {
+				return fullMatch;
+			}
+			const rawType = headerMatch[1] ?? 'note';
+			const restAfterMarker = innerHtml.slice(headerMatch[0].length).trimStart();
+			const type = rawType.toLowerCase();
+			const icon = CALLOUT_ICONS[type] ?? '';
+			const body = restAfterMarker.startsWith('</p>')
+				? restAfterMarker.slice(4).trim()
+				: `<p>${restAfterMarker.trim()}`;
 
-	return html.replace(pattern, (_, rawType: string, rawBody: string) => {
-		const type = rawType.toLowerCase();
-		const icon = CALLOUT_ICONS[type] ?? '';
-		const body = rawBody.trim();
-		return `<aside class="callout callout-${type}"><p class="callout-title"><span class="callout-icon" aria-hidden="true">${icon}</span>${type.replace('-', '\u2011')}</p><div class="callout-body">${body}</div></aside>`;
-	});
+			return `<aside class="callout callout-${type}"><p class="callout-title"><span class="callout-icon" aria-hidden="true">${icon}</span>${type.replace('-', '\u2011')}</p><div class="callout-body">${body}</div></aside>`;
+		}
+	);
 }
 
 function addImagePerformanceAttributes(html: string): string {
@@ -64,6 +75,37 @@ function addImagePerformanceAttributes(html: string): string {
 		}
 		return `<img${updated}${closing}`;
 	});
+}
+
+function applyCustomHeadingIds(html: string): string {
+	return html.replace(
+		/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/gi,
+		(fullMatch, level: string, attrs: string, inner: string) => {
+			const trimmedInner = inner.trimEnd();
+			const idMatch = trimmedInner.match(/\{#([a-zA-Z0-9_-]+)\}$/);
+			if (!idMatch) {
+				return fullMatch;
+			}
+			const customId = idMatch[1] ?? '';
+			const cleanInner = trimmedInner.slice(0, trimmedInner.length - idMatch[0].length).trimEnd();
+			const cleanAttrs = attrs.replace(/ id="[^"]*"/i, '');
+			return `<h${level} id="${customId}"${cleanAttrs}>${cleanInner}</h${level}>`;
+		}
+	);
+}
+
+function decodeHtmlEntities(text: string): string {
+	return text
+		.replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) =>
+			String.fromCodePoint(Number.parseInt(hex, 16))
+		)
+		.replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number.parseInt(dec, 10)))
+		.replace(/&quot;/g, '"')
+		.replace(/&apos;/g, "'")
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&');
 }
 
 export async function renderMarkdown(
@@ -86,26 +128,8 @@ export async function renderMarkdown(
 			.replace(/(src=["'])(?:\.\/)?images\/([^"'\s]+)(["'])/gi, `$1/docs/${category}/images/$2$3`);
 	}
 
-	// Support custom heading IDs: ## Heading Text {#custom-id}
-	processed = processed
-		.split('\n')
-		.map((line) => {
-			if (!line.startsWith('#')) return line;
-			const trimmed = line.trimEnd();
-			if (!trimmed.endsWith('}')) return line;
-			const idStart = trimmed.lastIndexOf('{#');
-			if (idStart === -1) return line;
-			const hashesMatch = line.match(/^#{1,6}\s+/);
-			if (!hashesMatch) return line;
-			const level = hashesMatch[0].trim().length;
-			const id = trimmed.slice(idStart + 2, -1).trim();
-			const title = trimmed.slice(hashesMatch[0].length, idStart).trim();
-			return `<h${level} id="${id}">${title}</h${level}>`;
-		})
-		.join('\n');
-
 	const result = await processor.process(processed);
-	return addImagePerformanceAttributes(transformCallouts(String(result)));
+	return addImagePerformanceAttributes(applyCustomHeadingIds(transformCallouts(String(result))));
 }
 
 export interface Heading {
@@ -125,8 +149,9 @@ export function extractHeadings(html: string): Heading[] {
 	while ((match = regex.exec(html)) !== null) {
 		const level = Number(match[1]) as 2 | 3;
 		const id = match[2] ?? '';
-		// Strip any inner HTML tags from the heading text
-		const text = (match[3] ?? '').replace(/<[^<>]*>/g, '').trim();
+		// Strip KaTeX MathML duplicate and inner HTML tags, then decode HTML entities
+		const rawInner = (match[3] ?? '').replace(/<span class="katex-mathml">[\s\S]*?<\/span>/gi, '');
+		const text = decodeHtmlEntities(rawInner.replace(/<[^<>]*>/g, '')).trim();
 		if (id && text) {
 			headings.push({ id, text, level });
 		}

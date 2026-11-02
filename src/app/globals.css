@@ -718,6 +718,9 @@ h3:hover .heading-anchor {
 	color: #2563eb;
 }
 
+.dark .callout-tip .callout-title {
+	color: #86efac;
+}
 .dark .callout-architecture .callout-title {
 	color: #a78bfa;
 }
@@ -737,6 +740,9 @@ h3:hover .heading-anchor {
 	color: #f87171;
 }
 
+.dark .callout-tip {
+	border-left-color: #86efac;
+}
 .dark .callout-architecture {
 	border-left-color: #a78bfa;
 }
