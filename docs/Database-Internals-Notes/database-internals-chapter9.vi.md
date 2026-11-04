@@ -17,149 +17,352 @@ tags: ["database-internals", "failure-detection", "heartbeat", "phi-accrual", "s
 
 ## Bài toán nan giải cốt lõi của Failure Detection {#fundamental-dilemma-of-failure-detection}
 
-Hầu hết các tác vụ quan trọng trong cơ sở dữ liệu phân tán — từ bầu chọn Leader mới (*Leader Election*), định tuyến lại truy vấn, cho tới kích hoạt quá trình sao chép bù dữ liệu — đều phụ thuộc vào một mô-đun nền tảng: **Failure Detector (Bộ phát hiện lỗi)**.
+### 1. Bài toán thực tế & Mental Model: Tại sao phát hiện một máy chủ "đã chết" lại khó đến vậy?
 
-Tuy nhiên, trong môi trường mạng đồng bộ từng phần (*Partially Synchronous Network*), khi Node `A` ngừng nhận được tín hiệu từ Node `B`, Node `A` không có bất kỳ phương thức vật lý nào để phân biệt giữa hai trạng thái:
+Trong một cơ sở dữ liệu phân tán, hầu như mọi quyết định sống còn đều phải chờ tín hiệu khởi phát từ một mô-đun nền tảng: **Failure Detector (Bộ phát hiện lỗi)**.
+- Nếu **Leader** bị sập, cụm chỉ có thể bắt đầu bầu chọn Leader mới (*Leader Election*) sau khi Failure Detector kết luận Leader cũ đã chết.
+- Nếu một **Data Node** bị hỏng ổ cứng hoặc cháy nguồn, bộ điều phối (*Coordinator*) chỉ ngừng định tuyến truy vấn của người dùng tới node đó và kích hoạt quá trình nhân bản bù dữ liệu (*Re-replication / Hinted Handoff*) khi Failure Detector báo node đó là `Dead`.
 
-1. **Node `B` đã thực sự sập nguồn (Crashed)**.
-2. **Node `B` vẫn hoàn toàn khỏe mạnh**, nhưng gói tin bị trễ do nghẽn mạng tạm thời, bão gói tin, hoặc tiến trình trên Node `B` đang bị đóng băng vài giây bởi **Stop-The-World Garbage Collection (GC Pause)** hay tắc nghẽn Disk I/O.
+Hãy hình dung **Mental Model** của Failure Detection:
+Trên một máy đơn lẻ, hệ điều hành biết ngay lập tức một tiến trình con đã chết thông qua tín hiệu ngắt nhân (`SIGCHLD`) hoặc bảng quản lý tiến trình trong RAM. Ngược lại, trong hệ thống phân tán với mô hình mạng **Đồng bộ từng phần (Partially Synchronous Network)**, các node bị ngăn cách bởi mạng cáp quang. Khi **Node A** ngừng nhận được gói tin từ **Node B** trong suốt `3` giây, **Node A không có bất kỳ phương thức vật lý nào để phân biệt hai thực tại hoàn toàn khác nhau sau đây**:
 
-### Sự đánh đổi giữa Completeness và Accuracy
+1. **Thực tại 1 — Node B đã thực sự sập nguồn (Crashed / Dead)**: Máy chủ vật lý của B bị rút dây nguồn hoặc Kernel Panic; mọi tiến trình trên B đã biến mất.
+2. **Thực tại 2 — Node B vẫn sống khoẻ nhưng bị "đóng băng" hoặc nghẽn mạng tạm thời (Slow / Paused)**:
+   - Tiến trình JVM/Go trên Node B đang bước vào đợt dọn rác bộ nhớ **Stop-The-World Garbage Collection (GC Pause)** kéo dài `4` giây, khiến mọi luồng gửi nhận mạng bị tạm dừng.
+   - Hoặc ổ đĩa NVMe trên Node B đang bị bão hoà `100%` I/O khi chạy LSM-Tree Compaction làm treo luồng chính.
+   - Hoặc Switch mạng ở giữa A và B đang bị tràn hàng đợi gói tin (*Micro-burst congestion*), làm rớt hoặc giữ chân gói tin vài giây.
 
-Chandra và Toueg (`1996`) đã định lượng hóa chất lượng của một Failure Detector thông qua hai thuộc tính đối lập nhau:
+### 2. Sự đánh đổi toán học giữa Completeness và Accuracy (Chandra & Toueg, `1996`)
 
-- **Completeness (Tính đầy đủ)**: Mọi nút thực sự bị sập cuối cùng bắt buộc phải bị phát hiện bởi các nút khỏe mạnh:
-  - *Strong Completeness*: Mọi nút bị sập cuối cùng đều bị tất cả các nút khỏe mạnh đánh dấu là `Dead`.
-  - *Weak Completeness*: Mọi nút bị sập cuối cùng đều bị ít nhất một nút khỏe mạnh đánh dấu là `Dead`.
-- **Accuracy (Tính chính xác)**: Không có nút khỏe mạnh nào bị kết luận nhầm là đã chết (**False Positive**):
-  - *Strong Accuracy*: Không một nút khỏe mạnh nào từng bị đánh dấu nhầm là `Dead` tại bất kỳ thời điểm nào.
-  - *Eventual Accuracy*: Bộ phát hiện lỗi có thể mắc sai lầm tạm thời trong lúc mạng biến động, nhưng sau một khoảng thời gian ổn định, không còn nút khỏe mạnh nào bị nghi ngờ nhầm nữa.
+Để đánh giá chất lượng của một thuật toán Failure Detection, Tushar Chandra và Sam Toueg (`1996`) đã định nghĩa hai thước đo đối lập nhau như hai đầu của một chiếc bập bênh:
+
+| Thuộc tính | Định nghĩa bản chất | Phân loại mức độ (Strong vs Weak / Eventual) | Lỗi xảy ra nếu vi phạm |
+| :--- | :--- | :--- | :--- |
+| **Completeness<br/>(Tính đầy đủ)** | Mọi node **thực sự đã chết (Crashed)** cuối cùng bắt buộc phải bị các node sống phát hiện ra. | • **Strong Completeness**: Mọi node chết cuối cùng đều bị **tất cả** các node khoẻ mạnh đánh dấu là `Dead`.<br/>• **Weak Completeness**: Mọi node chết cuối cùng bị **ít nhất 1** node khoẻ mạnh đánh dấu là `Dead`. | **False Negative (Bỏ lọt lỗi)**: Node B đã chết từ lâu nhưng Node A vẫn tưởng B còn sống và tiếp tục gửi truy vấn vào "hố đen", gây lỗi cho người dùng. |
+| **Accuracy<br/>(Tính chính xác)** | Không có node **đang còn sống khoẻ mạnh (Alive)** nào bị kết luận oan là đã chết. | • **Strong Accuracy**: Không một node sống nào từng bị đánh dấu nhầm là `Dead` tại bất kỳ thời điểm nào.<br/>• **Eventual Accuracy**: Có thể nghi ngờ nhầm lúc mạng nhiễu, nhưng sau một thời điểm ổn định, không còn node sống nào bị kết luận oan nữa. | **False Positive (Báo động giả)**: Node B chỉ bị GC Pause `2` giây nhưng bị cả cụm khai tử oan, kích hoạt bầu cử lại và di chuyển dữ liệu hỗn loạn. |
+
+```text
+Chiếc bập bênh đánh đổi của Failure Detector:
+
+  [Ưu tiên COMPLETENESS (Nhạy cao / Timeout ngắn)]       [Ưu tiên ACCURACY (Bảo thủ / Timeout dài)]
+  • Phát hiện node chết cực nhanh (vài trăm ms)          • Rất hiếm khi kết luận oan cho node bị GC Pause
+  • NHƯNG: Rất dễ bị False Positive (báo động giả)       • NHƯNG: Khi node chết thật, cả hệ thống bị treo
+    mỗi khi mạng lag nhẹ -> Gây Cascading Failure!         suốt hàng chục giây chờ Timeout (MTTR rất cao)!
+                         \                                      /
+                          \====================================/
+                                           ▲
+                          (Không thể đạt hoàn hảo cả hai cùng lúc
+                             trong mạng Partially Synchronous!)
+```
 
 > [!IMPORTANT]
-> **Không thể đạt đồng thời cả Strong Completeness và Strong Accuracy trong mạng thực tế:**
-> Nếu cấu hình bộ phát hiện lỗi cực kỳ nhạy (ngưỡng chờ ngắn) để đạt **Completeness** nhanh chóng, hệ thống sẽ liên tục gặp **False Positives** (vi phạm Accuracy) mỗi khi có nhiễu mạng hoặc GC pause. Ngược lại, nếu đặt ngưỡng chờ quá bảo thủ để bảo vệ **Accuracy**, hệ thống sẽ chậm phát hiện ra các nút đã chết thực sự, làm kéo dài thời gian gián đoạn dịch vụ (*MTTR / Failover time*).
+> **Định lý Chandra-Toueg về Failure Detector**:
+> Trong mạng bất đồng bộ hoặc đồng bộ từng phần có độ trễ biến thiên, **không thể xây dựng một bộ phát hiện lỗi đạt đồng thời cả Strong Completeness và Strong Accuracy**. Mọi thiết kế thực tế đều hướng tới việc đảm bảo **Strong Completeness** (chắc chắn phát hiện được node chết, thường nhờ Gossip lan truyền kết quả từ Weak Completeness sang toàn cụm) kết hợp với **Eventual Accuracy** (giảm thiểu tối đa tỷ lệ False Positive khi mạng biến động).
 
 ---
 
 ## Cơ chế Heartbeats vs Pings và Hạn chế của Fixed Timeout {#heartbeats-vs-pings-fixed-timeout}
 
-Hai cơ chế cơ bản để theo dõi trạng thái sống còn giữa hai nút là **Ping (Thăm dò hai chiều)** và **Heartbeat (Nhịp tim một chiều)**:
+### 1. So sánh cơ chế Pings (Chủ động hỏi) và Heartbeats (Chủ động phát nhịp tim)
 
-- **Pings (Request-Response)**: Định kỳ mỗi chu kỳ `Δ t`, Node `A` chủ động gửi gói tin `PING` tới Node `B` và chờ nhận lại gói tin `ACK` trong khoảng thời gian chờ `τ`. Cách tiếp cận này đo được độ trễ khứ hồi (*round-trip*), nhưng tốn gấp đôi lượng gói tin trên mạng.
-- **Heartbeats (Push-based)**: Node `B` chủ động phát đi gói tin `HEARTBEAT` định kỳ mỗi `Δ t` tới các nút đang theo dõi nó. Node `A` chỉ cần lắng nghe và cập nhật dấu thời gian nhận cuối cùng `t_last` (đo bằng **Monotonic Clock** cục bộ của `A`).
+Để theo dõi xem các node trong cụm còn hoạt động hay không, hệ thống phân tán sử dụng một trong hai giao thức truyền tin định kỳ:
 
-### Tại sao Fixed Timeout thất bại trong môi trường Cloud?
+| Đặc điểm | Pings (Request — Response / Pull-based) | Heartbeats (One-way / Push-based) |
+| :--- | :--- | :--- |
+| **Cơ chế hoạt động** | Định kỳ mỗi chu kỳ $\Delta t$, **Node A (Monitor)** gửi gói tin `PING` tới **Node B** và bấm giờ chờ gói tin `ACK` quay về trong khoảng thời gian $\tau$. | Định kỳ mỗi chu kỳ $\Delta t$, **Node B (Monitored)** tự động phát gói tin một chiều `HEARTBEAT` tới **Node A**. Node A chỉ lắng nghe và ghi nhận mốc thời gian nhận cuối cùng $t_{\text{last}}$ (bằng **Monotonic Clock** cục bộ). |
+| **Chi phí gói tin mạng** | Tốn **gấp đôi (`2x`)** số gói tin trên mỗi chu kỳ (1 chiều đi `PING` + 1 chiều về `ACK`). | Tối ưu băng thông hơn (**`1x`** chiều đi); thường được đính kèm (*Piggyback*) luôn vào các bản tin nhân bản dữ liệu (như `AppendEntries` trong Raft). |
+| **Khả năng đo Latency** | Đo được trực tiếp thời gian khứ hồi (**Round-Trip Time — RTT**) từ lúc gửi `PING` tới lúc nhận `ACK`. | Không biết được RTT tuyệt đối của từng gói tin (vì không thể trừ timestamp đồng hồ giữa hai máy khác nhau), nhưng đo được **Khoảng cách giữa các nhịp đến ($\Delta t_i = t_i - t_{i-1}$)**. |
 
-Trong các thiết kế truyền thống, bộ phát hiện lỗi sử dụng một ngưỡng thời gian chờ cố định `τ` (*Fixed Timeout*): nếu `t_now - t_last > τ`, nút từ xa lập tức bị chuyển trạng thái nhị phân từ `Alive` sang `Dead`. Cách tiếp cận cứng nhắc này gây ra hai hậu quả nghiêm trọng trong hạ tầng sản xuất:
+### 2. Bài toán thực tế: Tại sao Fixed Timeout gây ra Thảm hoạ sập dây chuyền (Cascading Failure)?
 
-1. **Đặt `τ` quá nhỏ (ví dụ `500ms`–`1,000ms`) `->` Hiệu ứng Domino & Flapping**:
-   - Khi hệ thống chịu tải cao, độ trễ mạng tăng vọt hoặc một node bước vào chu kỳ GC pause kéo dài `1.5` giây.
-   - Các node còn lại lập tức kết luận nhầm node đó đã chết (**False Positive**) và kích hoạt quy trình **Failover / Rebalancing**: bầu lại Leader, hủy các kết nối hiện tại và di chuyển hàng loạt phân vùng dữ liệu (*shard migration*) sang các node khác.
-   - Lưu lượng mạng phát sinh từ quá trình Rebalancing lại làm các node còn lại quá tải, đẩy chúng vượt ngưỡng `τ` và gây ra sập dây chuyền toàn cụm (**Cascading Failure**). Ngay sau đó, node bị GC pause tỉnh dậy và gia nhập lại cụm, gây ra hiện tượng trạng thái chập chờn liên tục (**Flapping**).
-2. **Đặt `τ` quá lớn (ví dụ `30`–`60` giây) `->` Phản ứng trì trệ**:
-   - Khi một máy chủ vật lý bị mất điện thực sự, toàn bộ các truy vấn gửi tới các phân vùng do máy đó nắm giữ sẽ bị treo cứng suốt `30`–`60` giây trước khi hệ thống bắt đầu chuyển đổi dự phòng.
+Trong các hệ thống thế hệ cũ, Failure Detector được cài đặt bằng một ngưỡng thời gian chờ cố định (**Fixed Timeout $\tau$**):
+```text
+// Logic Fixed Timeout cổ điển tại Node A:
+if (monotonic_now() - last_heartbeat_from_B > FIXED_TIMEOUT_TAU) {
+    mark_node_as_DEAD(Node_B);
+    trigger_failover_and_rebalance();
+}
+```
+
+Giả sử người vận hành cấu hình chu kỳ gửi Heartbeat là `1000 ms` và đặt ngưỡng cố định $\tau = 2000\text{ ms}$ với mong muốn phát hiện sự cố chỉ trong `2` giây. Hãy theo dõi **Kịch bản sập dây chuyền (Cascading Failure & Flapping)** xảy ra trong giờ cao điểm (Flash Sale) trên một cụm gồm 5 node (`Node 1` đến `Node 5`, mỗi node đang chạy ở mức tải `70%` CPU):
+
+```mermaid
+sequenceDiagram
+    participant N1 as Node 1 (70% Load)
+    participant N2 as Node 2..4 (70% Load)
+    participant N5 as Node 5 (GC Pause 2.5s)
+
+    Note over N5: t = 0.0s: Node 5 bước vào đợt<br/>Stop-The-World GC Pause (2,500 ms)!
+    Note over N1,N2: t = 2.0s: Đã quá Fixed Timeout (τ = 2,000 ms)<br/>không thấy Heartbeat từ Node 5!
+    N1->>N2: 1. Báo động giả (False Positive): "Node 5 ĐÃ CHẾT!"
+    Note over N1,N2: 2. Kích hoạt Failover & Rebalancing:<br/>Dồn toàn bộ truy vấn + Copy lại các Shard của Node 5<br/>sang Node 1, 2, 3, 4!
+    Note over N1: t = 2.3s: Tải của Node 1 vọt từ 70% lên 100%!<br/>Node 1 bị treo GC Pause 3.0s do quá tải!
+    Note over N5: t = 2.5s: Node 5 tỉnh dậy sau GC!<br/>Đòi gia nhập lại cụm (Flapping)
+    N2->>N2: t = 4.3s: Lại báo "Node 1 ĐÃ CHẾT!"<br/>Dồn toàn bộ tải của cụm 5 máy vào 3 máy còn lại!
+    Note over N1,N5: 💥 THẢM HỌA SẬP DÂY CHUYỀN (CASCADING FAILURE):<br/>Toàn bộ 5 node lần lượt ngạt thở và sập toàn cụm!
+```
+
+Hãy phân tích hai cực của cái bẫy **Fixed Timeout $\tau$**:
+1. **Khi đặt $\tau$ quá nhỏ (ví dụ `1s - 2s`) $\rightarrow$ Sập dây chuyền (Cascading Failure) & Chập chờn (Flapping)**:
+   - Chỉ cần một node (`Node 5`) bị khựng nhẹ `2.5` giây do JVM GC Pause hoặc nghẽn mạng thoáng qua, các node còn lại lập tức kết luận nhầm `Node 5` đã chết (**False Positive**).
+   - Hệ thống tự động kích hoạt quy trình **Phục hồi thảm hoạ (Failover & Shard Rebalancing)**: vừa chuyển hướng toàn bộ lưu lượng truy vấn của `Node 5` sang 4 node còn lại (làm tải mỗi node tăng thêm `17.5%`), vừa bơm hàng Gigabyte dữ liệu qua mạng để nhân bản bù các phân vùng của `Node 5`.
+   - Lưu lượng mạng và I/O khổng lồ từ việc Rebalancing đẩy `Node 1` vượt ngưỡng `100%` tài nguyên, khiến `Node 1` cũng bị trễ Heartbeat quá `2` giây $\rightarrow$ `Node 1` tiếp tục bị khai tử $\rightarrow$ toàn bộ tải dồn lên 3 node cuối cùng và đánh sập cả cụm như những quân cờ Domino!
+   - Tệ hơn nữa, ngay ở giây thứ `2.5`, `Node 5` hoàn tất GC Pause và tỉnh dậy, thông báo *"Tôi vẫn sống!"*, buộc cụm lại phải huỷ quá trình di chuyển dữ liệu hoặc chuyển ngược dữ liệu về — hiện tượng một node liên tục bị báo `Dead` rồi lại `Alive` đan xen gọi là **Flapping**.
+2. **Khi đặt $\tau$ quá lớn (ví dụ `30s - 60s`) $\rightarrow$ Hệ thống "đông cứng" khi có lỗi thật**:
+   - Để tránh False Positive, nếu quản trị viên tăng $\tau = 60\text{ s}$, thì khi một máy chủ bị cháy nguồn thật sự, toàn bộ khách hàng có dữ liệu nằm trên máy chủ đó sẽ bị treo cứng truy vấn suốt `1` phút đồng hồ trước khi hệ thống bắt đầu chuyển sang node dự phòng!
+
+**Câu hỏi đặt ra**: Làm thế nào để hệ thống **phát hiện lỗi cực nhanh (chỉ trong `~1.4` giây) khi đường mạng đang êm ả**, nhưng lại **tự động kiên nhẫn chờ lâu hơn (lên tới `5 - 10` giây) khi đường mạng đang có độ nhiễu (Jitter) cao** mà không cần con người chỉnh sửa tham số? Đó chính là lý do **$\Phi$-Accrual Failure Detector** ra đời.
 
 ---
 
 ## Thuật toán Phi-Accrual Failure Detector (Cassandra, Akka) {#phi-accrual-failure-detector}
 
-Để giải quyết triệt để điểm yếu của ngưỡng cố định và kết quả nhị phân (`Alive`/`Dead`), Hayashibara và cộng sự (`2004`) đã đề xuất **$\Phi$-Accrual Failure Detector (Phi-Accrual)** — thuật toán hiện được sử dụng làm nền tảng trong **Apache Cassandra**, **ScyllaDB** và **Akka Cluster**.
+Được đề xuất bởi Naohiro Hayashibara và cộng sự vào năm `2004`, **$\Phi$-Accrual Failure Detector (Phi-Accrual)** là một bước ngoặt trong thiết kế hệ thống phân tán và hiện là trái tim phát hiện lỗi của **Apache Cassandra**, **ScyllaDB**, **Akka Cluster**.
 
 ![Phân phối chuẩn với độ lệch chuẩn sigma dùng để ước lượng xác suất trễ nhịp tim trong Phi-Accrual Detector](./images/normal-distribution-sigma.svg)
 
-### Tư tưởng cốt lõi: Thay thế Boolean bằng Thang đo nghi ngờ liên tục ($\varphi$)
+### 1. Tư tưởng cốt lõi & Mental Model: Đổi từ câu trả lời Nhị phân (`Alive`/`Dead`) sang Thang đo nghi ngờ liên tục ($\varphi$)
 
-Thay vì trả lời câu hỏi nhị phân *"Node `B` còn sống hay đã chết?"*, bộ phát hiện lỗi Phi-Accrual tách biệt hoàn toàn tầng **Giám sát (Monitoring)** và tầng **Ra quyết định (Interpretation)**:
+Hãy hình dung sự khác biệt qua một ví dụ đời thường:
+- **Mental Model của Fixed Timeout**: Giống như một quy định cứng nhắc: *"Hàng ngày đồng nghiệp B đều đến văn phòng lúc `08:00`. Nếu tới `08:15` chưa thấy mặt, lập tức kết luận B đã nghỉ việc!"* Quy định này hoàn toàn phớt lờ bối cảnh thời tiết hay giao thông.
+- **Mental Model của $\Phi$-Accrual Failure Detector**: Hệ thống đóng vai một nhà thống kê học quan sát lịch sử đi làm của B trong `1,000` ngày gần nhất:
+  - **Bối cảnh 1 (Trời nắng đẹp, đường thông thoáng)**: Suốt `1,000` nhịp gần nhất, B luôn xuất hiện cực kỳ đúng giờ lúc `08:00` với sai số chỉ $\pm 30\text{ giây}$. Trong bối cảnh ổn định tuyệt đối này, nếu tới `08:05` (trễ `5` phút — tức gấp `10` lần độ lệch chuẩn $\sigma$) mà vẫn chưa thấy B, khả năng B gặp tai nạn thật sự là `99.999999%`!
+  - **Bối cảnh 2 (Trời bão lớn, đường kẹt cứng)**: Trong những nhịp gần đây, thời gian di chuyển biến động rất mạnh, lúc trễ `5` phút, lúc trễ `20` phút ($\sigma = 10\text{ phút}$). Trong bối cảnh nhiễu loạn này, việc `08:05` chưa thấy B là chuyện hết sức bình thường; hệ thống tự động hạ mức độ nghi ngờ xuống thấp và kiên nhẫn chờ tới `08:45` mới kết luận!
 
-- Nó liên tục thu thập lịch sử khoảng cách thời gian giữa các nhịp Heartbeat đến (*inter-arrival times*) trong một **cửa sổ trượt (Sliding Window)** để tự động học lấy đặc tính trễ và độ biến thiên (*jitter*) hiện tại của đường truyền mạng.
-- Dựa trên phân phối xác suất của lịch sử đó, tại bất kỳ thời điểm $t_{\text{now}}$ nào, thuật toán tính ra một giá trị thực liên tục $\varphi$ (**Phi — mức độ nghi ngờ**), phản ánh xác suất mà nút từ xa thực sự đã chết chứ không phải chỉ bị trễ gói tin.
+Về mặt kiến trúc phần mềm, $\Phi$-Accrual tách rời hoàn toàn **tầng đo đạc vật lý** (trả về con số thực $\varphi \ge 0$ biểu thị mức độ nghi ngờ tích luỹ theo thời gian) và **tầng hành động của ứng dụng** (tuỳ mức $\varphi$ cao hay thấp mà ứng dụng chọn hành động tương ứng):
+- Khi $\varphi < 3$: Mạng bình thường, tiếp tục gửi truy vấn như cũ.
+- Khi $3 \le \varphi < 8$: Node B đang có dấu hiệu chậm bất thường $\rightarrow$ Tạm thời ưu tiên gửi truy vấn đọc sang Replica khác (*Dynamic Snitch / Speculative Retry*), nhưng **chưa khai tử B**.
+- Khi $\varphi \ge 8$ (ngưỡng mặc định `phi_convict_threshold: 8` trong Cassandra): Xác suất B chỉ bị trễ mạng đã nhỏ hơn $10^{-8}$ $\rightarrow$ Chính thức đánh dấu B là **`Dead`** và kích hoạt Hinted Handoff!
 
 ```mermaid
 flowchart LR
-    HB["Luồng Heartbeats đến<br/>t1, t2, t3, ..."] --> Window["Sliding Window<br/>Lưu lịch sử khoảng cách<br/>Δt = t(i) - t(i-1)"]
-    Window --> Stats["Ước lượng phân phối xác suất<br/>Mean (μ) & Variance (σ²)"]
-    Stats --> CalcPhi["Tính giá trị nghi ngờ φ(t_now)<br/>φ = -log10(P_later)"]
-    CalcPhi --> App["Ứng dụng đối chiếu ngưỡng Φ<br/>(Ví dụ: Cassandra Φ = 8)"]
+    HB["Luồng Heartbeats đến<br/>t₁, t₂, t₃, ..., tₙ"] --> Window["1. Sliding Window (W = 1,000 mẫu)<br/>Lưu lịch sử khoảng cách đến:<br/>Δtᵢ = tᵢ - tᵢ₋₁"]
+    Window --> Stats["2. Ước lượng tham số Thống kê<br/>Trung bình (μ) & Độ lệch chuẩn (σ)"]
+    Stats --> CalcP["3. Tính xác suất gói tin đến muộn<br/>P_later(Δt_now) = 1 - F(Δt_now)"]
+    CalcP --> CalcPhi["4. Quy đổi sang thang Logarit<br/>φ = -log₁₀(P_later)"]
+    CalcPhi --> Action["5. So sánh ngưỡng Φ<br/>(Ví dụ: φ ≥ 8 ⇒ Đánh dấu DEAD)"]
 ```
 
-### Công thức toán học và Ý nghĩa xác suất của `φ`
+---
 
-Gọi `t_last` là thời điểm nhận được nhịp Heartbeat gần đây từ Node `B`, và `Δ t = t_now - t_last` là khoảng thời gian đã trôi qua kể từ đó. Từ các mẫu lịch sử trong cửa sổ trượt, hệ thống ước lượng hàm phân phối tích lũy `F(t)` (thường mô hình hóa bằng **Phân phối chuẩn - Normal Distribution** với trung bình `μ`, độ lệch chuẩn `σ` như trong Akka, hoặc **Phân phối mũ - Exponential Distribution** như trong cài đặt thực tế của Cassandra).
+### 2. Công thức toán học chi tiết của $\Phi$-Accrual
 
-Xác suất để nhịp Heartbeat tiếp theo sẽ đến muộn hơn khoảng thời gian $\Delta t$ hiện tại (tức là nút vẫn sống nhưng gói tin chỉ đến trễ) là:
+Quy trình tính toán tại **Node A** (đang theo dõi **Node B**) diễn ra qua 4 bước toán học rõ ràng:
 
-$$
-P_{\text{later}}(\Delta t) = 1 - F(\Delta t) = \int_{\Delta t}^{\infty} f(x)\,dx
-$$
+1. **Bước 1 — Thu thập mẫu vào Cửa sổ trượt (Sliding Window)**:
+   Mỗi khi nhận được nhịp Heartbeat thứ $i$ từ Node B tại thời điểm $t_i$ (đo bằng `CLOCK_MONOTONIC` của Node A), Node A tính khoảng thời gian cách nhịp trước đó:
+   $$\Delta t_i = t_i - t_{i-1}$$
+   Giá trị $\Delta t_i$ được đẩy vào một hàng đợi FIFO có kích thước cố định $W$ (thường lấy $W = 1000$ mẫu gần nhất; các mẫu quá cũ sẽ bị đẩy ra ngoài để phản ánh đúng tình trạng mạng hiện tại).
 
-Giá trị nghi ngờ $\varphi$ được định nghĩa theo thang logarit cơ số $10$:
+2. **Bước 2 — Tính Trung bình mẫu ($\mu$) và Độ lệch chuẩn mẫu ($\sigma$)**:
+   Từ $W$ mẫu $\{\Delta t_1, \Delta t_2, \dots, \Delta t_W\}$ trong cửa sổ trượt, hệ thống liên tục cập nhật:
+   $$\mu = \frac{1}{W} \sum_{i=1}^{W} \Delta t_i \quad \text{(Trung bình khoảng cách giữa 2 nhịp Heartbeat)}$$
+   $$\sigma = \sqrt{\frac{1}{W} \sum_{i=1}^{W} (\Delta t_i - \mu)^2} \quad \text{(Độ lệch chuẩn — đo mức độ nhiễu / Jitter của mạng)}$$
 
-$$
-\varphi(t_{\text{now}}) = -\log_{10}\left(P_{\text{later}}(t_{\text{now}} - t_{\text{last}})\right)
-$$
+3. **Bước 3 — Tính xác suất nhịp Heartbeat chỉ đang đến trễ ($P_{\text{later}}$)**:
+   Giả sử lần cuối cùng Node A nhận được Heartbeat từ Node B là tại thời điểm $t_{\text{last}}$, và thời điểm hiện tại là $t_{\text{now}}$. Khoảng thời gian đã trôi qua mà chưa thấy nhịp mới là:
+   $$\Delta t = t_{\text{now}} - t_{\text{last}}$$
+   Gọi $f(x)$ là hàm mật độ xác suất và $F(x)$ là hàm phân phối tích luỹ (*Cumulative Distribution Function — CDF*) của khoảng cách giữa các nhịp tim. Xác suất để Node B thực chất vẫn sống và nhịp Heartbeat tiếp theo sẽ đến muộn hơn $\Delta t$ là phần diện tích đuôi bên phải của phân phối:
+   $$P_{\text{later}}(\Delta t) = P(X > \Delta t) = 1 - F(\Delta t) = \int_{\Delta t}^{+\infty} f(x)\,dx$$
+   Trong bài báo gốc của Hayashibara và trong **Akka Cluster**, $X$ được mô hình hoá theo **Phân phối chuẩn (Normal / Gaussian Distribution) $\mathcal{N}(\mu, \sigma^2)$** với chuẩn hoá $Z$-score là $z = \frac{\Delta t - \mu}{\sigma}$:
+   $$P_{\text{later}}(\Delta t) = \frac{1}{\sigma\sqrt{2\pi}} \int_{\Delta t}^{+\infty} \exp\left(-\frac{(x - \mu)^2}{2\sigma^2}\right) dx = 1 - \Phi_{\text{norm}}\left(\frac{\Delta t - \mu}{\sigma}\right)$$
 
-### Ví dụ thực tế với `phi_convict_threshold` trong Apache Cassandra
+4. **Bước 4 — Ánh xạ sang chỉ số nghi ngờ $\varphi$ bằng hàm $-\log_{10}$**:
+   Vì xác suất $P_{\text{later}}(\Delta t)$ giảm về các số thập phân cực kỳ nhỏ (như $0.00000001$), thuật toán lấy đối số logarit cơ số $10$ để biến nó thành một con số dương dễ đọc:
+   $$\varphi(\Delta t) = -\log_{10}\big(P_{\text{later}}(\Delta t)\big)$$
 
-Nhờ hàm $-\log_{10}$, giá trị của $\varphi$ mang ý nghĩa xác suất trực quan rõ ràng:
+| Giá trị $\varphi$ đo được | Xác suất nhịp tim chỉ vô tình đến trễ ($P_{\text{later}} = 10^{-\varphi}$) | Tỷ lệ rủi ro kết luận nhầm (False Positive Rate) | Ý nghĩa vận hành |
+| :---: | :---: | :---: | :--- |
+| **$\varphi = 1$** | $10^{-1} = 0.1$ | **`10%`** (`1/10`) | Mới trễ rất nhẹ, khả năng cao chỉ là trễ gói tin bình thường. |
+| **$\varphi = 2$** | $10^{-2} = 0.01$ | **`1%`** (`1/100`) | Bắt đầu có dấu hiệu trễ rõ hơn mức trung bình. |
+| **$\varphi = 3$** | $10^{-3} = 0.001$ | **`0.1%`** (`1/1,000`) | Khá đáng ngờ (ngưỡng cảnh báo sớm ở một số hệ thống nội bộ). |
+| **$\varphi = 5$** | $10^{-5} = 0.00001$ | **`0.001%`** (`1/100,000`) | Ngưỡng mặc định cho mạng WAN nhiều nhiễu một số cấu hình. |
+| **$\varphi = 8$** | $10^{-8} = 0.00000001$ | **`0.000001%`** (`1/100,000,000`) | **Ngưỡng mặc định của Apache Cassandra (`phi_convict_threshold = 8`)**: Chắc chắn `99.999999%` là có sự cố thật! |
 
-- Nếu **$\varphi = 1$**: Xác suất nhịp Heartbeat chỉ bị trễ ($P_{\text{later}}$) là $10^{-1} = 10\%$ (khả năng mắc lỗi False Positive nếu kết luận node chết lúc này là $10\%$).
-- Nếu **$\varphi = 2$**: Xác suất gói tin đến trễ là $10^{-2} = 1\%$.
-- Nếu **$\varphi = 3$**: Xác suất gói tin đến trễ là $10^{-3} = 0.1\%$.
-- Trong **Apache Cassandra**, tham số mặc định là `phi_convict_threshold: 8` ($\Phi = 8$). Khi $\varphi$ vượt qua ngưỡng $8$, xác suất để nhịp Heartbeat chỉ vô tình đến muộn mà node chưa chết chỉ còn là **$10^{-8}$ ($0.000001\%$)**!
+---
 
-**Khả năng tự thích nghi (Self-Adapting to Network Jitter)**:
-Khi mạng nội bộ ổn định (ví dụ Heartbeat đến đều đặn mỗi $1000\text{ ms} \pm 5\text{ ms}$), độ lệch chuẩn $\sigma$ rất nhỏ, nên chỉ cần chậm vài giây là $\varphi$ đã vọt lên trên $8$. Ngược lại, khi mạng đang bị nghẽn hoặc có độ trễ dao động mạnh ($1000\text{ ms} \pm 800\text{ ms}$), độ lệch chuẩn $\sigma$ trong cửa sổ trượt tự động giãn rộng ra; lúc này đường cong tăng trưởng của $\varphi$ sẽ thoải hơn, giúp hệ thống tự động chờ lâu hơn trước khi chạm ngưỡng $\Phi = 8$ mà không cần người vận hành chỉnh sửa cấu hình bằng tay.
+### 3. Ví dụ chạy tay bằng con số cụ thể (Step-by-Step Numerical Worked Example)
+
+Để thấy tận mắt phép màu tự thích nghi (*Self-Adapting*) của thuật toán $\Phi$-Accrual, hãy đặt bút tính toán trên cùng một kịch bản:
+- **Node B** được cấu hình gửi Heartbeat định kỳ mỗi **`1,000 ms`** (`1` giây) sang **Node A**.
+- Ngưỡng khai tử (Conviction Threshold) của hệ thống được đặt cố định tại **$\Phi = 8.0$**.
+- Hãy so sánh kết quả tính $\varphi$ theo mô hình Phân phối chuẩn ($\mathcal{N}(\mu, \sigma^2)$) trong **2 trạng thái mạng trái ngược nhau**:
+
+#### Trường hợp 1: Mạng nội bộ cực kỳ ổn định (Low Jitter)
+Trong `1,000` nhịp Heartbeat gần nhất, mạng LAN hoạt động rất êm: các gói tin đến đều đặn quanh mốc `1,000 ms`, dao động chỉ vài chục mili-giây.
+- Cửa sổ trượt của Node A đo được:
+  $$\mu = 1000\text{ ms}, \qquad \sigma = 50\text{ ms}$$
+- Bây giờ, đột nhiên Node B bị sập nguồn sau nhịp tim tại $t_{\text{last}} = 0$. Hãy theo dõi đồng hồ của Node A khi thời gian chờ $\Delta t$ nhích dần lên:
+
+| Thời gian chờ $\Delta t$ | Độ lệch chuẩn hoá $z = \frac{\Delta t - \mu}{\sigma}$ | Xác suất trễ $P_{\text{later}}(\Delta t) = 1 - \Phi_{\text{norm}}(z)$ | Giá trị nghi ngờ $\varphi = -\log_{10}(P_{\text{later}})$ | Quyết định của Node A (so với ngưỡng $\Phi = 8.0$) |
+| :---: | :---: | :---: | :---: | :--- |
+| **`1000 ms`** | $z = \frac{1000 - 1000}{50} = \mathbf{0\sigma}$ | $P_{\text{later}} = 0.500$ ($50\%$) | $\varphi = -\log_{10}(0.5) = \mathbf{0.30}$ | `0.30 < 8.0` $\rightarrow$ **`Alive`** (Đúng hạn trung bình). |
+| **`1100 ms`** | $z = \frac{1100 - 1000}{50} = \mathbf{2\sigma}$ | $P_{\text{later}} \approx 0.02275$ ($2.28\%$) | $\varphi = -\log_{10}(0.02275) = \mathbf{1.64}$ | `1.64 < 8.0` $\rightarrow$ **`Alive`** (Mới trễ `100 ms`). |
+| **`1200 ms`** | $z = \frac{1200 - 1000}{50} = \mathbf{4\sigma}$ | $P_{\text{later}} \approx 3.167 \times 10^{-5}$ | $\varphi = -\log_{10}(3.167 \times 10^{-5}) = \mathbf{4.50}$ | `4.50 < 8.0` $\rightarrow$ **`Alive`** (Bắt đầu nghi ngờ). |
+| **`1300 ms`** | $z = \frac{1300 - 1000}{50} = \mathbf{6\sigma}$ | $P_{\text{later}} \approx 9.866 \times 10^{-10}$ | $\varphi = -\log_{10}(9.866 \times 10^{-10}) = \mathbf{9.01}$ | **`9.01 > 8.0` $\rightarrow$ KẾT LUẬN `DEAD` NGAY LẬP TỨC!** |
+| **`1400 ms`** | $z = \frac{1400 - 1000}{50} = \mathbf{8\sigma}$ | $P_{\text{later}} \approx 6.22 \times 10^{-16}$ | $\varphi = -\log_{10}(6.22 \times 10^{-16}) = \mathbf{15.21}$ | **`15.21 >> 8.0` $\rightarrow$ Đã vượt xa ngưỡng `DEAD`!** |
+
+**Nhận xét Trường hợp 1**: Vì mạng trước đó rất ổn định ($\sigma = 50\text{ ms}$), chỉ cần Node B trễ thêm **`300 ms`** so với chu kỳ chuẩn (tức tại mốc **$\Delta t = 1300\text{ ms}$**, tương đương $6\sigma$), giá trị $\varphi$ đã vọt thẳng lên **`9.01`** (vượt ngưỡng $\Phi = 8.0$). Hệ thống phát hiện Node B chết chỉ sau **`1.3` giây**!
+
+---
+
+#### Trường hợp 2: Mạng đang bị nhiễu loạn mạnh / Jitter cao (High Jitter)
+Giả sử cụm đang chạy tác vụ đồng bộ dữ liệu nặng hoặc đường truyền liên vùng (Cross-AZ) đang bị nghẽn, khiến các nhịp Heartbeat gần đây lúc thì đến sau `600 ms`, lúc thì trễ tới `1,500 ms`.
+- Cửa sổ trượt của Node A tự động cập nhật độ lệch chuẩn giãn rộng gấp `8` lần:
+  $$\mu = 1000\text{ ms}, \qquad \sigma = 400\text{ ms}$$
+- Bây giờ, hãy tính lại bảng giá trị $\varphi$ tại **cùng các mốc thời gian chờ $\Delta t$** như trên:
+
+| Thời gian chờ $\Delta t$ | Độ lệch chuẩn hoá $z = \frac{\Delta t - 1000}{400}$ | Xác suất trễ $P_{\text{later}}(\Delta t) = 1 - \Phi_{\text{norm}}(z)$ | Giá trị nghi ngờ $\varphi = -\log_{10}(P_{\text{later}})$ | Quyết định của Node A (so với ngưỡng $\Phi = 8.0$) |
+| :---: | :---: | :---: | :---: | :--- |
+| **`1300 ms`** *(Mốc mà TH1 đã báo Dead!)* | $z = \frac{1300 - 1000}{400} = \mathbf{0.75\sigma}$ | $P_{\text{later}} \approx 0.2266$ ($22.66\%$) | $\varphi = -\log_{10}(0.2266) = \mathbf{0.64}$ | `0.64 << 8.0` $\rightarrow$ **Hoàn toàn bình tĩnh (`Alive`)!** |
+| **`1400 ms`** | $z = \frac{1400 - 1000}{400} = \mathbf{1.00\sigma}$ | $P_{\text{later}} \approx 0.1587$ ($15.87\%$) | $\varphi = -\log_{10}(0.1587) = \mathbf{0.80}$ | `0.80 << 8.0` $\rightarrow$ **Vẫn cực kỳ thấp (`Alive`)!** |
+| **`2000 ms`** | $z = \frac{2000 - 1000}{400} = \mathbf{2.50\sigma}$ | $P_{\text{later}} \approx 0.00621$ ($0.62\%$) | $\varphi = -\log_{10}(0.00621) = \mathbf{2.21}$ | `2.21 < 8.0` $\rightarrow$ **Tiếp tục kiên nhẫn chờ (`Alive`)!** |
+| **`3000 ms`** | $z = \frac{3000 - 1000}{400} = \mathbf{5.00\sigma}$ | $P_{\text{later}} \approx 2.867 \times 10^{-7}$ | $\varphi = -\log_{10}(2.867 \times 10^{-7}) = \mathbf{6.54}$ | `6.54 < 8.0` $\rightarrow$ **Chưa vội kết luận (`Alive`)!** |
+| **`3300 ms`** | $z = \frac{3300 - 1000}{400} = \mathbf{5.75\sigma}$ | $P_{\text{later}} \approx 4.46 \times 10^{-9}$ | $\varphi = -\log_{10}(4.46 \times 10^{-9}) = \mathbf{8.35}$ | **`8.35 > 8.0` $\rightarrow$ Lúc này mới kết luận `DEAD`!** |
+
+**Đối chiếu trực diện tại mốc $\Delta t = 1400\text{ ms}$**:
+- Khi mạng ổn định ($\sigma = 50\text{ ms}$): Tại $\Delta t = 1400\text{ ms}$, $\varphi = \mathbf{15.21} \gg 8 \implies$ Đã khai tử node từ lâu.
+- Khi mạng nhiễu ($\sigma = 400\text{ ms}$): Tại đúng $\Delta t = 1400\text{ ms}$, $\varphi$ mới chỉ bằng **$\mathbf{0.80}$** (nhỏ hơn ngưỡng $8.0$ tới `10` lần trên thang tuyến tính và nhỏ hơn hàng trăm triệu lần về mặt xác suất)! Hệ thống tự động kéo dài thời gian ân hạn từ `1.3 giây` lên **`3.3 giây`**, giúp miễn nhiễm hoàn toàn với bão báo động giả (**False Positives**) mà không cần bất kỳ ai can thiệp vào file cấu hình!
+
+> [!NOTE]
+> **Chi tiết cài đặt thực tế trong mã nguồn Apache Cassandra (Exponential Distribution Approximation)**:
+> Trong khi bài báo gốc và Akka sử dụng Phân phối chuẩn $\mathcal{N}(\mu, \sigma^2)$, các kỹ sư phát triển **Apache Cassandra** (`FailureDetector.java`) nhận thấy việc dùng **Phân phối mũ (Exponential Distribution)** với tham số $\lambda = \frac{1}{\mu}$ cho kết quả tính toán cực nhanh và ổn định hơn khi có các đợt spike đột ngột. Với phân phối mũ, xác suất $P_{\text{later}}(\Delta t) = e^{-\Delta t / \mu}$, dẫn tới công thức rút gọn rất đẹp trong Cassandra:
+> $$\varphi_{\text{Cassandra}}(\Delta t) = -\log_{10}\left(e^{-\Delta t / \mu}\right) = \frac{\Delta t}{\mu} \cdot \log_{10}(e) \approx 0.43429 \times \frac{t_{\text{now}} - t_{\text{last}}}{\mu}$$
+> Với công thức này, ngưỡng `phi_convict_threshold = 8` tương ứng với việc chờ khoảng thời gian gấp $\frac{8}{0.43429} \approx \mathbf{18.42\text{ lần}}$ trung bình trượt $\mu$ của các nhịp Heartbeat gần nhất!
 
 ---
 
 ## Giao thức Gossip và Outsourced Heartbeats (SWIM Protocol) {#gossip-and-swim-protocol}
 
-Khi quy mô cụm phân tán mở rộng lên hàng trăm hoặc hàng nghìn node, việc cho phép mọi node gửi Heartbeat trực tiếp tới tất cả các node còn lại (**All-to-All Heartbeating**) tạo ra số lượng tin nhắn tăng bậc hai **`O(N^2)`** trên mỗi chu kỳ, nhanh chóng làm bão hòa băng thông mạng và CPU. Bên cạnh đó, nếu chỉ có đường kết nối cục bộ giữa Node `A` và Node `B` bị lỗi định tuyến (trong khi `B` vẫn giao tiếp bình thường với các node `C, D, E` khác), một bộ phát hiện lỗi cục bộ tại `A` sẽ đưa ra kết luận sai lệch so với phần còn lại của cụm.
+### 1. Bài toán thực tế & Mental Model: Hai tử huyệt của All-to-All Heartbeating khi mở rộng quy mô
 
-Để giải quyết cả bài toán mở rộng quy mô lẫn lỗi đường truyền cục bộ, Das và cộng sự (`2002`) đã thiết kế giao thức **SWIM (Scalable Weakly-consistent Infection-style Process Group Membership Protocol)** — kiến trúc được áp dụng rộng rãi trong HashiCorp Consul/Serf và Uber Ringpop.
+Cho đến đây, chúng ta mới xét việc **Node A** theo dõi **Node B**. Nhưng trong một cụm cơ sở dữ liệu hoặc hệ thống Microservices gồm $N = 1000$ node (như cụm Cassandra, Consul hay Uber Ringpop), làm thế nào để **mọi node đều biết trạng thái sống/chết của tất cả 999 node còn lại**?
+
+Nếu áp dụng mô hình ngây thơ **All-to-All Heartbeating** (mỗi node gửi Heartbeat trực tiếp tới toàn bộ $N - 1$ node khác mỗi giây), hệ thống sẽ đâm sầm vào **2 tử huyệt vật lý**:
+
+1. **Tử huyệt 1 — Bùng nổ gói tin bậc hai $O(N^2)$**:
+   - Với $N = 1000$ node, mỗi chu kỳ `1` giây toàn cụm phải bắn đi $N(N - 1) \approx \mathbf{1000000\text{ gói tin Heartbeat/giây}}$!
+   - Khi quy mô tăng gấp đôi lên $N = 2000$, lượng gói tin chỉ riêng cho việc "hỏi thăm sức khoẻ" tăng gấp 4 lần lên `4,000,000` gói/giây, làm bão hoà băng thông Switch và ngốn sạch CPU Kernel Interrupt trước cả khi hệ thống kịp xử lý bất kỳ truy vấn dữ liệu nào của khách hàng.
+2. **Tử huyệt 2 — Lỗi đường truyền cục bộ bất đối xứng (Asymmetric / Partial Link Failure)**:
+   - Giả sử **Node B hoàn toàn khoẻ mạnh**, vẫn đang giao tiếp bình thường với `Node C, D, E, F`. Tuy nhiên, do lỗi bảng định tuyến BGP hoặc tường lửa cấu hình sai, **chỉ có riêng sợi cáp/kết nối trực tiếp giữa `Node A <-> Node B` bị đứt**.
+   - Nếu `Node A` chỉ dựa vào bộ phát hiện lỗi cục bộ của riêng mình, `Node A` sẽ khăng khăng kết luận *"Node B đã chết!"*, trong khi toàn bộ các node còn lại trong cụm đều thấy *"Node B đang sống rất khoẻ"* — gây ra tình trạng bất nhất về danh sách thành viên (*Inconsistent Cluster Membership View*).
+
+### 2. Giải pháp SWIM Protocol (`2002`): Thăm dò ngẫu nhiên $O(1)$, Ủy thác `PING-REQ` và Cơ chế Tự minh oan (Refutation)
+
+Để giải quyết đồng thời cả hai tử huyệt trên, Abhinandan Das, Indranil Gupta và cộng sự tại Đại học Cornell (`2002`) đã phát minh ra giao thức **SWIM (Scalable Weakly-consistent Infection-style Process Group Membership Protocol)**.
+
+Mental Model của SWIM dựa trên 3 trụ cột thông minh:
+1. **Thăm dò ngẫu nhiên (Randomized Probing — Giảm tải từ $O(N^2)$ xuống $O(N)$ toàn cụm / $O(1)$ mỗi node)**:
+   Trong mỗi chu kỳ giao thức $T'$, một node **KHÔNG gửi Ping cho tất cả mọi người**, mà chỉ bốc thăm ngẫu nhiên **đúng `1` node** trong danh sách để gửi `PING`.
+2. **Ủy thác thăm dò gián tiếp (Outsourced Heartbeats / Indirect Probing — Chống lỗi đứt cáp cục bộ)**:
+   Nếu `Node A` gọi trực tiếp cho `Node B` không được, `A` không vội kết luận `B` chết mà chọn ngẫu nhiên $k$ "người hàng xóm" trung gian (ví dụ `Node C`, `Node D`) và nhờ họ: *"Đường dây của tôi tới B đang mất tín hiệu, nhờ hai anh gọi thử cho B qua đường dây của hai anh xem B còn sống không!"* (gói tin `PING-REQ`).
+3. **Lan truyền tin đồn kiểu dịch bệnh (Piggybacked Infection-style Gossip) & Trạng thái đệm `Suspect` có số thế hệ (`incarnation`)**:
+   - Thay vì phát tán thông tin thành viên bằng các gói tin Broadcast riêng lẻ tốn băng thông, SWIM **đính kèm (Piggyback)** các mẩu tin đồn (`Alive`, `Suspect`, `Dead`) trực tiếp vào phần đuôi của chính các gói `PING`, `PING-REQ` và `ACK` hàng ngày!
+   - Khi cả `A` lẫn $k$ người hàng xóm đều không gọi được cho `B`, `B` vẫn chưa bị khai tử thành `Dead` ngay, mà chỉ bị gắn nhãn **`Suspect(B, incarnation = i)`** trong một khoảng thời gian ân hạn. Nếu `B` vừa tỉnh dậy sau GC Pause và nghe được tin đồn mình đang bị nghi ngờ, `B` chỉ cần tự tăng số thế hệ lên **`incarnation = i + 1`** và tung tin **`Alive(B, incarnation = i + 1)`** để đập tan mọi lời đồn!
 
 ```mermaid
 sequenceDiagram
-    participant A as Node A
+    participant A as Node A (Prober)
     participant B as Node B (Target)
-    participant C as Peer Node C
-    participant D as Peer Node D
+    participant C as Peer Node C (Mediator 1)
+    participant D as Peer Node D (Mediator 2)
 
-    A->>B: 1. Direct PING
-    Note over A,B: Mất kết nối trực tiếp A <-> B<br/>(Timeout, không nhận được ACK)
-    Note over A: 2. Chưa vội kết luận B chết!<br/>Chọn ngẫu nhiên k peers (C, D)
+    A->>B: 1. Direct PING (kèm Gossip payload)
+    Note over A,B: ⚡ Lỗi đường truyền cục bộ A <-> B!<br/>(Timeout, A không nhận được ACK từ B)
+    Note over A: 2. Chưa kết luận B chết!<br/>Chọn ngẫu nhiên k = 2 peers (C, D) để nhờ hỏi hộ
     A->>C: PING-REQ(target = B)
     A->>D: PING-REQ(target = B)
-    C->>B: 3. Indirect PING
-    D->>B: 3. Indirect PING
-    B-->>C: ACK
-    C-->>A: 4. Chuyển tiếp ACK(B is Alive)
-    Note over A: Node A giữ trạng thái B = Alive!<br/>(Tránh được False Positive do lỗi link A-B)
+    C->>B: 3. Indirect PING (qua đường mạng C <-> B)
+    D->>B: 3. Indirect PING (qua đường mạng D <-> B)
+    B-->>C: ACK (B vẫn sống khoẻ!)
+    C-->>A: 4. Chuyển tiếp ACK(B is Alive) về cho A
+    Note over A: ✅ Node A giữ nguyên B = Alive!<br/>(Hoàn toàn miễn nhiễm với lỗi đứt cáp cục bộ A-B)
 ```
 
-### Quy trình `4` bước của SWIM (Indirect Probing & Suspicion Mechanism)
+---
 
-Trong mỗi chu kỳ giao thức `T'`, mỗi Node `A` chỉ chọn **ngẫu nhiên `1` node bất kỳ** trong danh sách thành viên (giả sử là Node `B`) để kiểm tra, giữ cho tải mạng trên mỗi node luôn ở mức hằng số `O(1)`:
+### 3. Ví dụ chạy tay từng bước (Step-by-Step Worked Example): Trace giao thức SWIM trên cụm 6 Node
 
-1. **Thăm dò trực tiếp (Direct Ping)**: Node `A` gửi gói tin `PING` tới Node `B` và chờ phản hồi `ACK`. Nếu nhận được `ACK` đúng hạn, chu kỳ kiểm tra hoàn tất.
-2. **Ủy thác thăm dò gián tiếp (Outsourced / Indirect Ping - `PING-REQ`)**: Nếu không nhận được `ACK` từ `B` sau khoảng chờ ngắn, Node `A` **không lập tức đánh dấu `B` đã chết** (vì nguyên nhân có thể chỉ là lỗi cáp hoặc tường lửa giữa riêng cặp `A <-> B`). Thay vào đó, `A` chọn ngẫu nhiên `k` node trung gian khác (ví dụ `C, D, E`) và gửi bản tin `PING-REQ(B)` nhờ chúng kiểm tra hộ.
-3. **Chuyển tiếp kết quả**: Mỗi node trong nhóm `k` node trung gian sẽ tự gửi `PING` trực tiếp tới `B` thông qua đường mạng riêng của mình. Nếu bất kỳ node trung gian nào nhận được `ACK` từ `B`, nó sẽ chuyển tiếp gói `ACK` đó về cho `A`. Nhờ cơ chế đi vòng qua `k` đường truyền độc lập này, tỷ lệ kết luận nhầm do nghẽn mạng cục bộ giảm đi theo cấp số nhân.
-4. **Trạng thái Nghi ngờ (Suspect State) & Phản bác tin đồn (Refutation)**:
-   - Ngay cả khi cả `A` lẫn toàn bộ `k` node trung gian đều không nhận được `ACK` từ `B`, giao thức SWIM vẫn **chưa khai tử `B` ngay lập tức**.
-   - Node `A` chuyển trạng thái của `B` sang **`Suspect` (Đang nghi ngờ)** và phát tán tin đồn `Suspect(B, incarnation = i)` ra toàn cụm bằng cách đính kèm (*piggyback*) vào các gói `PING` / `ACK` thông thường (không cần gửi gói tin quảng bá riêng).
-   - Nếu Node `B` thực chất vẫn sống (ví dụ vừa thoát khỏi đợt GC pause) và nghe được tin đồn rằng chính mình đang bị liệt vào danh sách `Suspect`, `B` lập tức tự tăng số hiệu thế hệ (`incarnation = i + 1`) và phát tán bản tin `Alive(B, incarnation = i + 1)` để **phản bác tin đồn**.
-   - Chỉ khi hết khoảng thời gian ân hạn (*Suspicion Timeout*) mà không có bất kỳ bản tin phản bác nào từ `B`, trạng thái của `B` mới chính thức chuyển sang **`Dead` (`Confirm`)** và bị loại khỏi danh sách thành viên của cụm.
+Hãy theo dõi chi tiết từng gói tin trên một cụm gồm **6 node: `{A, B, C, D, E, F}`**, với cấu hình:
+- Chu kỳ giao thức $T' = 1000\text{ ms}$ (trong đó `400 ms` đầu dành cho `Direct PING`, `600 ms` sau dành cho `Indirect PING-REQ`).
+- Số lượng node trung gian uỷ thác: $k = 2$.
+- Ban đầu tại $t = 0$, mọi node đều có danh sách thành viên hoàn toàn khoẻ mạnh với số hiệu thế hệ (`incarnation number`) bằng `0`:
+  $$\text{Membership View} = \big\{\text{Alive}(A, 0),\ \text{Alive}(B, 0),\ \text{Alive}(C, 0),\ \text{Alive}(D, 0),\ \text{Alive}(E, 0),\ \text{Alive}(F, 0)\big\}$$
+
+#### Kịch bản Phần 1 (Chu kỳ 1: `t = 0 ms -> 1000 ms`): Đứt cáp cục bộ `A <-> B`, cứu nguy nhờ `PING-REQ`
+Giả sử sợi cáp mạng nối trực tiếp giữa `Node A` và `Node B` bị lỗi tường lửa chặn mất gói tin, nhưng `Node B` vẫn kết nối tốt với `C, D, E, F`:
+
+1. **`t = 0 ms` (Direct Ping)**:
+   `Node A` bốc thăm ngẫu nhiên trúng `Node B` làm mục tiêu kiểm tra trong chu kỳ này. `Node A` gửi `PING` trực tiếp tới `Node B`. Do lỗi đường truyền `A <-> B`, gói tin bị rơi.
+2. **`t = 400 ms` (Hết hạn Direct Ping $\rightarrow$ Kích hoạt Indirect `PING-REQ`)**:
+   Không thấy `ACK` từ `B`, `Node A` bốc thăm ngẫu nhiên $k = 2$ node khác trong tập `{C, D, E, F}` — giả sử trúng **`Node C`** và **`Node D`**.
+   `Node A` gửi `PING-REQ(target = B)` tới cả `C` và `D`.
+3. **`t = 420 ms` (Node trung gian kiểm tra hộ)**:
+   `Node C` và `Node D` nhận được yêu cầu, lập tức gửi `PING` trực tiếp tới `Node B` thông qua đường cáp `C <-> B` và `D <-> B`.
+4. **`t = 450 ms` (Nhận phản hồi qua trung gian)**:
+   Vì `Node B` hoàn toàn khoẻ mạnh, `B` trả lời `ACK` cho cả `C` và `D`. `Node C` lập tức chuyển tiếp gói `ACK(target = B)` về cho `Node A` lúc `t = 470 ms`.
+5. **Kết quả Chu kỳ 1**:
+   `Node A` nhận được bằng chứng xác thực từ `Node C` rằng `B` vẫn sống! `Node A` giữ nguyên trạng thái `Alive(B, 0)` — **không hề có bất kỳ báo động giả nào xảy ra dù đường truyền `A <-> B` bị đứt hoàn toàn**!
+
+---
+
+#### Kịch bản Phần 2 (Chu kỳ 2 & 3: `t = 1000 ms -> 3500 ms`): `Node B` bị GC Pause, bị đồn là `Suspect` và Tự minh oan (`Refutation`)
+
+Bây giờ, tại đúng mốc **`t = 1000 ms`**, tiến trình trên **`Node B` bước vào một đợt Stop-The-World GC Pause kéo dài `1,800 ms`** (từ `t = 1000 ms` đến `t = 2800 ms`). Hãy theo dõi cách tin đồn lan truyền (Piggyback Gossip) và cách `Node B` tự cứu mình khi tỉnh dậy:
+
+| Mốc thời gian | Bước thực thi trong giao thức SWIM | Luồng gói tin & Nội dung Gossip đính kèm (Piggybacked) | Trạng thái của `Node B` trong sổ tay của các Node |
+| :---: | :--- | :--- | :--- |
+| **`t = 1000 ms`** | **Bắt đầu Chu kỳ 2**: `Node B` bị đóng băng hoàn toàn bởi GC Pause. `Node A` lại thăm dò `Node B` bằng `Direct PING`. | `A -> B`: `PING` *(Không có phản hồi vì B đang GC Pause)*. | • Mọi node: `Alive(B, inc=0)` |
+| **`t = 1400 ms`** | `Direct PING` timeout! `Node A` chọn $k = 2$ node trung gian là `Node C` và `Node D` để gửi `PING-REQ(target = B)`. | `A -> C, D`: `PING-REQ(B)`<br/>`C, D -> B`: `PING` *(Cũng không có phản hồi vì B vẫn đang GC Pause!)*. | • Mọi node: `Alive(B, inc=0)` |
+| **`t = 2000 ms`** | **Hết Chu kỳ 2 (`1000 ms`) mà cả `A, C, D` đều không nhận được `ACK` từ `B`!**<br/>`Node A` **KHÔNG đánh dấu `B` là `Dead`**, mà chuyển `B` sang trạng thái nghi ngờ **`Suspect(B, inc=0)`** và bắt đầu bộ đếm ân hạn (*Suspicion Timer = `3000 ms`*, hết hạn lúc `t = 5000 ms`). | **Bắt đầu Chu kỳ 3**: `Node A` đến lượt ping định kỳ cho `Node E` và `Node F`, đồng thời **đính kèm (Piggyback)** tin đồn vào gói `PING`:<br/>`A -> E`: `PING + Gossip[Suspect(B, inc=0)]`<br/>`E -> C`: `PING + Gossip[Suspect(B, inc=0)]` | • `A, E, C, D, F`: Cập nhật sổ tay thành **`Suspect(B, inc=0)`** (vì ở cùng `inc=0`, trạng thái `Suspect` thắng `Alive`).<br/>• Riêng `B` (đang ngủ): Chưa biết gì. |
+| **`t = 2800 ms`** | **Node B tỉnh dậy sau đợt GC Pause!**<br/>Đúng lúc này, `Node E` gửi một gói `PING` định kỳ tới `Node B`, bên trong có đính kèm tin đồn `Gossip[Suspect(B, inc=0)]`. | `E -> B`: `PING + Gossip[Suspect(B, inc=0)]` | • `A, C, D, E, F`: `Suspect(B, inc=0)`<br/>• `Node B` đọc gói tin và phát hiện: *"Cả cụm đang nghi ngờ mình sắp chết ở thế hệ `inc=0`!"* |
+| **`t = 2810 ms` (Tự minh oan / Refutation!)** | Để bác bỏ lời đồn `Suspect(B, inc=0)`, `Node B` lập tức **tăng số hiệu thế hệ của chính mình lên `incarnation = 0 + 1 = 1`**, và đính kèm tuyên bố **`Alive(B, inc=1)`** vào gói `ACK` trả lời cho `Node E`! | `B -> E`: `ACK + Gossip[Alive(B, inc=1)]`<br/>Sau đó `E`, `B` tiếp tục piggyback tin `Alive(B, inc=1)` sang `A, C, D, F` trong các gói `PING/ACK` kế tiếp. | • Khi `A, C, D, E, F` nhận được `Alive(B, inc=1)`: vì **`inc = 1 > inc = 0`**, tin mới ghi đè hoàn toàn tin nghi ngờ cũ!<br/>• **Toàn cụm huỷ bộ đếm Suspicion Timer và khôi phục `Alive(B, inc=1)`!** |
+
+---
+
+### 4. Quy tắc thứ tự ưu tiên trạng thái (State Precedence Rules) trong SWIM
+
+Tại sao khi `Node B` phát tin `Alive(B, inc=1)` thì nó lại thắng được `Suspect(B, inc=0)` đang lan truyền trên mạng? Bởi vì mọi node trong giao thức SWIM đều áp dụng quy tắc so sánh tất định (tương tự một State-based CRDT) cho mỗi thành viên $M$:
+
+```text
+Quy tắc ghi đè trạng thái của Node M giữa bản tin cũ và bản tin mới:
+
+  1. Trạng thái DEAD (Confirm) luôn là trạng thái cuối cùng (thắng mọi trạng thái khác):
+       Dead(M, bất kỳ inc nào)  >  Suspect(M, i)  và  Alive(M, i)
+
+  2. Giữa Alive và Suspect, bản tin nào có số thế hệ (incarnation) LỚN HƠN sẽ thắng:
+       Alive(M, inc = j)    >  Suspect(M, inc = i)     khi và chỉ khi:  j > i
+       Suspect(M, inc = j)  >  Alive(M, inc = i)       khi và chỉ khi:  j >= i
+
+  (Lưu ý cực kỳ quan trọng: Chỉ có CHÍNH NODE M mới được phép tăng số `incarnation` của M
+   khi nó cần tự minh oan! Các node khác khi nghi ngờ M chỉ giữ nguyên số `inc` hiện tại).
+```
+
+Chỉ khi nào `Node B` đã chết thật sự (không thể tỉnh dậy để nâng `incarnation` lên `1` trước khi bộ đếm *Suspicion Timeout* tại `t = 5000 ms` kết thúc), lúc đó `Node A` mới chính thức phát tán bản tin **`Dead(B)` (`Confirm`)** để các node xoá `B` khỏi bảng định tuyến.
+
+| Tiêu chí so sánh | All-to-All Heartbeating | SWIM Protocol (Gossip + Outsourced Ping) |
+| :--- | :--- | :--- |
+| **Số gói tin trên mạng mỗi chu kỳ** | **$O(N^2)$** trên toàn cụm ($O(N)$ tại mỗi node). | **$O(N)$** trên toàn cụm (**$O(1)$** hằng số tại mỗi node). |
+| **Thời gian phát hiện 1 node sập (Detection Time)** | $O(1)$ chu kỳ. | $O(1)$ chu kỳ (kỳ vọng toán học $\approx \frac{1}{1 - e^{-1}} \approx 1.58$ chu kỳ để một node bất kỳ bốc thăm trúng node bị sập). |
+| **Thời gian lan truyền tin ra toàn cụm (Dissemination Time)** | Mỗi node tự phát hiện độc lập. | **$O(\log N)$** chu kỳ (lan truyền theo cấp số nhân kiểu dịch bệnh — *Epidemic / Infection style*). |
+| **Khả năng chống lỗi đứt cáp cục bộ (`A <-> B`)** | **Kém**: Node A sẽ báo B chết dù B vẫn sống khoẻ với phần còn lại. | **Xuất sắc**: Cơ chế `PING-REQ` qua $k$ node trung gian giảm xác suất báo nhầm theo luỹ thừa. |
+| **Khả năng chống báo động giả do GC Pause** | Phụ thuộc hoàn toàn vào ngưỡng Timeout. | **Xuất sắc**: Nhờ cơ chế **Suspicion + Incarnation Refutation** (tự minh oan). |
 
 ---
 
 ## Tóm tắt & Ghi nhớ cốt lõi (Key Takeaways) {#key-takeaways}
 
-- **Đánh đổi cốt lõi của Failure Detection**: Trong mạng đồng bộ từng phần, không thể phân biệt chắc chắn một node đã crash với một node bị chậm do mạng hoặc GC pause. Mọi bộ phát hiện lỗi đều phải cân bằng giữa **Completeness** (phát hiện hết mọi node chết) và **Accuracy** (tránh kết luận nhầm node sống thành chết — False Positive).
-- **Nhược điểm của Fixed Timeout**: Đặt ngưỡng cố định quá thấp dẫn đến **False Positives**, kích hoạt Failover/Rebalance sai lầm gây sập dây chuyền (**Cascading Failure**) và chập chờn (**Flapping**); đặt ngưỡng quá cao làm kéo dài thời gian ngưng trệ khi có sự cố thật.
-- **Cơ chế Phi-Accrual ($\Phi$-Accrual)**: Thay vì trả về kết quả nhị phân `Dead`/`Alive`, thuật toán duy trì một cửa sổ trượt lưu lịch sử khoảng cách giữa các Heartbeat để ước lượng phân phối xác suất và tính ra chỉ số nghi ngờ liên tục $\varphi = -\log_{10}(P_{\text{later}})$. Với ngưỡng $\Phi = 8$ trong Cassandra, xác suất nhịp tim chỉ vô tình đến trễ là $10^{-8}$ ($0.000001\%$), giúp hệ thống tự động thích nghi với độ nhiễu mạng (*network jitter*).
-- **Giao thức SWIM và Outsourced Heartbeats**: Tránh bùng nổ gói tin $O(N^2)$ của All-to-All Heartbeat bằng cách kết hợp thăm dò ngẫu nhiên $O(1)$, **Indirect Ping (`PING-REQ`)** qua $k$ node trung gian để vượt qua lỗi đường truyền cục bộ, cùng trạng thái đệm **`Suspect`** cho phép node bị nghi ngờ tự phản bác trước khi bị đánh dấu `Dead`.
+- **Bản chất bất định của Failure Detection**: Trong mạng đồng bộ từng phần, không thể phân biệt tuyệt đối một node đã sập nguồn với một node đang bị đóng băng bởi GC Pause hoặc nghẽn mạng. Mọi bộ phát hiện lỗi đều phải đánh đổi giữa **Completeness** (phát hiện hết mọi node chết — tránh *False Negative*) và **Accuracy** (không kết luận oan cho node đang sống — tránh *False Positive*).
+- **Tại sao Fixed Timeout nguy hiểm trong Production**: Đặt ngưỡng thời gian chờ cố định $\tau$ quá ngắn sẽ biến các đợt GC Pause hoặc nghẽn mạng ngắn hạn thành hàng loạt báo động giả (**False Positives**), kích hoạt Failover/Rebalance sai lầm làm quá tải các node còn lại và dẫn tới **Sập dây chuyền toàn cụm (Cascading Failure)** cùng hiện tượng **Flapping**. Ngược lại, đặt $\tau$ quá dài làm tăng vọt thời gian gián đoạn dịch vụ khi có lỗi thật.
+- **Thuật toán $\Phi$-Accrual Failure Detector (Cassandra, ScyllaDB, Akka)**:
+  - Thay thế kết quả nhị phân `Alive`/`Dead` bằng thang đo mức độ nghi ngờ liên tục $\varphi(t_{\text{now}}) = -\log_{10}(P_{\text{later}}(\Delta t))$ dựa trên trung bình $\mu$ và độ lệch chuẩn $\sigma$ của các nhịp Heartbeat trong cửa sổ trượt.
+  - Khi mạng ổn định ($\sigma$ nhỏ), $\varphi$ tăng vọt qua ngưỡng $\Phi = 8$ (xác suất nhầm chỉ là $10^{-8}$) rất nhanh chỉ sau vài trăm mili-giây trễ; khi mạng nhiễu ($\sigma$ lớn), đường cong $\varphi$ tự động thoải xuống giúp hệ thống kiên nhẫn chờ lâu hơn mà không cần chỉnh sửa cấu hình.
+- **Giao thức SWIM (Consul, Serf, Ringpop)**:
+  - Giải quyết bài toán mở rộng quy mô hàng nghìn node bằng cách kết hợp **Thăm dò ngẫu nhiên $O(1)$**, **Ủy thác thăm dò gián tiếp (`PING-REQ`)** qua $k$ node trung gian để xuyên qua các sự cố đứt cáp cục bộ, **Piggyback Gossip** (đính kèm tin đồn vào gói `PING/ACK` để phát tán trong $O(\log N)$ bước), và cơ chế **Suspicion + Incarnation Refutation** cho phép node vừa thoát khỏi GC Pause tự nâng số thế hệ để bác bỏ tin đồn thất thiệt về mình.
 
 ### Tài liệu & Nguồn tham khảo
-- [Hayashibara, N., et al. (2004) — *The $\varphi$ Accrual Failure Detector*](https://www.Semanticscholar.org/paper/The-%CF%86-accrual-failure-detector-Hayashibara-Defago/1106278042c721abbe61490a3b97111a8a212e8e)
-- [Das, A., Gupta, I., & Motivala, A. (2002) — *SWIM: Scalable Weakly-consistent Infection-style Process Group Membership Protocol*](https://www.cs.cornell.edu/projects/Quicksilver/public_pdfs/SWIM.pdf)
-- [Akka Documentation — Phi Accrual Failure Detector Implementation](https://doc.akka.io/docs/akka/current/typed/failure-detector.html)
+- [Petrov, A. (2019) — *Database Internals: A Deep Dive into How Distributed Data Systems Work*, Chapter 9: Failure Detection (O'Reilly Media)](https://www.databass.dev/)
+- [Chandra, T. D., & Toueg, S. (1996) — *Unreliable Failure Detectors for Reliable Distributed Systems* (Journal of the ACM)](https://dl.acm.org/doi/10.1145/226643.226647)
+- [Hayashibara, N., Défago, X., Yared, R., & Katayama, T. (2004) — *The $\varphi$ Accrual Failure Detector* (IEEE Symposium on Reliable Distributed Systems - SRDS)](https://www.semanticscholar.org/paper/The-%CF%86-accrual-failure-detector-Hayashibara-Defago/1106278042c721abbe61490a3b97111a8a212e8e)
+- [Das, A., Gupta, I., & Motivala, A. (2002) — *SWIM: Scalable Weakly-consistent Infection-style Process Group Membership Protocol* (DSN)](https://www.cs.cornell.edu/projects/Quicksilver/public_pdfs/SWIM.pdf)
+- [Lifeguard / HashiCorp Serf & Consul — *Making Gossip More Robust with Lifeguard (Local Health Aware Probe)*](https://arxiv.org/abs/1707.00788)
