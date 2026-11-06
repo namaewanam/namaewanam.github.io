@@ -7,6 +7,7 @@ tags: ["database-internals", "distributed-transactions", "2pc", "spanner", "calv
 ---
 
 ## Table of Contents
+0. [Khởi động cho người mới & Bảng Từ Điển Thuật Ngữ Nhanh](#beginner-guide-and-glossary)
 1. [Bài toán Atomic trên nhiều Node phân tán](#distributed-atomicity)
 2. [Two-Phase Commit (2PC) và Điểm yếu Blocking](#two-phase-commit)
 3. [Three-Phase Commit (3PC) và Rủi ro Split-Brain](#three-phase-commit)
@@ -16,6 +17,40 @@ tags: ["database-internals", "distributed-transactions", "2pc", "spanner", "calv
 ---
 
 Khi quy mô dữ liệu vượt quá khả năng lưu trữ và xử lý của một server đơn lẻ, cơ sở dữ liệu buộc phải chia nhỏ dữ liệu ra nhiều phân vùng vật lý độc lập (**Sharding / Partitioning**). Tuy nhiên, một khi dữ liệu nằm rải rác trên nhiều server, cơ chế khoá cục bộ (Local Locks) và Write-Ahead Log (WAL) của từng máy không còn đủ để đảm bảo tính nguyên tử (**Atomicity**) và cô lập (**Isolation**) cho các giao dịch chạm tới nhiều phân vùng. Chương 13 giải phẫu các giao thức **Atomic Commitment** kinh điển (**2PC**, **3PC**) và cách ba kiến trúc cơ sở dữ liệu phân tán hiện đại (**Google Spanner**, **Calvin**, **Google Percolator**) giải quyết bài toán giao dịch phân tán.
+
+---
+
+## Khởi động cho người mới & Bảng Từ Điển Thuật Ngữ Nhanh {#beginner-guide-and-glossary}
+
+### 1. Khởi động cho người mới: Tại sao chuyển tiền giữa 2 máy chủ lại khó gấp vạn lần trên 1 máy chủ?
+
+Trước khi đi vào các giao thức phân tán, hãy nhìn vào bài toán quen thuộc nhất trong ngành phần mềm — **chuyển `100 USD` từ tài khoản `Alice` (`UPDATE Alice -100 USD`) sang tài khoản `Bob` (`UPDATE Bob +100 USD`)**:
+
+- **Khi cả `Alice` và `Bob` nằm chung trên 1 máy chủ PostgreSQL/MySQL đơn lẻ**:
+  - Mọi thứ cực kỳ đơn giản: cả hai dòng dữ liệu đều dùng chung bộ nhớ RAM và chung một tệp nhật ký **WAL (Write-Ahead Log)** trên cùng một ổ cứng. Chỉ cần hệ điều hành ghi dòng chữ `[COMMIT]` vào tệp WAL đó thành công là cả hai tài khoản cùng đổi số dư; nếu máy mất điện trước dòng `[COMMIT]`, khi bật lại máy tự động hoàn tác (Rollback) cả hai.
+- **Khi dữ liệu phình to và phải chia tải (`Sharding`): `Alice` nằm ở `Server A` (Hà Nội), còn `Bob` nằm ở `Server B` (TP.HCM)**:
+  - Lúc này **không còn một tệp WAL chung nào nữa**! Nếu `Server A` vừa trừ `100 USD` của `Alice` xong thì `Server B` bị cháy ổ cứng hoặc đứt cáp quang, tiền của `Alice` đã mất mà `Bob` không nhận được đồng nào!
+- **Giải pháp cổ điển — Giao thức Cam kết Hai pha (`Two-Phase Commit — 2PC`) giống hệt một lễ cưới tại nhà thờ**:
+  - **Pha 1 (`Prepare / Voting` — Hỏi ý kiến)**: Vị linh mục (**`Coordinator`**) hỏi chú rể `Server A`: *"Con có chắc chắn trừ được 100 USD của Alice không?"* (`Server A` khoá chặt tài khoản `Alice`, ghi nháp vào sổ WAL rồi đáp: *"Con đồng ý — `Prepared`!"*). Linh mục hỏi tiếp cô dâu `Server B`: *"Con có chắc chắn cộng được 100 USD cho Bob không?"* (`Server B` khoá chặt tài khoản `Bob`, ghi nháp vào sổ WAL rồi đáp: *"Con đồng ý — `Prepared`!"*).
+  - **Pha 2 (`Commit / Decision` — Tuyên bố kết quả)**: Khi cả hai đều đã hứa `"Con đồng ý"`, linh mục mới ký vào sổ hộ tịch trung tâm (`Coordinator WAL`) rồi dõng dạc tuyên bố: *"Ta tuyên bố giao dịch hoàn tất (`Commit`)!"*.
+- **Tử huyệt của lễ cưới 2PC và cách các hệ thống NewSQL hiện đại (Spanner, TiKV, Calvin) giải cứu**:
+  - Chuyện gì xảy ra nếu ngay sau khi cô dâu và chú rể đều đã hứa *"Con đồng ý"* (đã khoá chặt tài khoản `Alice` và `Bob`), **vị linh mục đột nhiên ngất xỉu (máy chủ `Coordinator` sập nguồn)**?! Cô dâu và chú rể đã trót thề nguyện nên không ai dám tự ý bỏ về (không dám tự `Abort`), cũng không dám tự tuyên bố thành vợ chồng (không dám tự `Commit` vì nhỡ người kia vừa từ chối thì sao?). Cả hai đành **đứng chôn chân tại lễ đường suốt nhiều giờ đồng hồ (`Blocking Problem`)**, làm treo cứng mọi giao dịch khác chạm vào `Alice` và `Bob`!
+  - Để xoá bỏ điểm nghẽn này trên quy mô toàn cầu, ba kiến trúc hiện đại đi theo 3 hướng đột phá:
+    1. **Google Spanner**: Thay vị linh mục đơn độc bằng một **Hội đồng 5 linh mục (`Paxos Group`)** (người này ngất thì người bên cạnh đọc sổ tuyên bố tiếp ngay trong vài mili-giây!), kết hợp với **Đồng hồ nguyên tử + GPS (`TrueTime`)** để đóng dấu thời gian chuẩn xác trên toàn cầu.
+    2. **Calvin (FaunaDB)**: Bắt mọi giao dịch phải **xếp hàng chốt cứng thứ tự qua Raft trước khi bước vào phòng xử lý**; vì mọi máy chủ đều chạy cùng một kịch bản tất định theo đúng thứ tự đã chốt nên hoàn toàn **không cần lễ cưới 2PC nữa**!
+    3. **Google Percolator (TiDB / TiKV)**: Không cần thuê linh mục trung tâm; chọn ngay **tài khoản của `Alice` làm cột mốc quyết định duy nhất (`Primary Lock`)**, còn tài khoản `Bob` chỉ cần treo biển chỉ đường *"Muốn biết giao dịch thành công hay chưa, hãy sang hỏi dòng Alice!"*.
+
+### 2. Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (Cassandra / DynamoDB / Spanner / TiKV / CockroachDB / etcd) là gì? |
+| :--- | :--- | :--- |
+| **`Coordinator` & `Participant / Cohort`** *(Nút điều phối giao dịch & Nút tham gia chứa dữ liệu)* | **Coordinator**: Vị linh mục chủ hôn đứng ra hỏi ý kiến và tuyên bố kết quả cuối cùng.<br/>**Participant / Cohort**: Cô dâu và chú rể (các máy chủ nắm giữ từng mảnh dữ liệu của giao dịch). | Trong **PostgreSQL FDW / MySQL XA**, ứng dụng hoặc node gốc đóng vai `Transaction Coordinator`, các phân vùng dữ liệu là `XA Participants`. Trong **Google Spanner / CockroachDB**, node Leader nhận truy vấn từ Client đóng vai `Coordinator` điều phối các `Shard/Range Leaders` (`Participants`). |
+| **`Two-Phase Commit (2PC: Prepare Phase & Commit Phase)`** | Quy trình 2 bước để đảm bảo 100% các bên cùng làm hoặc cùng huỷ: **Pha 1 (`Prepare`)** khoá tài nguyên và ghi nháp vào đĩa rồi bỏ phiếu `YES/NO`; **Pha 2 (`Commit`)** thực thi thật sự và mở khoá khi 100% phiếu là `YES`. | Giao thức chuẩn công nghiệp cho giao dịch đa phân vùng trong **Google Spanner, CockroachDB, YugabyteDB, TiDB/TiKV, MongoDB Multi-Document Transactions** và chuẩn **X/Open XA** trong RDBMS truyền thống. |
+| **`Blocking Problem của 2PC`** *(Điểm nghẽn treo khóa khi Coordinator chết sau khi gom phiếu)* | Sau khi cô dâu và chú rể đã thề `"Con đồng ý"` (`Prepared`), vị linh mục bỗng ngất xỉu. Cả hai không biết linh mục đã kịp ký giấy kết hôn hay chưa nên phải đứng im giữ chặt khoá chờ linh mục tỉnh lại. | Trên **MySQL XA / Postgres `PREPARE TRANSACTION`**, nếu ứng dụng Coordinator sập sau pha Prepare, các dòng dữ liệu bị kẹt ở trạng thái `IN-DOUBT` giữ chặt `Exclusive Lock (X-Lock)` chặn đứng mọi truy vấn khác cho đến khi DBA can thiệp hoặc Coordinator khôi phục. |
+| **`Three-Phase Commit (3PC: CanCommit -> PreCommit -> DoCommit)`** | Thêm một bước thông báo đệm ***"Tất cả đều đã đồng ý rồi nhé (`PreCommit`)!"*** trước khi tuyên bố kết hôn, để nếu linh mục ngất sau bước đệm này thì cô dâu chú rể tự kết hôn luôn khi hết giờ chờ (`Timeout`). | Chỉ tồn tại trong lý thuyết học thuật (Skeen & Stonebraker, 1981). **Không được dùng trong Database thực tế** vì khi đứt cáp mạng (`Network Partition`), nửa cụm nhận được `PreCommit` sẽ tự Commit còn nửa chưa nhận được sẽ tự Abort, gây thảm hoạ lệch tiền (`Split-Brain`). |
+| **`Google Spanner & TrueTime API`** *(Đồng hồ nguyên tử + GPS trả về khoảng sai số `[earliest, latest]` với `Commit Wait 2ε`)* | Vì không đồng hồ nào chính xác tuyệt đối, mỗi trung tâm dữ liệu lắp **GPS + Đồng hồ nguyên tử** để biết chắc chắn *"Bây giờ là từ `10:00:00.001` đến `10:00:00.009`"* (sai số $\epsilon = 4\text{ ms}$). Trước khi báo giao dịch xong, hệ thống đứng chờ hết khoảng sai số $2\epsilon = 8\text{ ms}$ để mọi giao dịch sau đó trên toàn thế giới chắc chắn có số giờ lớn hơn! | Trong **Google Cloud Spanner**, phần cứng `TrueTime` giữ $\epsilon \le 1\text{--}7\text{ ms}$, kết hợp `2PL + 2PC` trên các cụm **Paxos** để đạt **External Consistency (Linearizability)** toàn cầu và cho phép đọc `Snapshot Read` không cần xin khoá. (**CockroachDB / YugabyteDB** học theo kiến trúc này nhưng dùng đồng hồ phần mềm `HLC — Hybrid Logical Clock`). |
+| **`Calvin`** *(Deterministic Transaction Ordering — Chốt thứ tự giao dịch qua Raft trước khi thực thi để không cần 2PC)* | Thay vì vừa nấu ăn vừa xin nguyên liệu gây tắc bếp, nhà hàng bắt mọi đơn đặt hàng phải **đóng dấu số thứ tự cố định ở cửa vào (`Sequencer`)**. Vào trong bếp, mọi đầu bếp cứ lấy nguyên liệu theo đúng số thứ tự đã in nên không bao giờ tranh giành hay phải hỏi ý kiến nhau (`Không cần 2PC`). | Kiến trúc cốt lõi của **FaunaDB**: tầng `Sequencer` gom các giao dịch theo từng lô `10 ms` rồi đồng thuận qua **Raft** vào nhật ký đầu vào tất định; tầng `Scheduler` cấp khoá theo đúng thứ tự Log (không bao giờ bị Deadlock) và thực thi không cần 2PC. |
+| **`Google Percolator`** *(Giao dịch Snapshot Isolation phân tán dùng Timestamp Oracle TSO + Primary Lock được áp dụng trong TiDB/TiKV)* | Chọn 1 dòng duy nhất làm **"Trụ sở chính" (`Primary Lock`)**, các dòng khác chỉ là **"Chi nhánh" (`Secondary Lock`)** có gắn biển chỉ đường về Trụ sở chính. Chỉ cần lật bảng trạng thái ở Trụ sở chính từ `"Đang khoá"` sang `"Đã duyệt"` là toàn bộ giao dịch hoàn tất nguyên tử! | Là trái tim của **TiDB / TiKV** (và hệ thống lập chỉ mục Google Bigtable): sử dụng dịch vụ **PD / TSO (`Timestamp Oracle`)** cấp phát `start_ts` và `commit_ts`, lưu dữ liệu trên 3 cột (`data, lock, write` trong RocksDB). Nếu Client chết giữa chừng, truy vấn đọc tiếp theo sẽ tự nhìn vào `Primary Lock` để dọn khoá (`Roll-back` hoặc `Roll-forward`). |
 
 ---
 
@@ -40,26 +75,32 @@ Nhưng khi hệ thống được chia tải (**Sharded**) thành nhiều server 
 
 Để dễ dàng so sánh bản chất của từng giao thức từ cổ điển đến hiện đại, toàn bộ chương này sẽ dùng chung **một bài toán chuẩn đơn lẻ** để chạy tay từng bước:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai khung `SHARD A` (bên trái) và `SHARD B` (bên phải)**: Dữ liệu ngân hàng được chia làm 2 máy chủ độc lập — `SHARD A` giữ tài khoản `"Alice"` (đang có `500 USD`), còn `SHARD B` giữ tài khoản `"Bob"` (đang có `200 USD`). Tổng tiền toàn hệ thống là `700 USD`.
+> 2. **Theo dõi thao tác của giao dịch `Tx_100`**: Cần trừ `100 USD` ở `SHARD A` (`Alice` còn `400 USD`) và cộng `100 USD` ở `SHARD B` (`Bob` lên `300 USD`).
+> 3. **Kết quả bắt buộc ở phần `Yêu cầu Atomicity` dưới đáy**: Tổng tiền sau giao dịch luôn phải bảo toàn là `700 USD` (hoặc cả hai cùng đổi thành `400 USD / 300 USD`, hoặc cả hai cùng giữ nguyên `500 USD / 200 USD`), tuyệt đối không được để xảy ra trạng thái nửa vời làm bốc hơi `100 USD`!
+
 ```text
 ================================================================================
               BÀI TOÁN XUYÊN SUỐT: GIAO DỊCH CHUYỂN TIỀN TX_100
 ================================================================================
-  Giao dịch Tx_100: Chuyển 100$ từ tài khoản Alice sang tài khoản Bob
+  Giao dịch Tx_100: Chuyển 100 USD từ tài khoản Alice sang tài khoản Bob
 
   ┌──────────────────────────────────┐      ┌──────────────────────────────────┐
   │             SHARD A              │      │             SHARD B              │
   │  (Lưu tài khoản từ A -> M)       │      │  (Lưu tài khoản từ N -> Z)       │
   ├──────────────────────────────────┤      ├──────────────────────────────────┤
   │  Khoá: "Alice"                   │      │  Khoá: "Bob"                     │
-  │  Số dư ban đầu: 500$             │      │  Số dư ban đầu: 200$             │
+  │  Số dư ban đầu: 500 USD             │      │  Số dư ban đầu: 200 USD             │
   │  Thao tác: Alice = 500 - 100     │      │  Thao tác: Bob = 200 + 100       │
-  │  Số dư kỳ vọng: 400$             │      │  Số dư kỳ vọng: 300$             │
+  │  Số dư kỳ vọng: 400 USD             │      │  Số dư kỳ vọng: 300 USD             │
   └──────────────────────────────────┘      └──────────────────────────────────┘
 
   Yêu cầu Atomicity:
-  - Hoặc cả hai cùng cập nhật thành công: (Alice = 400$, Bob = 300$) -> Tổng = 700$
-  - Hoặc cả hai cùng giữ nguyên:          (Alice = 500$, Bob = 200$) -> Tổng = 700$
-  - TUYỆT ĐỐI KHÔNG ĐƯỢC XẢY RA:          (Alice = 400$, Bob = 200$) -> Mất 100$!
+  - Hoặc cả hai cùng cập nhật thành công: (Alice = 400 USD, Bob = 300 USD) -> Tổng = 700 USD
+  - Hoặc cả hai cùng giữ nguyên:          (Alice = 500 USD, Bob = 200 USD) -> Tổng = 700 USD
+  - TUYỆT ĐỐI KHÔNG ĐƯỢC XẢY RA:          (Alice = 400 USD, Bob = 200 USD) -> Mất 100 USD!
 ================================================================================
 ```
 
@@ -78,20 +119,32 @@ Hãy hình dung **2PC** giống như một **lễ cưới tại nhà thờ**:
    - Khi thấy cả hai đều đã nói `VOTE_YES`, Linh mục ghi vào sổ hộ tịch (**Coordinator WAL**): `COMMIT`, rồi dõng dạc tuyên bố: *"Ta tuyên bố hai con là vợ chồng (`GLOBAL_COMMIT`)"*.
    - Ngược lại, nếu một trong hai người nói `VOTE_NO` (hoặc ngất xỉu trước khi trả lời), Linh mục ghi `ABORT` và tuyên bố huỷ hôn lễ (`GLOBAL_ABORT`) để người kia được tự do ra về.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào 3 cột dọc từ trái sang phải**: Cột `'Coordinator#0'` là máy chủ điều phối giao dịch (bắt đầu nhận lệnh `Write` ở hộp màu vàng); hai cột `'Participant#0'` và `'Participant#1'` là hai phân vùng lưu trữ dữ liệu.
+> 2. **Theo dõi 4 mũi tên đầu tiên (Pha 1 — `Prepare`)**: `Coordinator#0` lần lượt gửi lệnh `Prepare()` sang `Participant#0` và `Participant#1`. Mỗi Participant sau khi kiểm tra điều kiện và ghi nháp vào đĩa xong sẽ trả lời mũi tên nét đứt `("prepared")` (đồng ý!).
+> 3. **Kết quả ở 4 mũi tên tiếp theo (Pha 2 — `Commit`)**: Khi đã gom đủ cả 2 lời hứa `("prepared")`, `Coordinator#0` mới phát lệnh `Commit()` xuống cho `Participant#0` và `Participant#1` để chính thức áp dụng dữ liệu và mở khoá.
+
 ![Sơ đồ tuần tự giao thức Two-Phase Commit](./images/two-phase-commit.png "Hai giai đoạn Voting Phase và Completion Phase trong Two-Phase Commit")
 *Hình 13.1: Hai giai đoạn Voting Phase (Prepare) và Completion Phase (Commit) giữa Coordinator và các Cohorts trong giao thức 2PC*
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào nửa trên (`Phase 1: Prepare / Voting Phase`)**: `Coordinator` gửi `1a. PREPARE` và `1b. PREPARE` tới `Shard A` và `Shard B`. Chú ý hộp ghi chú bên phải: cả hai Shard phải **giữ chặt khoá độc quyền (`Exclusive Lock`)** và ép ghi **`fsync [PREPARED Tx_100]` xuống ổ cứng WAL** trước khi trả lời `2a, 2b. VOTE_YES`.
+> 2. **Theo dõi hộp ghi chú bên trái ở giữa sơ đồ (`ĐIỂM QUYẾT ĐỊNH NGUYÊN TỬ`)**: Khoảnh khắc `Coordinator` ép ghi `fsync [COMMIT Tx_100]` vào đĩa WAL của chính nó là ranh giới sinh tử — từ giây phút này giao dịch đã chính thức thành công không thể đảo ngược.
+> 3. **Kết quả ở nửa dưới (`Phase 2: Commit / Decision Phase`)**: `Coordinator` phát lệnh `3a, 3b. GLOBAL_COMMIT` để hai Shard cập nhật số dư mới (`Alice = 400 USD`, `Bob = 300 USD`), nhả khoá dòng và trả lời `4a, 4b. ACK`.
 
 ```mermaid
 sequenceDiagram
     participant C as Coordinator
-    participant SA as Shard A (Alice: 500$ -> 400$)
-    participant SB as Shard B (Bob: 200$ -> 300$)
+    participant SA as Shard A (Alice: 500 USD -> 400 USD)
+    participant SB as Shard B (Bob: 200 USD -> 300 USD)
 
     Note over C,SB: Phase 1: Prepare / Voting Phase
     C->>C: Ghi WAL: [BEGIN_2PC Tx_100, participants={A, B}]
-    C->>SA: 1a. PREPARE(Tx_100: Alice = 400$)
-    C->>SB: 1b. PREPARE(Tx_100: Bob = 300$)
-    Note right of SA: Kiểm tra số dư >= 100$,<br/>Giữ chặt Exclusive Lock("Alice"),<br/>fsync Undo/Redo + [PREPARED Tx_100] vào WAL
+    C->>SA: 1a. PREPARE(Tx_100: Alice = 400 USD)
+    C->>SB: 1b. PREPARE(Tx_100: Bob = 300 USD)
+    Note right of SA: Kiểm tra số dư >= 100 USD,<br/>Giữ chặt Exclusive Lock("Alice"),<br/>fsync Undo/Redo + [PREPARED Tx_100] vào WAL
     SA-->>C: 2a. VOTE_YES (Prepared)
     Note right of SB: Giữ chặt Exclusive Lock("Bob"),<br/>fsync Undo/Redo + [PREPARED Tx_100] vào WAL
     SB-->>C: 2b. VOTE_YES (Prepared)
@@ -100,9 +153,9 @@ sequenceDiagram
     Note left of C: ĐIỂM QUYẾT ĐỊNH NGUYÊN TỬ:<br/>fsync [COMMIT Tx_100] vào Coordinator WAL!
     C->>SA: 3a. GLOBAL_COMMIT(Tx_100)
     C->>SB: 3b. GLOBAL_COMMIT(Tx_100)
-    Note right of SA: Ghi WAL [COMMIT Tx_100],<br/>Cập nhật Alice = 400$, Nhả Lock("Alice")
+    Note right of SA: Ghi WAL [COMMIT Tx_100],<br/>Cập nhật Alice = 400 USD, Nhả Lock("Alice")
     SA-->>C: 4a. ACK
-    Note right of SB: Ghi WAL [COMMIT Tx_100],<br/>Cập nhật Bob = 300$, Nhả Lock("Bob")
+    Note right of SB: Ghi WAL [COMMIT Tx_100],<br/>Cập nhật Bob = 300 USD, Nhả Lock("Bob")
     SB-->>C: 4b. ACK
     C->>C: Ghi WAL: [END Tx_100]
 ```
@@ -111,15 +164,15 @@ sequenceDiagram
 
 ### Ví dụ chạy tay từng bước: Trạng thái tệp WAL và Khoá trong 2PC
 
-Hãy theo dõi chính xác những gì được ép ghi xuống ổ cứng (`fsync` vào tệp **WAL**) và trạng thái khoá dòng (**Row Locks**) trên `Coordinator`, `Shard A` và `Shard B` ở từng mốc thời gian khi chạy giao dịch `Tx_100` (chuyển `100$` từ `Alice` sang `Bob`):
+Hãy theo dõi chính xác những gì được ép ghi xuống ổ cứng (`fsync` vào tệp **WAL**) và trạng thái khoá dòng (**Row Locks**) trên `Coordinator`, `Shard A` và `Shard B` ở từng mốc thời gian khi chạy giao dịch `Tx_100` (chuyển `100 USD` từ `Alice` sang `Bob`):
 
 | Bước thời gian | Trạng thái trên `Coordinator` | Trạng thái trên `Shard A` (`Alice`) | Trạng thái trên `Shard B` (`Bob`) |
 | :--- | :--- | :--- | :--- |
-| **Trước khi chạy** | WAL: *(Trống)* | - Dữ liệu: `Alice = 500$`<br/>- Lock: `None`<br/>- WAL: *(Trống)* | - Dữ liệu: `Bob = 200$`<br/>- Lock: `None`<br/>- WAL: *(Trống)* |
-| **Bước 1: Thực thi nhánh & Gửi `PREPARE`** | - Ghi WAL: `[BEGIN_2PC Tx_100, Cohorts={A,B}]`<br/>- Gửi `PREPARE(Tx_100)` tới `Shard A` và `Shard B`. | - Giữ **`X-Lock("Alice")`**<br/>- Kiểm tra `500$ >= 100$` (Hợp lệ)<br/>- Ghi Undo (`500$`) & Redo (`400$`) vào bộ đệm. | - Giữ **`X-Lock("Bob")`**<br/>- Tính số dư mới `200$ + 100$ = 300$`<br/>- Ghi Undo (`200$`) & Redo (`300$`) vào bộ đệm. |
+| **Trước khi chạy** | WAL: *(Trống)* | - Dữ liệu: `Alice = 500 USD`<br/>- Lock: `None`<br/>- WAL: *(Trống)* | - Dữ liệu: `Bob = 200 USD`<br/>- Lock: `None`<br/>- WAL: *(Trống)* |
+| **Bước 1: Thực thi nhánh & Gửi `PREPARE`** | - Ghi WAL: `[BEGIN_2PC Tx_100, Cohorts={A,B}]`<br/>- Gửi `PREPARE(Tx_100)` tới `Shard A` và `Shard B`. | - Giữ **`X-Lock("Alice")`**<br/>- Kiểm tra `500 USD >= 100 USD` (Hợp lệ)<br/>- Ghi Undo (`500 USD`) & Redo (`400 USD`) vào bộ đệm. | - Giữ **`X-Lock("Bob")`**<br/>- Tính số dư mới `200 USD + 100 USD = 300 USD`<br/>- Ghi Undo (`200 USD`) & Redo (`300 USD`) vào bộ đệm. |
 | **Bước 2: Bỏ phiếu `VOTE_YES` (Kết thúc Phase 1)** | Nhận được `VOTE_YES` từ cả `Shard A` và `Shard B`. | - **`fsync` xuống đĩa WAL**:<br/>  `[UNDO: Alice=500, REDO: Alice=400]`<br/>  `[PREPARED Tx_100]`<br/>- Vẫn **giữ chặt `X-Lock("Alice")`**!<br/>- Trạng thái: **`IN-DOUBT`**<br/>- Gửi `VOTE_YES` về Coordinator. | - **`fsync` xuống đĩa WAL**:<br/>  `[UNDO: Bob=200, REDO: Bob=300]`<br/>  `[PREPARED Tx_100]`<br/>- Vẫn **giữ chặt `X-Lock("Bob")`**!<br/>- Trạng thái: **`IN-DOUBT`**<br/>- Gửi `VOTE_YES` về Coordinator. |
 | **Bước 3: Coordinator chốt quyết định (Đầu Phase 2)** | - **`fsync` xuống đĩa WAL**:<br/>  **`[COMMIT Tx_100]`**<br/>  *(Khoảnh khắc bản ghi này chạm đĩa của Coordinator, giao dịch `Tx_100` đã chính thức được Commit không thể đảo ngược!)*<br/>- Gửi `GLOBAL_COMMIT(Tx_100)` cho `A` và `B`. | Đang chờ lệnh từ Coordinator (Mọi truy vấn khác chạm vào dòng `"Alice"` đều bị chặn lại bởi `X-Lock("Alice")`). | Đang chờ lệnh từ Coordinator (Mọi truy vấn khác chạm vào dòng `"Bob"` đều bị chặn lại bởi `X-Lock("Bob")`). |
-| **Bước 4: Hoàn tất & Nhả khoá (Cuối Phase 2)** | Nhận đủ `ACK` từ `A` và `B` $\rightarrow$ Ghi WAL `[END Tx_100]`. | - **`fsync` xuống đĩa WAL**: `[COMMIT Tx_100]`<br/>- Áp dụng `Alice = 400$`<br/>- **Nhả `X-Lock("Alice")`**<br/>- Gửi `ACK` về Coordinator. | - **`fsync` xuống đĩa WAL**: `[COMMIT Tx_100]`<br/>- Áp dụng `Bob = 300$`<br/>- **Nhả `X-Lock("Bob")`**<br/>- Gửi `ACK` về Coordinator. |
+| **Bước 4: Hoàn tất & Nhả khoá (Cuối Phase 2)** | Nhận đủ `ACK` từ `A` và `B` $\rightarrow$ Ghi WAL `[END Tx_100]`. | - **`fsync` xuống đĩa WAL**: `[COMMIT Tx_100]`<br/>- Áp dụng `Alice = 400 USD`<br/>- **Nhả `X-Lock("Alice")`**<br/>- Gửi `ACK` về Coordinator. | - **`fsync` xuống đĩa WAL**: `[COMMIT Tx_100]`<br/>- Áp dụng `Bob = 300 USD`<br/>- **Nhả `X-Lock("Bob")`**<br/>- Gửi `ACK` về Coordinator. |
 
 ---
 
@@ -131,9 +184,9 @@ Tại sao setiap bản ghi `[PREPARED Tx_100]` và `[COMMIT Tx_100]` đều ph�
 - **Diễn biến**: `Coordinator` gửi `PREPARE(Tx_100)` tới `Shard A` và `Shard B`. `Shard B` đã ghi `[PREPARED Tx_100]` vào WAL và trả về `VOTE_YES`. Nhưng `Shard A` bị mất điện ngay trước khi kịp ghi `[PREPARED Tx_100]` xuống đĩa.
 - **Xử lý**:
   - Trên `Coordinator`: Hết thời gian chờ (Timeout) mà không nhận được phiếu của `Shard A`. Vì chưa có sự đồng thuận 100%, `Coordinator` được quyền đơn phương quyết định huỷ giao dịch: ghi `[ABORT Tx_100]` vào WAL và gửi `GLOBAL_ABORT(Tx_100)` cho `Shard B`.
-  - Trên `Shard B`: Nhận lệnh `GLOBAL_ABORT`, dùng bản ghi Undo (`Bob = 200$`) trong WAL để khôi phục, ghi `[ABORT Tx_100]` và nhả khoá `X-Lock("Bob")`.
+  - Trên `Shard B`: Nhận lệnh `GLOBAL_ABORT`, dùng bản ghi Undo (`Bob = 200 USD`) trong WAL để khôi phục, ghi `[ABORT Tx_100]` và nhả khoá `X-Lock("Bob")`.
   - Trên `Shard A` (khi khởi động lại): Đọc tệp WAL của mình, thấy không có bản ghi `[PREPARED Tx_100]` nào cả $\rightarrow$ `Shard A` tự động Rollback mọi thay đổi dở dang của `Tx_100`.
-- **Kết quả**: **An toàn và Không bị treo (Non-blocking)**! Số dư vẫn là `(Alice = 500$, Bob = 200$)`.
+- **Kết quả**: **An toàn và Không bị treo (Non-blocking)**! Số dư vẫn là `(Alice = 500 USD, Bob = 200 USD)`.
 
 #### Kịch bản (b): `Coordinator` bị sập TRƯỚC khi ghi `[COMMIT Tx_100]` vào WAL
 - **Diễn biến**: `Shard A` và `Shard B` đều đã gửi `VOTE_YES`, nhưng `Coordinator` bị sập nguồn ngay trước khi kịp `fsync` bản ghi `[COMMIT Tx_100]` xuống đĩa WAL của `Coordinator`.
@@ -144,6 +197,12 @@ Tại sao setiap bản ghi `[PREPARED Tx_100]` và `[COMMIT Tx_100]` đều ph�
 #### Kịch bản (c) — Điểm yếu Blocking chí mạng của 2PC: `Coordinator` và `Shard A` cùng sập SAU khi các Shard đã `VOTE_YES`!
 
 Đây là kịch bản kinh điển chứng minh **2PC là một giao thức Blocking (chặn đứng hệ thống)**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào 4 mũi tên đầu tiên từ trên xuống**: Cả `Shard A (Alice)` và `Shard B (Bob)` đều đã nhận `PREPARE`, đã ghi `[PREPARED Tx_100]` xuống đĩa WAL, đang **giữ chặt khoá độc quyền (`X-Lock`)** và đều đã gửi `VOTE_YES` về cho `Coordinator`.
+> 2. **Theo dõi hàng biểu tượng `💥 SẬP NGUỒN!` ở dưới**: Đúng lúc này, cả `Coordinator` lẫn `Shard A` đều mất điện hoặc đứt mạng cùng lúc.
+> 3. **Kết quả ở góc dưới bên phải (`❓ BỊ CÔ LẬP!`)**: `Shard B` còn sống trơ trọi một mình, không biết trước khi sập `Coordinator` đã kịp tuyên bố `COMMIT` hay `ABORT` cho `Shard A` hay chưa $\rightarrow$ `Shard B` bị kẹt cứng ở trạng thái **`IN-DOUBT`**, buộc phải ngâm khoá tài khoản `Bob` vô thời hạn!
 
 ```text
 ================================================================================
@@ -169,10 +228,10 @@ Hãy đặt mình vào vị trí của **`Shard B`** (đang quản lý tài kho�
 1. `Shard B` chờ mãi không thấy `Coordinator` gửi kết quả Phase 2 (`Coordinator` đã sập).
 2. `Shard B` thử gọi trực tiếp sang đồng nghiệp là `Shard A` để hỏi xem `Shard A` đã nhận được lệnh gì từ `Coordinator` chưa (*Cooperative Termination Protocol*), nhưng **`Shard A` cũng đã sập hoặc đứt mạng**!
 3. Lúc này, `Shard B` rơi vào thế **tiến thoái lưỡng nan (In-Doubt Dilemma)**:
-   - **Tại sao `Shard B` KHÔNG DÁM tự ý Abort (nhả khoá và giữ nguyên `Bob = 200$`)?**
-     Vì nhỡ đâu một tích tắc trước khi sập, `Coordinator` đã kịp ghi `[COMMIT Tx_100]` và gửi `GLOBAL_COMMIT` cho `Shard A`, khiến `Shard A` đã thực sự trừ tiền `Alice = 400$`, nhả khoá và báo giao dịch thành công cho người dùng rồi thì sao? Nếu `Shard B` tự ý Abort thì `Alice` mất `100$` mà `Bob` không nhận được tiền!
-   - **Tại sao `Shard B` CŨNG KHÔNG DÁM tự ý Commit (cộng tiền `Bob = 300$`)?**
-     Vì từ góc nhìn của `Shard B`, nó chỉ biết bản thân nó đã bỏ phiếu `VOTE_YES`, chứ nó hoàn toàn **không biết `Shard A` đã bỏ phiếu `VOTE_YES` hay `VOTE_NO` ở Phase 1**! Nhỡ đâu ở Phase 1, tài khoản `Alice` không đủ tiền nên `Shard A` đã bỏ phiếu `VOTE_NO` và tự Abort ngay lập tức rồi thì sao? Nếu `Shard B` tự ý Commit thì `Alice` vẫn còn `500$` mà `Bob` tự nhiên được cộng thêm `100$` từ hư không!
+   - **Tại sao `Shard B` KHÔNG DÁM tự ý Abort (nhả khoá và giữ nguyên `Bob = 200 USD`)?**
+     Vì nhỡ đâu một tích tắc trước khi sập, `Coordinator` đã kịp ghi `[COMMIT Tx_100]` và gửi `GLOBAL_COMMIT` cho `Shard A`, khiến `Shard A` đã thực sự trừ tiền `Alice = 400 USD`, nhả khoá và báo giao dịch thành công cho người dùng rồi thì sao? Nếu `Shard B` tự ý Abort thì `Alice` mất `100 USD` mà `Bob` không nhận được tiền!
+   - **Tại sao `Shard B` CŨNG KHÔNG DÁM tự ý Commit (cộng tiền `Bob = 300 USD`)?**
+     Vì từ góc nhìn của `Shard B`, nó chỉ biết bản thân nó đã bỏ phiếu `VOTE_YES`, chứ nó hoàn toàn **không biết `Shard A` đã bỏ phiếu `VOTE_YES` hay `VOTE_NO` ở Phase 1**! Nhỡ đâu ở Phase 1, tài khoản `Alice` không đủ tiền nên `Shard A` đã bỏ phiếu `VOTE_NO` và tự Abort ngay lập tức rồi thì sao? Nếu `Shard B` tự ý Commit thì `Alice` vẫn còn `500 USD` mà `Bob` tự nhiên được cộng thêm `100 USD` từ hư không!
 4. **Hậu quả thảm khốc**:
    Để không làm sai lệch tiền bạc (**bảo vệ Safety**), `Shard B` không còn bất kỳ lựa chọn nào khác ngoài việc **đóng băng tại chỗ và ngâm chặt khoá `X-Lock("Bob")` vô thời hạn** (có thể là hàng giờ đồng hồ cho đến khi máy chủ `Coordinator` được sửa phần cứng và khởi động lại để đọc đĩa WAL)! Trong suốt thời gian đó, mọi giao dịch khác trong hệ thống muốn chuyển tiền cho `Bob` hoặc đọc số dư của `Bob` đều bị treo cứng dây chuyền.
 
@@ -187,7 +246,7 @@ Nhìn lại kịch bản Blocking của 2PC ở trên, nguyên nhân khiến `Sh
 Năm 1981, Dale Skeen và Michael Stonebraker đề xuất giao thức **Three-Phase Commit (3PC)** nhằm biến Atomic Commitment thành **Non-Blocking Protocol** bằng hai thay đổi:
 1. Chèn thêm một pha thông báo trung gian gọi là **`PreCommit`** nằm giữa `CanCommit` (Prepare) và `DoCommit` (Commit).
 2. Đặt quy tắc tự động xử lý khi hết **Timeout**:
-   - **Phase 1 (`CanCommit?`)**: `Coordinator` hỏi `Shard A` và `Shard B` xem có sẵn sàng chuyển `100$` từ `Alice` sang `Bob` không. Cả hai khoá dòng và trả lời `VOTE_YES`. *(Lưu ý: ở thời điểm này, chưa ai được phép Commit, và nếu hết Timeout ở đây thì các Shard tự động **Abort**).*
+   - **Phase 1 (`CanCommit?`)**: `Coordinator` hỏi `Shard A` và `Shard B` xem có sẵn sàng chuyển `100 USD` từ `Alice` sang `Bob` không. Cả hai khoá dòng và trả lời `VOTE_YES`. *(Lưu ý: ở thời điểm này, chưa ai được phép Commit, và nếu hết Timeout ở đây thì các Shard tự động **Abort**).*
    - **Phase 2 (`PreCommit`)**: Khi `Coordinator` nhận đủ 100% phiếu `VOTE_YES`, thay vì ra lệnh Commit ngay, `Coordinator` gửi thông báo **`PRE_COMMIT`** tới cả `Shard A` và `Shard B` để truyền đi thông điệp: *"Tất cả các bên đều đã bỏ phiếu `YES` rồi! Hãy bước vào trạng thái `PreCommitted`!"*. Các Shard xác nhận bằng bản tin `ACK`.
    - **Phase 3 (`DoCommit`)**: Sau khi nhận đủ `ACK` của pha `PreCommit`, `Coordinator` mới phát lệnh `DO_COMMIT` cuối cùng. Nếu một Shard đã bước vào trạng thái **`PreCommitted`** mà thấy `Coordinator` bị sập (hết Timeout), Shard đó biết chắc chắn 100% rằng không có ai bỏ phiếu `NO` ở Phase 1, nên quy tắc của 3PC cho phép nó **tự động Commit (Auto-Commit on Timeout)** mà không cần chờ `Coordinator` sống lại!
 
@@ -197,15 +256,21 @@ Năm 1981, Dale Skeen và Michael Stonebraker đề xuất giao thức **Three-P
 
 Trên lý thuyết (trong mạng đồng bộ hoàn hảo nơi không bao giờ có chuyện gói tin bị trễ quá hạn và bộ phát hiện lỗi không bao giờ nhầm lẫn), 3PC giải quyết được bài toán Blocking. Nhưng trong **mạng thực tế bất đồng bộ (Asynchronous Network)** có hiện tượng **Network Partition (Đứt cáp mạng chia cắt cụm)** hoặc trễ mạng, quy tắc *"Tự động Abort nếu chưa nhận `PreCommit`"* và *"Tự động Commit nếu đã nhận `PreCommit`"* của 3PC sẽ gây ra thảm hoạ **Split-Brain (Nửa Commit, Nửa Abort)**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào `Phase 1: CanCommit` ở trên cùng**: Cả `Shard A` và `Shard B` đều trả lời `2a, 2b. VOTE_YES`.
+> 2. **Theo dõi sự cố ở `Phase 2: PreCommit`**: Mũi tên `3a. PRE_COMMIT` gửi tới `Shard A` thành công (đưa `Shard A` sang trạng thái `PRE_COMMITTED`), nhưng mũi tên `3b. PRE_COMMIT` gửi tới `Shard B` bị đánh dấu `x` (**ĐỨT CÁP MẠNG -> RỚT GÓI TIN!**).
+> 3. **Kết quả thảm hoạ ở 2 hộp ghi chú dưới đáy**: Khi hết Timeout, `Shard A` (đã nhận `PreCommit`) tự động **COMMIT** trừ `100 USD` của `Alice`, trong khi `Shard B` (chưa nhận `PreCommit`) lại tự động **ABORT** giữ nguyên `Bob = 200 USD` $\rightarrow$ `100 USD` bốc hơi khỏi ngân hàng!
+
 ```mermaid
 sequenceDiagram
     participant C as Coordinator
-    participant SA as Shard A (Alice: 500$)
-    participant SB as Shard B (Bob: 200$)
+    participant SA as Shard A (Alice: 500 USD)
+    participant SB as Shard B (Bob: 200 USD)
 
     Note over C,SB: Phase 1: CanCommit (Tất cả đều đồng ý)
-    C->>SA: 1a. CAN_COMMIT?(Tx_100: Alice - 100$)
-    C->>SB: 1b. CAN_COMMIT?(Tx_100: Bob + 100$)
+    C->>SA: 1a. CAN_COMMIT?(Tx_100: Alice - 100 USD)
+    C->>SB: 1b. CAN_COMMIT?(Tx_100: Bob + 100 USD)
     SA-->>C: 2a. VOTE_YES (State = Uncertain/Prepared)
     SB-->>C: 2b. VOTE_YES (State = Uncertain/Prepared)
 
@@ -215,15 +280,15 @@ sequenceDiagram
     C--xSB: 3b. PRE_COMMIT(Tx_100) (ĐỨT CÁP MẠNG -> RỚT GÓI TIN!)
     Note over C,SB: ⚡ Mạng bị chia cắt hoàn toàn giữa Coordinator, Shard A và Shard B!
 
-    Note right of SA: Hết Timeout không thấy Coordinator!<br/>Vì đang ở trạng thái PRE_COMMITTED,<br/>Shard A TỰ ĐỘNG COMMIT!<br/>👉 Alice bị trừ 100$ (Còn 400$)!
-    Note right of SB: Hết Timeout không thấy Coordinator!<br/>Vì vẫn đang ở trạng thái Phase 1 (chưa nhận PreCommit),<br/>Shard B TỰ ĐỘNG ABORT!<br/>👉 Bob giữ nguyên 200$ (Không nhận được 100$)!
+    Note right of SA: Hết Timeout không thấy Coordinator!<br/>Vì đang ở trạng thái PRE_COMMITTED,<br/>Shard A TỰ ĐỘNG COMMIT!<br/>👉 Alice bị trừ 100 USD (Còn 400 USD)!
+    Note right of SB: Hết Timeout không thấy Coordinator!<br/>Vì vẫn đang ở trạng thái Phase 1 (chưa nhận PreCommit),<br/>Shard B TỰ ĐỘNG ABORT!<br/>👉 Bob giữ nguyên 200 USD (Không nhận được 100 USD)!
 ```
 
-Hãy trace từng bước thảm hoạ mất tiền trong ví dụ chuyển `100$` từ `Alice` (`Shard A`) sang `Bob` (`Shard B`) khi dùng 3PC:
+Hãy trace từng bước thảm hoạ mất tiền trong ví dụ chuyển `100 USD` từ `Alice` (`Shard A`) sang `Bob` (`Shard B`) khi dùng 3PC:
 
 1. **Bước 1 — Hoàn tất Phase 1 (`CanCommit`)**:
    - `Coordinator` gửi `CAN_COMMIT?(Tx_100)` tới `Shard A` và `Shard B`.
-   - `Shard A` khoá dòng `Alice`, kiểm tra số dư `500$ >= 100$` và trả lời `VOTE_YES`.
+   - `Shard A` khoá dòng `Alice`, kiểm tra số dư `500 USD >= 100 USD` và trả lời `VOTE_YES`.
    - `Shard B` khoá dòng `Bob` và trả lời `VOTE_YES`.
    - Hiện tại cả `Shard A` và `Shard B` đều đang ở trạng thái cuối Phase 1 (chưa nhận được `PRE_COMMIT`).
 2. **Bước 2 — Sự cố đứt mạng ngay giữa Phase 2 (`PreCommit`)**:
@@ -231,10 +296,10 @@ Hãy trace từng bước thảm hoạ mất tiền trong ví dụ chuyển `100
    - Gói tin `PRE_COMMIT(Tx_100)` gửi tới **`Shard A` đến nơi thành công** $\rightarrow$ `Shard A` chuyển sang trạng thái **`PRE_COMMITTED`** và gửi trả `ACK`.
    - Tuy nhiên, đúng tích tắc đó, **switch mạng gặp sự cố (Network Partition)** khiến gói tin `PRE_COMMIT(Tx_100)` gửi tới **`Shard B` bị rớt**, đồng thời `Coordinator` cũng bị cô lập khỏi cả `Shard A` và `Shard B`!
 3. **Bước 3 — Hai nửa phân vùng tự hành động ngược chiều nhau khi hết Timeout**:
-   - **Tại `Shard B` (`Bob`)**: Bộ đếm thời gian chờ (Timeout) hết hạn. `Shard B` kiểm tra trạng thái cục bộ của mình: thấy mình mới chỉ gửi `VOTE_YES` ở Phase 1 chứ **chưa hề nhận được thông báo `PRE_COMMIT`**. Theo đúng quy tắc Non-blocking của 3PC (vì nghĩ rằng có thể `Shard A` đã bỏ phiếu `NO` và `Coordinator` đã chết ở Phase 1), `Shard B` **tự động thực thi `ABORT`**: huỷ giao dịch, nhả khoá và giữ nguyên số dư **`Bob = 200$`**!
-   - **Tại `Shard A` (`Alice`)**: Bộ đếm thời gian chờ `DO_COMMIT` cũng hết hạn mà không liên lạc được với `Coordinator` hay `Shard B`. `Shard A` kiểm tra trạng thái cục bộ của mình: thấy mình **đã ở trạng thái `PRE_COMMITTED`**. Theo đúng quy tắc Non-blocking của 3PC, `Shard A` **tự động thực thi `COMMIT`**: trừ tiền của `Alice` xuống **`Alice = 400$`** và nhả khoá!
+   - **Tại `Shard B` (`Bob`)**: Bộ đếm thời gian chờ (Timeout) hết hạn. `Shard B` kiểm tra trạng thái cục bộ của mình: thấy mình mới chỉ gửi `VOTE_YES` ở Phase 1 chứ **chưa hề nhận được thông báo `PRE_COMMIT`**. Theo đúng quy tắc Non-blocking của 3PC (vì nghĩ rằng có thể `Shard A` đã bỏ phiếu `NO` và `Coordinator` đã chết ở Phase 1), `Shard B` **tự động thực thi `ABORT`**: huỷ giao dịch, nhả khoá và giữ nguyên số dư **`Bob = 200 USD`**!
+   - **Tại `Shard A` (`Alice`)**: Bộ đếm thời gian chờ `DO_COMMIT` cũng hết hạn mà không liên lạc được với `Coordinator` hay `Shard B`. `Shard A` kiểm tra trạng thái cục bộ của mình: thấy mình **đã ở trạng thái `PRE_COMMITTED`**. Theo đúng quy tắc Non-blocking của 3PC, `Shard A` **tự động thực thi `COMMIT`**: trừ tiền của `Alice` xuống **`Alice = 400 USD`** và nhả khoá!
 4. **Hậu quả cuối cùng**:
-   - `Alice` còn **`400$`** (đã bị trừ `100$`), trong khi `Bob` vẫn là **`200$`** (không nhận được đồng nào)! Tổng số tiền trong ngân hàng bốc hơi mất `100$`, **phá vỡ hoàn toàn tính nguyên tử (Atomicity / Safety)** của cơ sở dữ liệu!
+   - `Alice` còn **`400 USD`** (đã bị trừ `100 USD`), trong khi `Bob` vẫn là **`200 USD`** (không nhận được đồng nào)! Tổng số tiền trong ngân hàng bốc hơi mất `100 USD`, **phá vỡ hoàn toàn tính nguyên tử (Atomicity / Safety)** của cơ sở dữ liệu!
 
 > [!WARNING]
 > **Bài học cốt lõi từ 2PC và 3PC**:
@@ -246,7 +311,7 @@ Hãy trace từng bước thảm hoạ mất tiền trong ví dụ chuyển `100
 
 ## Các kiến trúc Giao dịch Phân tán hiện đại: Spanner, Calvin, Percolator {#modern-architectures}
 
-Làm thế nào để vừa có được tính **Safety tuyệt đối** của 2PC, lại vừa **không bao giờ bị treo khoá vô thời hạn (Non-Blocking)** khi một máy chủ bị sập? Ba kiến trúc kinh điển của kỷ nguyên NewSQL là **Google Spanner**, **Calvin** và **Google Percolator** đã giải quyết bài toán chuyển `100$` từ `Alice` sang `Bob` theo 3 triết lý hoàn toàn khác biệt.
+Làm thế nào để vừa có được tính **Safety tuyệt đối** của 2PC, lại vừa **không bao giờ bị treo khoá vô thời hạn (Non-Blocking)** khi một máy chủ bị sập? Ba kiến trúc kinh điển của kỷ nguyên NewSQL là **Google Spanner**, **Calvin** và **Google Percolator** đã giải quyết bài toán chuyển `100 USD` từ `Alice` sang `Bob` theo 3 triết lý hoàn toàn khác biệt.
 
 ---
 
@@ -261,6 +326,12 @@ Trong 2PC cổ điển, `Coordinator`, `Shard A` và `Shard B` là từng máy c
 Trong **Google Spanner**:
 - Mỗi phân vùng dữ liệu (`Shard A` chứa `Alice`, `Shard B` chứa `Bob`) không phải là 1 máy chủ đơn lẻ, mà là một **nhóm đồng thuận Paxos (`Paxos Group`)** gồm `3` hoặc `5` máy chủ đặt tại nhiều Availability Zone khác nhau.
 - Bản thân vai trò **`Coordinator`** cũng không phải là 1 máy chủ đơn lẻ, mà do **Paxos Leader của một nhóm Paxos** đảm nhận, và mọi trạng thái khoá / bản ghi WAL của 2PC (`[PREPARED]`, `[COMMIT]`) đều được **sao chép qua giao thức đồng thuận Paxos** lên đa số máy chủ trong nhóm đó!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai hộp lớn `Cụm Paxos: SHARD A` và `Cụm Paxos: SHARD B`**: Thay vì mỗi bên chỉ có 1 máy chủ lẻ loi, mỗi Shard nay là một nhóm 3 máy chủ (`A1, A2, A3` và `B1, B2, B3`) luôn đồng bộ nhật ký với nhau qua giao thức **Paxos**.
+> 2. **Theo dõi mũi tên hai chiều `◄══ 2PC ═══►` ở giữa**: Giao thức 2PC (`Prepare / Commit`) được thực hiện giữa hai vị nhóm trưởng (`★ Leader A1` và `★ Leader B1`), nhưng mỗi bước ghi trạng thái 2PC đều được sao chép ngay lập tức xuống các máy phó (`A2, A3` và `B2, B3`).
+> 3. **Kết quả ở dòng chú thích dưới cùng**: Nếu máy chủ điều phối `Leader A1` bị cháy nguồn ngay giữa lễ cưới 2PC, máy phó `Replica A2` sẽ đắc cử Leader mới chỉ sau vài trăm mili-giây và hoàn tất nốt 2PC với `Shard B` — xoá sổ hoàn toàn căn bệnh treo khoá `In-Doubt`!
 
 ```text
 ================================================================================
@@ -315,9 +386,15 @@ $$\text{TT.now()} = [t_{\text{earliest}}, \; t_{\text{latest}}], \quad \text{tro
 #### Ví dụ chạy tay bằng con số cụ thể (Step-by-Step Dry Run): TrueTime & Commit Wait với $\epsilon = 4\text{ ms}$
 
 Giả sử sai số đồng hồ của cụm Spanner hiện tại là **$\epsilon = 4\text{ ms}$** (nên độ rộng khoảng bất định của `TT.now()` luôn là $2\epsilon = 8\text{ ms}$).
-Xét giao dịch **$T_1$** (chuyển `100$` từ `Alice` sang `Bob` tại Datacenter Mỹ). Ngay sau khi `Bob` nhìn thấy thông báo nhận được tiền trên màn hình điện thoại, `Bob` lập tức bấm thực hiện giao dịch **$T_2$** (dùng `100$` vừa nhận để mua hàng tại Datacenter Singapore).
+Xét giao dịch **$T_1$** (chuyển `100 USD` từ `Alice` sang `Bob` tại Datacenter Mỹ). Ngay sau khi `Bob` nhìn thấy thông báo nhận được tiền trên màn hình điện thoại, `Bob` lập tức bấm thực hiện giao dịch **$T_2$** (dùng `100 USD` vừa nhận để mua hàng tại Datacenter Singapore).
 
 Hãy theo dõi từng mili-giây theo đồng hồ thực tế của vũ trụ ($t_{\text{abs}}$) và khoảng trả về của `TT.now()`:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào trục `Thời gian thực (t_abs)` trên cùng**: Trục thời gian chạy từ trái sang phải qua các mốc `100ms -> 104ms -> 108ms -> 112ms -> 113ms`.
+> 2. **Theo dõi mục `[1]` và `[2] COMMIT WAIT (8ms)`**: Tại `t_abs = 104ms`, đồng hồ TrueTime trả về khoảng `[100ms, 108ms]`, nên giao dịch `T1` được đóng dấu mốc lớn nhất `s1 = 108ms`. Vì lúc này ngoài đời thực mới là `104ms` (chưa tới `108ms`), `T1` **bắt buộc phải đứng chờ đủ `2ε = 8ms`** (từ `104ms` đến `112.1ms`) cho đến khi mép dưới `earliest (109ms)` vượt hẳn qua `s1 (108ms)` mới được nhả khoá ở mục `[3]`.
+> 3. **Kết quả ở mục `[4]` (`t_abs = 113ms` tại Singapore)**: Nhờ `T1` đã chờ qua khỏi mốc `108ms` rồi mới báo xong, khi `T2` bắt đầu ở Singapore lúc `113ms`, nhãn của `T2` (`s2 = 117ms`) chắc chắn 100% lớn hơn `s1 (108ms)` mà hai máy chủ Mỹ và Singapore không cần gửi một gói tin nào hỏi giờ nhau!
 
 ```text
 ==========================================================================================
@@ -380,24 +457,30 @@ Hãy nhìn vào lý do tại sao Spanner và các hệ thống 2PC truyền th�
 Năm 2012, nhóm nghiên cứu của Daniel Abadi tại Đại học Yale đề xuất kiến trúc **Calvin** (được hiện thực hoá trong **FaunaDB**) với một góc nhìn đảo ngược hoàn toàn:
 > **Ý tưởng cốt lõi của Calvin**: *"Nếu tất cả các phân vùng và tất cả các bản sao đều thống nhất thứ tự thực thi các giao dịch `[Tx_1, Tx_2, Tx_3, ...]` **TRƯỚC KHI** bắt đầu chạy, và hàm xử lý giao dịch là **hoàn toàn tất định (Deterministic)**, thì mọi node chắc chắn sẽ tính ra cùng một kết quả giống hệt nhau — và do đó **KHÔNG CẦN chạy 2PC** nữa!"*
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn từ trái sang phải bắt đầu ở `1. Sequencer Layer`**: Khi `Client` gửi `Tx_100`, hệ thống chưa chạy giao dịch hay khoá dòng ngay, mà gom vào lô `10ms` rồi chạy Paxos/Raft để **đóng đinh thứ tự toàn cục `[Tx_99, Tx_100, Tx_101]`** trước.
+> 2. **Theo dõi nhánh rẽ sang `2a, 2b. Scheduler`**: Cả `Shard A` và `Shard B` đều nhận cùng một danh sách thứ tự `[Tx_99, Tx_100, Tx_101]` và cấp khoá dòng `'Alice'`, `'Bob'` theo đúng thứ tự đó (loại bỏ 100% nguy cơ Deadlock).
+> 3. **Kết quả ở `3a, 3b. Execution` bên phải**: Khi thực thi, `Shard A` và `Shard B` chỉ trao đổi dữ liệu đọc với nhau rồi tự ghi kết quả xuống đĩa mà **hoàn toàn không cần chạy 2PC bầu chọn**!
+
 ```mermaid
 flowchart LR
-    Client["Client gửi Tx_100:<br/>Chuyển 100$ Alice -> Bob"] --> Seq["<b>1. Sequencer Layer</b><br/>Gom lô (Epoch 10ms) &<br/>Đồng thuận Paxos/Raft"]
+    Client["Client gửi Tx_100:<br/>Chuyển 100 USD Alice -> Bob"] --> Seq["<b>1. Sequencer Layer</b><br/>Gom lô (Epoch 10ms) &<br/>Đồng thuận Paxos/Raft"]
     Seq -->|"Đã đóng đinh thứ tự toàn cục<br/>[Tx_99, Tx_100, Tx_101]"| SchedA["<b>2a. Scheduler (Shard A)</b><br/>Cấp khoá 'Alice' theo<br/>đúng thứ tự Log"]
     Seq -->|"Đã đóng đinh thứ tự toàn cục<br/>[Tx_99, Tx_100, Tx_101]"| SchedB["<b>2b. Scheduler (Shard B)</b><br/>Cấp khoá 'Bob' theo<br/>đúng thứ tự Log"]
-    SchedA --> ExecA["<b>3a. Execution (Shard A)</b><br/>Đọc/Ghi Alice = 400$<br/>(Gửi 500$ sang B nếu cần)"]
-    SchedB --> ExecB["<b>3b. Execution (Shard B)</b><br/>Nhận tín hiệu từ A,<br/>Ghi Bob = 300$ (Không cần 2PC!)"]
+    SchedA --> ExecA["<b>3a. Execution (Shard A)</b><br/>Đọc/Ghi Alice = 400 USD<br/>(Gửi 500 USD sang B nếu cần)"]
+    SchedB --> ExecB["<b>3b. Execution (Shard B)</b><br/>Nhận tín hiệu từ A,<br/>Ghi Bob = 300 USD (Không cần 2PC!)"]
     ExecA <-->|"Trao đổi dữ liệu đọc<br/>(Không cần bầu chọn 2PC)"| ExecB
 ```
 
-#### Ví dụ chạy tay từng bước: Giao dịch chuyển `100$` (`Alice -> Bob`) trên kiến trúc Calvin
+#### Ví dụ chạy tay từng bước: Giao dịch chuyển `100 USD` (`Alice -> Bob`) trên kiến trúc Calvin
 
-Hãy trace hành trình của giao dịch `Tx_100` (chuyển `100$` từ `Alice` ở `Shard A` sang `Bob` ở `Shard B`, kèm theo một giao dịch cạnh tranh `Tx_101` rút `50$` từ `Alice`) đi qua 3 tầng của Calvin:
+Hãy trace hành trình của giao dịch `Tx_100` (chuyển `100 USD` từ `Alice` ở `Shard A` sang `Bob` ở `Shard B`, kèm theo một giao dịch cạnh tranh `Tx_101` rút `50 USD` từ `Alice`) đi qua 3 tầng của Calvin:
 
 1. **Bước 1 — Tầng `Sequencer Layer` (Chốt thứ tự vào `Deterministic Input Log` trước khi chạy)**:
    - Client gửi toàn bộ mã lệnh của `Tx_100` (`Read("Alice"), Read("Bob"), Write("Alice", -100), Write("Bob", +100)`) dưới dạng một gói lệnh trọn vẹn (**One-Shot Transaction / Stored Procedure**) vào tầng **Sequencer**.
    - Tầng Sequencer gom các giao dịch nhận được trong mỗi khung thời gian `10 ms` (**Epoch**) và dùng giao thức đồng thuận (Paxos/Raft) để ghi nối đuôi vào một nhật ký đầu vào toàn cục (**Deterministic Input Log**).
-   - Giả sử lô Log số `#50` vừa được chốt có thứ tự bất biến là: **`[Tx_100 (Alice -> Bob), Tx_101 (Alice rút 50$)]`**.
+   - Giả sử lô Log số `#50` vừa được chốt có thứ tự bất biến là: **`[Tx_100 (Alice -> Bob), Tx_101 (Alice rút 50 USD)]`**.
    - Ngay tại bước này, mọi giá trị không tất định như thời gian hiện tại `NOW()` hay số ngẫu nhiên `UUID()` đều được Sequencer tính sẵn và đóng cứng thành hằng số bên trong bản ghi Log của `Tx_100`.
 2. **Bước 2 — Tầng `Scheduler Layer` (Cấp phát khoá tất định — `Deterministic Locking`)**:
    - Cả `Shard A` và `Shard B` đều đọc lô Log `#50` (`[Tx_100, Tx_101]`).
@@ -407,16 +490,16 @@ Hãy trace hành trình của giao dịch `Tx_100` (chuyển `100$` từ `Alice`
    - **Tại sao không bao giờ xảy ra Deadlock?**: Vì cả `Shard A` và `Shard B` đều cấp phát khoá theo đúng một thứ tự toàn cục đơn lẻ `[Tx_100, Tx_101]` trong Log, không bao giờ có chuyện `Shard A` cấp khoá cho `Tx_100` trước còn `Shard B` lại cấp khoá cho một giao dịch khác theo thứ tự ngược lại!
 3. **Bước 3 — Tầng `Execution Threads` (Thực thi hoàn toàn không cần 2PC!)**:
    - Khi `Tx_100` đã nhận được khoá ở cả hai Shard, các luồng Worker bắt đầu thực thi:
-     - `Shard A` đọc số dư `Alice = 500$`, kiểm tra điều kiện `500$ >= 100$` (đủ tiền!). `Shard A` gửi thông điệp dữ liệu `{status: "OK", amount: 100$}` sang cho `Shard B`, đồng thời trừ tiền `Alice = 400$` và **nhả ngay khoá `X-Lock("Alice")` cho `Tx_101` chạy tiếp**!
-     - `Shard B` nhận được thông điệp từ `Shard A`, cộng tiền `Bob = 200$ + 100$ = 300$` và nhả khoá `X-Lock("Bob")`!
+     - `Shard A` đọc số dư `Alice = 500 USD`, kiểm tra điều kiện `500 USD >= 100 USD` (đủ tiền!). `Shard A` gửi thông điệp dữ liệu `{status: "OK", amount: 100 USD}` sang cho `Shard B`, đồng thời trừ tiền `Alice = 400 USD` và **nhả ngay khoá `X-Lock("Alice")` cho `Tx_101` chạy tiếp**!
+     - `Shard B` nhận được thông điệp từ `Shard A`, cộng tiền `Bob = 200 USD + 100 USD = 300 USD` và nhả khoá `X-Lock("Bob")`!
    - **Tại sao không cần 2PC để hỏi xem `Shard B` có bị sập nguồn hay đầy đĩa không?**:
-     - Giả sử `Shard A` kiểm tra thấy `Alice` chỉ có `30$` (`< 100$`, lỗi nghiệp vụ **Deterministic Abort**): `Shard A` gửi thông báo `{status: "INSUFFICIENT_FUNDS"}` sang `Shard B` và cả hai cùng huỷ giao dịch một cách tất định.
-     - Còn nếu máy chủ `Shard B` bị **sập nguồn đột ngột (Non-deterministic Crash)** ngay lúc đang cộng tiền cho `Bob`? `Shard A` **không cần Rollback**! Bởi vì đầu vào `Tx_100` đã nằm bền vững trong `Deterministic Input Log` rồi; khi bản sao dự phòng của `Shard B` tiếp quản (hoặc khi `Shard B` khởi động lại và chạy lại Log từ đầu), nó chắc chắn sẽ chạy lại đúng lệnh `Tx_100` và ra đúng kết quả `Bob = 300$`!
+     - Giả sử `Shard A` kiểm tra thấy `Alice` chỉ có `30 USD` (`< 100 USD`, lỗi nghiệp vụ **Deterministic Abort**): `Shard A` gửi thông báo `{status: "INSUFFICIENT_FUNDS"}` sang `Shard B` và cả hai cùng huỷ giao dịch một cách tất định.
+     - Còn nếu máy chủ `Shard B` bị **sập nguồn đột ngột (Non-deterministic Crash)** ngay lúc đang cộng tiền cho `Bob`? `Shard A` **không cần Rollback**! Bởi vì đầu vào `Tx_100` đã nằm bền vững trong `Deterministic Input Log` rồi; khi bản sao dự phòng của `Shard B` tiếp quản (hoặc khi `Shard B` khởi động lại và chạy lại Log từ đầu), nó chắc chắn sẽ chạy lại đúng lệnh `Tx_100` và ra đúng kết quả `Bob = 300 USD`!
 
 #### Điểm yếu của Calvin: Bài toán `Dependent Transactions` và `Reconnaissance Queries`
 Để `Scheduler` ở Bước 2 có thể cấp phát toàn bộ khoá theo đúng thứ tự Log **trước khi** giao dịch bắt đầu chạy, Calvin bắt buộc phải **biết trước 100% danh sách các khoá cần Đọc và Ghi (`Read/Write Set`)** ngay từ khi giao dịch bước vào Sequencer!
-- Với giao dịch `Chuyển 100$ từ Alice sang Bob`, tập khoá `{ "Alice", "Bob" }` đã biết rõ từ đầu nên chạy cực nhanh.
-- Nhưng với một **Giao dịch phụ thuộc dữ liệu (`Dependent Transaction`)** mà khoá cần sửa chỉ được biết sau khi đọc một bảng chỉ mục phụ (Secondary Index), ví dụ: *"Chuyển `100$` từ `Alice` cho **người dùng nào có số điện thoại `0901234567`**"* (chưa biết người đó là `Bob` ở `Shard B` hay `Charlie` ở `Shard C`!), Calvin phải xử lý bằng kỹ thuật **Optmistic Reconnaissance Query (Truy vấn trinh sát)**:
+- Với giao dịch `Chuyển 100 USD từ Alice sang Bob`, tập khoá `{ "Alice", "Bob" }` đã biết rõ từ đầu nên chạy cực nhanh.
+- Nhưng với một **Giao dịch phụ thuộc dữ liệu (`Dependent Transaction`)** mà khoá cần sửa chỉ được biết sau khi đọc một bảng chỉ mục phụ (Secondary Index), ví dụ: *"Chuyển `100 USD` từ `Alice` cho **người dùng nào có số điện thoại `0901234567`**"* (chưa biết người đó là `Bob` ở `Shard B` hay `Charlie` ở `Shard C`!), Calvin phải xử lý bằng kỹ thuật **Optmistic Reconnaissance Query (Truy vấn trinh sát)**:
   1. **Pha 1 (Trinh sát không khoá)**: Chạy một truy vấn đọc không khoá vào bảng chỉ mục số điện thoại để tìm ra chủ nhân của số `0901234567` là `Bob`.
   2. **Pha 2 (Đóng gói vào Sequencer kèm kiểm tra)**: Gửi giao dịch với tập khoá cố định `{"Alice", "Bob", "idx:0901234567"}` vào `Sequencer Log`. Khi thực thi thật sự dưới khoá tất định, nó kiểm tra lại xem `idx:0901234567` có còn trỏ về `Bob` hay không; nếu vừa bị người khác đổi sang `Charlie`, giao dịch phải Abort và chạy lại từ Pha 1!
 
@@ -431,9 +514,15 @@ Năm 2010, Google cần cập nhật chỉ mục tìm kiếm web theo từng ph�
 **Giải pháp của Google Percolator (và cũng là giao thức giao dịch cốt lõi của TiKV / TiDB, Neo4j, CockroachDB đời đầu)**:
 - Sử dụng một **Timestamp Oracle (TSO)** để cấp phát nhãn thời gian tăng dần nghiêm ngặt (`start_ts` và `commit_ts`).
 - **Neo toàn bộ trạng thái sống/chết của giao dịch vào đúng 1 dòng đơn lẻ gọi là `Primary Lock`**:
-  - Trong giao dịch chuyển `100$` từ `Alice` sang `Bob`, Client chọn dòng **`"Alice"` làm `Primary Lock`**, và chọn các dòng còn lại (**`"Bob"`**) làm **`Secondary Lock`**.
+  - Trong giao dịch chuyển `100 USD` từ `Alice` sang `Bob`, Client chọn dòng **`"Alice"` làm `Primary Lock`**, và chọn các dòng còn lại (**`"Bob"`**) làm **`Secondary Lock`**.
   - Khoá trên dòng `"Bob"` lưu một con trỏ chỉ thẳng về dòng `"Alice"`: `primary = "Alice"`.
   - Ở Phase 2 (`Commit`), Client chỉ cần thực hiện **1 thao tác nguyên tử trên dòng `"Alice"`**: xoá `Primary Lock` và ghi nhãn `commit_ts` vào cột `write` của `"Alice"`. **Khoảnh khắc dòng `"Alice"` được mở khoá và có bản ghi `write`, toàn bộ giao dịch (kể cả dòng `"Bob"`) được coi là đã Commit 100%!**
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào bước `1` và `PHASE 1: PREWRITE` (`2a, 2b`)**: `Client` xin nhãn bắt đầu `start_ts = 10` từ `TSO`, sau đó đặt **`Primary Lock`** lên dòng `"Alice"` (`Shard A`) và đặt **`Secondary Lock`** lên dòng `"Bob"` (`Shard B`) có chứa con trỏ `primary: "Alice"`.
+> 2. **Theo dõi bước `3` và `PHASE 2: COMMIT` (`4`)**: `Client` xin nhãn kết thúc `commit_ts = 15` từ `TSO`, rồi chỉ gửi lệnh `4. Commit Primary` tới **đơn lẻ dòng `"Alice"`** (ghi `write={15 -> data@10}` và xoá `lock@10`).
+> 3. **Kết quả ở hộp `⚡ TỪ KHOẢNH KHẮC NÀY` và bước `5`**: Ngay khi dòng Primary `"Alice"` xoá khoá xong ở bước `4`, toàn bộ giao dịch đã chính thức Commit 100%! Bước `5. Async Commit Secondary` dọn khoá trên `"Bob"` chỉ cần chạy ngầm mà không bắt người dùng phải chờ.
 
 ```mermaid
 sequenceDiagram
@@ -444,12 +533,12 @@ sequenceDiagram
 
     C->>TSO: 1. Xin start_ts
     TSO-->>C: start_ts = 10
-    Note over C,SB: Đọc Snapshot tại start_ts = 10 (Alice = 500$, Bob = 200$)
+    Note over C,SB: Đọc Snapshot tại start_ts = 10 (Alice = 500 USD, Bob = 200 USD)
 
     Note over C,SB: PHASE 1: PREWRITE (Khoá Primary trước, Secondary trỏ về Primary)
-    C->>SA: 2a. Prewrite Primary("Alice", data=400$, lock={primary:"Alice"} @ ts=10)
+    C->>SA: 2a. Prewrite Primary("Alice", data=400 USD, lock={primary:"Alice"} @ ts=10)
     SA-->>C: OK
-    C->>SB: 2b. Prewrite Secondary("Bob", data=300$, lock={primary:"Alice"} @ ts=10)
+    C->>SB: 2b. Prewrite Secondary("Bob", data=300 USD, lock={primary:"Alice"} @ ts=10)
     SB-->>C: OK
 
     C->>TSO: 3. Xin commit_ts
@@ -467,19 +556,19 @@ sequenceDiagram
 #### Ví dụ chạy tay từng bước: Bảng trạng thái 3 cột vật lý (`data`, `lock`, `write`) của Percolator
 
 Trong Percolator, mỗi dòng dữ liệu (`"Alice"` và `"Bob"`) được lưu trữ kèm nhãn thời gian trên **3 cột vật lý (Column Families)**:
-1. Cột **`data`**: Lưu giá trị thực tế của bản ghi tại thời điểm `start_ts` (ví dụ `10: "400$"`).
+1. Cột **`data`**: Lưu giá trị thực tế của bản ghi tại thời điểm `start_ts` (ví dụ `10: "400 USD"`).
 2. Cột **`lock`**: Lưu khoá tạm thời trong khi đang chạy 2PC, chứa con trỏ về khoá chính (ví dụ `10: Primary("Alice")`).
 3. Cột **`write`**: Lưu dấu xác nhận giao dịch đã Commit tại thời điểm `commit_ts`, trỏ ngược về vị trí dữ liệu ở `start_ts` (ví dụ `15: data@10` — nghĩa là *"Giao dịch bắt đầu lúc `ts=10` đã chính thức được Commit lúc `ts=15`; hãy đọc giá trị ở cột `data` dòng `ts=10`"*).
 
-Giả sử ban đầu (tại `ts = 5`), số dư của `Alice = 500$` (đã commit tại `ts = 6`) và `Bob = 200$` (đã commit tại `ts = 6`).
-Bây giờ, giao dịch chuyển `100$` từ `Alice` sang `Bob` bắt đầu với **`start_ts = 10`** và sau đó nhận **`commit_ts = 15`**. Hãy quan sát sự biến đổi của 3 cột `data`, `lock`, `write` qua từng bước:
+Giả sử ban đầu (tại `ts = 5`), số dư của `Alice = 500 USD` (đã commit tại `ts = 6`) và `Bob = 200 USD` (đã commit tại `ts = 6`).
+Bây giờ, giao dịch chuyển `100 USD` từ `Alice` sang `Bob` bắt đầu với **`start_ts = 10`** và sau đó nhận **`commit_ts = 15`**. Hãy quan sát sự biến đổi của 3 cột `data`, `lock`, `write` qua từng bước:
 
 ##### Bước 0: Trạng thái ban đầu trước giao dịch (Đã có dữ liệu gốc `start_ts = 5`, `commit_ts = 6`)
 
 | Khoá (Row Key) | Cột `data` *(Giá trị gốc)* | Cột `lock` *(Khoá 2PC đang giữ)* | Cột `write` *(Bản ghi đã Commit hiển thị cho người đọc)* |
 | :--- | :--- | :--- | :--- |
-| **`"Alice"`** *(Shard A)* | `5: 500$` | *(Trống)* | `6: data@5` *(Đọc thấy `500$`)* |
-| **`"Bob"`** *(Shard B)* | `5: 200$` | *(Trống)* | `6: data@5` *(Đọc thấy `200$`)* |
+| **`"Alice"`** *(Shard A)* | `5: 500 USD` | *(Trống)* | `6: data@5` *(Đọc thấy `500 USD`)* |
+| **`"Bob"`** *(Shard B)* | `5: 200 USD` | *(Trống)* | `6: data@5` *(Đọc thấy `200 USD`)* |
 
 ##### Bước 1: `Prewrite` — Phase 1 của 2PC tại `start_ts = 10`
 Client chọn **`"Alice"` làm Primary Lock**, còn **`"Bob"` làm Secondary Lock** (chứa con trỏ `primary = "Alice"`).
@@ -490,10 +579,10 @@ Client chọn **`"Alice"` làm Primary Lock**, còn **`"Bob"` làm Secondary Loc
 
 | Khoá (Row Key) | Cột `data` | Cột `lock` | Cột `write` |
 | :--- | :--- | :--- | :--- |
-| **`"Alice"`** *(Primary)* | `5: 500$`<br/>**`10: 400$`** *(Mới ghi)* | **`10: {type: PRIMARY, primary: "Alice", ttl: 3000ms}`** | `6: data@5` |
-| **`"Bob"`** *(Secondary)* | `5: 200$`<br/>**`10: 300$`** *(Mới ghi)* | **`10: {type: SECONDARY, primary: "Alice", ttl: 3000ms}`** | `6: data@5` |
+| **`"Alice"`** *(Primary)* | `5: 500 USD`<br/>**`10: 400 USD`** *(Mới ghi)* | **`10: {type: PRIMARY, primary: "Alice", ttl: 3000ms}`** | `6: data@5` |
+| **`"Bob"`** *(Secondary)* | `5: 200 USD`<br/>**`10: 300 USD`** *(Mới ghi)* | **`10: {type: SECONDARY, primary: "Alice", ttl: 3000ms}`** | `6: data@5` |
 
-*(Lưu ý: Tại thời điểm này, vì cột `write` chưa có bản ghi cho `10`, dữ liệu `400$` và `300$` vẫn hoàn toàn vô hình với các giao dịch khác!)*
+*(Lưu ý: Tại thời điểm này, vì cột `write` chưa có bản ghi cho `10`, dữ liệu `400 USD` và `300 USD` vẫn hoàn toàn vô hình với các giao dịch khác!)*
 
 ##### Bước 2: `Commit Primary` — Điểm quyết định nguyên tử tại `commit_ts = 15`
 Client xin được **`commit_ts = 15`** từ TSO, sau đó gửi lệnh Commit tới **đơn lẻ dòng Primary `"Alice"`**.
@@ -501,8 +590,8 @@ Client xin được **`commit_ts = 15`** từ TSO, sau đó gửi lệnh Commit 
 
 | Khoá (Row Key) | Cột `data` | Cột `lock` | Cột `write` |
 | :--- | :--- | :--- | :--- |
-| **`"Alice"`** *(Primary)* | `5: 500$`<br/>`10: 400$` | ***(Đã xoá `lock@10`!)*** | `6: data@5`<br/>**`15: data@10`** *(ĐÃ COMMIT! Đọc thấy `400$`)* |
-| **`"Bob"`** *(Secondary)* | `5: 200$`<br/>`10: 300$` | **`10: {type: SECONDARY, primary: "Alice"}`** *(Vẫn còn khoá!)* | `6: data@5` |
+| **`"Alice"`** *(Primary)* | `5: 500 USD`<br/>`10: 400 USD` | ***(Đã xoá `lock@10`!)*** | `6: data@5`<br/>**`15: data@10`** *(ĐÃ COMMIT! Đọc thấy `400 USD`)* |
+| **`"Bob"`** *(Secondary)* | `5: 200 USD`<br/>`10: 300 USD` | **`10: {type: SECONDARY, primary: "Alice"}`** *(Vẫn còn khoá!)* | `6: data@5` |
 
 > [!IMPORTANT]
 > **Tại sao ngay ở Bước 2 (khi `"Bob"` vẫn còn nguyên khoá và chưa có `write@15`), giao dịch đã được coi là Commit 100%?**
@@ -513,8 +602,8 @@ Client trả kết quả thành công về cho ứng dụng, đồng thời gử
 
 | Khoá (Row Key) | Cột `data` | Cột `lock` | Cột `write` |
 | :--- | :--- | :--- | :--- |
-| **`"Alice"`** *(Primary)* | `5: 500$`<br/>`10: 400$` | *(Trống)* | `6: data@5`<br/>`15: data@10` *(Đọc thấy `400$`)* |
-| **`"Bob"`** *(Secondary)* | `5: 200$`<br/>`10: 300$` | ***(Đã xoá `lock@10`!)*** | `6: data@5`<br/>**`15: data@10`** *(Đọc thấy `300$`)* |
+| **`"Alice"`** *(Primary)* | `5: 500 USD`<br/>`10: 400 USD` | *(Trống)* | `6: data@5`<br/>`15: data@10` *(Đọc thấy `400 USD`)* |
+| **`"Bob"`** *(Secondary)* | `5: 200 USD`<br/>`10: 300 USD` | ***(Đã xoá `lock@10`!)*** | `6: data@5`<br/>**`15: data@10`** *(Đọc thấy `300 USD`)* |
 
 ---
 
@@ -525,6 +614,12 @@ Giả sử máy **Client bị mất điện đột ngột** khi chưa kịp dọ
 - Quy tắc đọc của `T_read (start_ts = 20)`: Để đọc snapshot tại `ts = 20`, `T_read` phải kiểm tra xem trên dòng `"Bob"` có khoá nào trong cột `lock` nằm trong đoạn `[0 .. 20]` hay không.
 - `T_read` phát hiện dòng `"Bob"` đang bị chặn bởi khoá **`lock@10 = {type: SECONDARY, primary: "Alice"}`** ($10 \le 20$)!
 - Thay vì bị treo vô hạn chờ chiếc máy Client đã chết sống lại, **`T_read` đọc con trỏ `primary: "Alice"` và tự mình gửi RPC sang `Shard A` để kiểm tra dòng `"Alice"`**. Sẽ có đúng 2 kịch bản xảy ra:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào điểm bắt đầu `T_read (start_ts = 20) đọc dòng "Bob"`**: Khi thấy dòng `"Bob"` đang bị kẹt bởi một `Secondary Lock` mồ côi tại `ts = 10`, `T_read` không đứng chờ mà lần theo tấm biển chỉ đường `primary: "Alice"` để sang kiểm tra dòng gốc `"Alice"`.
+> 2. **Theo dõi nhánh `KỊCH BẢN 1` (nếu `"Alice"` vẫn còn `Primary Lock @10` đã hết hạn TTL)**: Chứng tỏ máy Client cũ đã chết trước khi kịp Commit $\rightarrow$ `T_read` tự tay xoá khoá (**`ROLL-BACK`**) trên cả `"Alice"` lẫn `"Bob"`, rồi đọc số dư cũ `Bob = 200 USD`.
+> 3. **Kết quả ở nhánh `KỊCH BẢN 2` (nếu `"Alice"` đã có bản ghi `write 15: data@10`)**: Chứng tỏ giao dịch cũ đã Commit thành công lúc `ts = 15` $\rightarrow$ `T_read` tự tay hoàn tất nốt việc mở khoá (**`ROLL-FORWARD`**) cho `"Bob"` và đọc số dư mới `Bob = 300 USD`!
 
 ```text
 ==========================================================================================
@@ -538,24 +633,24 @@ Giả sử máy **Client bị mất điện đột ngột** khi chưa kịp dọ
              ├──► KỊCH BẢN 1: Trên "Alice" VẪN CÒN Primary Lock @10 (Client chết ở Bước 1, hết TTL)
              │    1. T_read XOÁ Primary Lock @10 trên "Alice" & xoá data@10 của "Alice" (ROLL-BACK!).
              │    2. T_read quay về XOÁ Secondary Lock @10 trên "Bob" & xoá data@10 của "Bob".
-             │    3. T_read đọc giá trị cũ hợp lệ của "Bob" tại write@6 -> Bob = 200$!
+             │    3. T_read đọc giá trị cũ hợp lệ của "Bob" tại write@6 -> Bob = 200 USD!
              │
              └──► KỊCH BẢN 2: Trên "Alice" ĐÃ CÓ bản ghi write `15: data@10` (Client chết ở Bước 2)
                   1. T_read biết giao dịch cũ ĐÃ COMMIT tại commit_ts = 15!
                   2. T_read giúp "Bob" ROLL-FORWARD: Ghi `15: data@10` vào cột write của "Bob"
                      và XOÁ Secondary Lock @10 trên "Bob".
-                  3. Vì 15 <= 20 (start_ts của T_read), T_read đọc giá trị mới -> Bob = 300$!
+                  3. Vì 15 <= 20 (start_ts của T_read), T_read đọc giá trị mới -> Bob = 300 USD!
 ==========================================================================================
 ```
 
 1. **Kịch bản 1 — Tự động `Roll-Back` (Khi Client sập ở cuối Bước 1, TRƯỚC khi kịp Commit dòng Primary `"Alice"`)**:
    - `T_read` kiểm tra dòng `"Alice"` và thấy trên cột `lock` của `"Alice"` **vẫn còn nguyên `10: {type: PRIMARY, primary: "Alice"}`** và thời hạn sống (`TTL`) của khoá đã hết hạn (chứng tỏ Client đã chết trước khi bước sang Phase 2).
    - `T_read` lập tức thực hiện thao tác nguyên tử trên dòng `"Alice"`: **Xoá `Primary Lock @10`** và ghi dấu Rollback tại `10` trên `"Alice"`. (Từ giây phút `Primary Lock` trên `"Alice"` bị xoá mà không có bản ghi `write`, giao dịch cũ vĩnh viễn không bao giờ có thể Commit được nữa, kể cả khi máy Client cũ bất ngờ tỉnh lại!).
-   - Tiếp theo, `T_read` xoá nốt `Secondary Lock @10` và dữ liệu rác `data@10 (300$)` trên dòng `"Bob"`, rồi đọc bản ghi đã commit trước đó (`6: data@5`) $\rightarrow$ nhận kết quả chính xác **`Bob = 200$`**!
+   - Tiếp theo, `T_read` xoá nốt `Secondary Lock @10` và dữ liệu rác `data@10 (300 USD)` trên dòng `"Bob"`, rồi đọc bản ghi đã commit trước đó (`6: data@5`) $\rightarrow$ nhận kết quả chính xác **`Bob = 200 USD`**!
 2. **Kịch bản 2 — Tự động `Roll-Forward` (Khi Client sập ở cuối Bước 2, SAU khi đã Commit dòng Primary `"Alice"`)**:
    - `T_read` kiểm tra dòng `"Alice"` và thấy `Primary Lock @10` không còn nữa, mà trong cột `write` của `"Alice"` **đã xuất hiện bản ghi `15: data@10`**!
    - `T_read` hiểu ngay rằng giao dịch chuyển tiền thực chất **đã Commit thành công tại `commit_ts = 15`** trước khi Client sập, chỉ là Client chưa kịp sang mở khoá cho `"Bob"`.
-   - `T_read` đóng vai "người tốt việc tốt" (**Roll-Forward**): lấy đúng con số `commit_ts = 15` từ dòng `"Alice"`, ghi bản ghi **`15: data@10`** vào cột `write` của dòng `"Bob"`, xoá `Secondary Lock @10` trên `"Bob"`, rồi đọc giá trị mới tại `data@10` $\rightarrow$ nhận kết quả chính xác **`Bob = 300$`**!
+   - `T_read` đóng vai "người tốt việc tốt" (**Roll-Forward**): lấy đúng con số `commit_ts = 15` từ dòng `"Alice"`, ghi bản ghi **`15: data@10`** vào cột `write` của dòng `"Bob"`, xoá `Secondary Lock @10` trên `"Bob"`, rồi đọc giá trị mới tại `data@10` $\rightarrow$ nhận kết quả chính xác **`Bob = 300 USD`**!
 
 ---
 

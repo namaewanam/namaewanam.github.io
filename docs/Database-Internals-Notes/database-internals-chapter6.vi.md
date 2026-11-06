@@ -21,6 +21,42 @@ tags: ["database-internals", "b-tree-variants", "cow", "bw-tree", "wiredtiger"]
 
 ---
 
+### 0. Khởi động cho người mới: Tại sao cây `B+Tree` kinh điển từ thập niên 1970 lại "hụt hơi" trên ổ cứng SSD và CPU 64 nhân hiện nay?
+
+Ở các chương trước (Chương 2 đến Chương 5), chúng ta đã thấy cây `B+Tree` truyền thống (trong PostgreSQL, MySQL InnoDB) hoạt động rất trực quan: khi chạy lệnh `UPDATE users SET points = points + 1 WHERE id = 42;`, hệ thống tìm đến trang lá `16 KB` chứa dòng `id = 42`, khóa trang đó lại bằng `X-Latch`, sửa con số `points` ngay tại chỗ (**In-Place Update**), rồi sau đó đẩy trang `16 KB` đó đè lên vị trí cũ trên ổ cứng.
+
+Cách làm "tẩy xóa và ghi đè tại chỗ" này hoàn hảo trên **ổ đĩa cơ học quay từ tính (HDD)** và **máy tính ít nhân CPU** của 40 năm trước, nhưng lại đâm sầm vào **2 bức tường vật lý** của phần cứng hiện đại:
+
+1. **Bức tường thứ nhất — Nỗi khổ ngầm của ổ cứng SSD/NVMe (Không thể ghi đè tại chỗ!)**:
+   - Người mới thường nghĩ SSD chỉ là "ổ HDD chạy nhanh hơn". Thực tế, chip nhớ **NAND Flash** bên trong SSD có một luật vật lý cực kỳ khắc nghiệt: **Nó có thể đọc/ghi từng trang nhỏ (`4 KB – 16 KB`), nhưng KHÔNG THỂ ghi đè lên trang đã có chữ nếu chưa xóa trắng nguyên cả một cụm `Erase Block` khổng lồ (`256 KB – 4 MB`, tức gấp `64` đến `256` lần một trang!)**.
+   - Hãy tưởng tượng một tờ giấy A0 khổng lồ gồm `256` ô nhỏ: muốn sửa `1` chữ trong `1` ô nhỏ, phần cứng SSD không có cục tẩy cho từng ô, mà phải chép `255` ô còn lại sang tờ giấy A0 mới rồi đem đốt cả tờ giấy A0 cũ!
+   - Vì vậy, khi `B+Tree` truyền thống sửa `100 bytes` của dòng `id = 42` rồi bắt SSD ghi đè trang `16 KB` tại chỗ, bộ điều khiển bên trong SSD (**FTL — Flash Translation Layer**) phải âm thầm lén ghi trang `16 KB` đó sang một chỗ trống khác và liên tục chạy dọn rác ngầm (**SSD Garbage Collection**). Sửa `100 bytes` trong SQL cuối cùng biến thành hàng trăm Kilobyte ghi vật lý trên chip Flash (**Write Amplification**), làm SSD vừa nhanh hỏng vừa bị giật cục độ trễ!
+2. **Bức tường thứ hai — Cảnh "tắc đường ở trạm thu phí" trên CPU 64–128 nhân (`Latch Contention`)**:
+   - Trên máy chủ hiện đại có `64` hoặc `128` nhân CPU cùng chạy hàng nghìn câu lệnh `INSERT / UPDATE` mỗi giây, việc các luồng CPU phải xếp hàng xin khóa vật lý (`X-Latch / S-Latch`) và cập nhật biến đếm trên cùng một trang B-Tree làm các nhân CPU liên tục giành giật bộ nhớ đệm `L1/L2 Cache` của nhau, khiến `80%` thời gian CPU chỉ ngồi chờ khóa chứ không làm việc thực!
+
+**4 biến thể B-Tree trong Chương 6 chính là 4 lời giải thông minh để vượt qua 2 bức tường này:**
+- **Copy-on-Write B-Tree (`LMDB`)**: Không bao giờ sửa đè lên trang cũ! Sửa trang nào thì chép nhánh đó ra trang mới tinh, vừa hợp với SSD vừa bỏ luôn được cả tệp nhật ký WAL.
+- **Lazy-Adaptive Tree (`Bε-Tree / TokuDB / WiredTiger`)**: Đặt các "giỏ đựng thư trung chuyển" ở lưng chừng cây để gom hàng trăm lệnh `INSERT/UPDATE` nhỏ thành một kiện hàng lớn rồi mới đẩy xuống trang lá một lần.
+- **FD-Tree (`Flash-Disk Tree`)**: Biến toàn bộ việc ghi ngẫu nhiên thành ghi tuần tự theo từng tầng trên SSD, và gắn các "cầu thang máy" (**Fractional Cascading**) để nhảy thẳng giữa các tầng khi đọc.
+- **Bw-Tree (`Microsoft SQL Server Hekaton`)**: Xóa sổ hoàn toàn mọi khóa `Latch` bằng cách dùng bảng số điện thoại ảo (**Mapping Table**) kết hợp các tờ giấy ghi chú dán chồng (**Delta Chain**) và lệnh nguyên tử `CAS` của CPU!
+
+---
+
+### Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database thực tế (PostgreSQL / MySQL InnoDB / RocksDB / LMDB) là gì? |
+| :--- | :--- | :--- |
+| **`In-Place Update` vs. `Out-of-Place Update`** | **`In-Place`**: Lấy bút xóa tẩy chữ cũ và viết đè chữ mới ngay trên tờ giấy cũ. **`Out-of-Place`**: Giữ nguyên tờ giấy cũ không chạm vào, lấy một tờ giấy trắng mới tinh viết nội dung mới sang chỗ khác. | **`In-Place`**: `B+Tree` truyền thống trong **MySQL InnoDB** (sửa đè tại chỗ trên trang `16 KB`). **`Out-of-Place`**: **LMDB** (Copy-on-Write), **WiredTiger**, và **RocksDB** (LSM-Tree). |
+| **`Write Amplification` (Hệ số khuếch đại ghi)** | Tỷ lệ "phóng đại công sức": Ứng dụng chỉ muốn lưu thêm **`100 bytes`** dữ liệu (1 câu lệnh `UPDATE`), nhưng ổ cứng bên dưới bị bắt phải cày cục ghi tới **`16 KB` – `320 KB`** dữ liệu vật lý! | Khi sửa 1 dòng trong **InnoDB**, hệ thống phải ghi bản ghi `Redo Log` + `Undo Log` + `Doublewrite Buffer` (`16 KB`) + `Data Page` (`16 KB`), làm hệ số khuếch đại ghi vọt lên hàng trăm lần. |
+| **`SSD Flash Translation Layer` (`FTL`) & `Garbage Collection`** | **Bộ phận điều phối ngầm bên trong ổ cứng SSD**: Vì chip nhớ Flash không cho ghi đè tại chỗ, mỗi khi hệ điều hành bảo *"Hãy ghi đè vào địa chỉ #10"*, `FTL` lén ghi sang ô mới `#99`, đánh dấu ô `#10` là rác, rồi lúc rảnh tự đi gom các ô còn sống để xóa trắng cả cụm `Erase Block` (`256 KB – 4 MB`). | Diễn ra bên trong firmware của mọi ổ cứng **NVMe / SATA SSD** hiện đại; nếu Database ghi ngẫu nhiên quá nhiều sẽ làm bộ `FTL Garbage Collection` của SSD bị quá tải, gây vọt độ trễ `p99`. |
+| **`Copy-on-Write` (`CoW`) & `Path Copying`** | Khi muốn sửa 1 trang lá ở đáy cây mục lục, thay vì sửa trang cũ, ta **tạo trang lá mới `C'` $\to$ tạo trang cha mới `B'` trỏ vào `C'` $\to$ tạo trang gốc mới `Root A'` trỏ vào `B'`**. Các nhánh khác không sửa thì dùng chung lại nguyên vẹn! | Cơ chế cốt lõi của **LMDB (`Lightning Memory-Mapped Database`)**, hệ thống file **Btrfs**, **ZFS**, **Apple APFS**, và quá trình Checkpoint của **MongoDB WiredTiger**. |
+| **`Dual Meta Pages` (Trang siêu dữ liệu kép Ping-Pong trong LMDB)** | Hai tấm biển chỉ đường **`Meta 0`** và **`Meta 1`** đặt ở ngay cổng vào file Database. Giao dịch chẵn ghi gốc mới vào `Meta 0`, giao dịch lẻ ghi gốc mới vào `Meta 1`. Lỡ mất điện khi đang ghi tấm biển mới thì tấm biển cũ bên cạnh vẫn còn nguyên vẹn `100%`! | Trang `Page 0` và `Page 1` ở đầu file `data.mdb` của **LMDB** — giúp LMDB đạt tính bền vững nguyên tử (`ACID`) mà **hoàn toàn không cần file nhật ký `WAL`**! |
+| **`Lazy-Adaptive Tree` / `Bε-Tree` (Cây gắn bộ đệm tại các node nội bộ)** | Thay vì bắt bưu tá cầm từng lá thư chạy tuốt từ tổng đài (`Root`) xuống tận nhà dân (`Leaf`), ta đặt một **giỏ chứa thư tạm (`Message Buffer`) ở ngay mỗi ngã ba (`Internal Node`)**. Khi giỏ đầy cả trăm lá thư cùng tuyến đường thì mới cử xe chở cả lô xuống tầng dưới 1 lần! | Cốt lõi của **TokuDB** (`Fractal Tree` cho MySQL/Percona), hệ thống file **BetrFS**, và truyền cảm hứng cho cơ chế `Update List` trong RAM của **MongoDB WiredTiger**. |
+| **`FD-Tree` (`Head Tree` trên RAM + `Sorted Runs` trên SSD + `Fractional Cascading`)** | Tổ chức dữ liệu thành chiếc phễu nhiều tầng trên SSD: chỉ ghi nối tiếp ở tầng trên rồi trộn dần xuống tầng dưới. Để khi đọc không phải dò tìm lại từ đầu ở mỗi tầng, ta bắc sẵn các **"cầu thang máy chỉ điểm" (`Fence Pointers / Fractional Cascading`)** nối từ tầng trên cắm thẳng vào đúng ô ở tầng dưới! | Thiết kế cây chỉ mục chuyên biệt cho SSD (tiền thân kết hợp giữa B+Tree và LSM-Tree), sử dụng kỹ thuật **Fractional Cascading** để đọc qua nhiều tầng với chi phí $O(1)$ mỗi tầng. |
+| **`Bw-Tree` (Cây không dùng khóa Latch nhờ `Mapping Table` + `CAS` + `Delta Chain`)** | Thay vì khóa cửa phòng để sửa trang giấy, mỗi trang được cấp một **số nội bộ ảo (`Logical PID`)** tra qua bảng tổng đài **`Mapping Table`**. Ai muốn sửa gì chỉ việc viết ra **tờ giấy nhớ (`Delta Record`)** rồi dùng lệnh phần cứng **`CAS`** dán đè địa chỉ tờ giấy nhớ đó vào bảng tổng đài trong 1 nhịp CPU! | Cấu trúc chỉ mục B-Tree không khóa (**Latch-Free**) được Microsoft phát triển cho **SQL Server Hekaton** (In-Memory OLTP Engine) và từng dùng trong **Cosmos DB**. |
+
+---
+
 ## Tại sao `B+Tree` truyền thống gặp nút thắt trên phần cứng hiện đại? {#standard-btree-bottlenecks}
 
 Khi thực thi khối lượng công việc có tần suất ghi và cập nhật cao, `B+Tree` cập nhật tại chỗ vấp phải `3` rào cản vật lý lớn:
@@ -48,7 +84,19 @@ Ngược lại, trong **Copy-on-Write (CoW) B-Tree** (được sử dụng trong
 3. Cuối cùng nút gốc `Root A` cũng được chép sang **`New Root A'`** trỏ tới `B'`.
 Trong suốt thời gian luồng ghi đang lặng lẽ xây dựng nhánh mới `C' -> B' -> A'`, toàn bộ các luồng đọc vẫn đọc trên cây cũ `Root A` một cách bình yên mà không hề biết có luồng ghi đang chạy!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào các vòng tròn màu đen bên trái (`xs -> d -> b, g ...`)**: Đây là cây dữ liệu gốc trước khi sửa, với nút gốc là `d` (được trỏ bởi biến `xs`).
+> 2. **Theo dõi nhánh màu xanh dương bên phải (`ys -> d' -> g' -> f' -> e`)**: Khi chèn thêm nút lá mới **`e`** vào dưới nút `f`, hệ thống **không hề sửa trực tiếp vào nút `f` màu đen**, mà tạo ra bản sao mới màu xanh dương dọc theo đường đi từ lá lên gốc: tạo `f'` (trỏ xuống `e`) $\to$ tạo cha mới `g'` (trỏ xuống `f'`) $\to$ tạo gốc mới `d'` (trỏ xuống `g'`).
+> 3. **Chú ý các mũi tên màu xanh dương chỉ sang vòng tròn màu đen (`d' -> b` và `g' -> h`)**: Toàn bộ nhánh con bên trái (`b -> a, c`) và nút lá `h` không hề bị thay đổi nên được cây mới `ys` **tái sử dụng nguyên vẹn 100%** mà không cần sao chép lại!
+
 ![Minh họa cơ chế Path Copying trên cây bất biến (Persistent / Copy-on-Write Tree)](./images/persistent-cow-tree.svg)
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khung trên cùng (`2 Meta Pages luân phiên ở đầu file`)**: File cơ sở dữ liệu LMDB luôn có 2 trang biển chỉ đường ở đầu file là `Meta Page 0` (đang trỏ vào cây cũ `txid = 100`) và `Meta Page 1` (vừa được cập nhật lên `txid = 101`).
+> 2. **Theo dõi mũi tên từ `Meta Page 0` xuống khung bên trái (`Cây Snapshot cũ`)**: Các câu lệnh `SELECT` bắt đầu từ trước vẫn đi theo `Meta Page 0 -> Root A (Page 2) -> Internal B (Page 3) -> Leaf C (Page 5)` để đọc giá trị cũ `Val='old'` mà không cần khóa.
+> 3. **Theo dõi mũi tên đậm từ `Meta Page 1` xuống khung bên phải (`Nhánh Copy-on-Write mới`)**: Giao dịch ghi `Tx 101` tạo ra 3 trang mới `Page 9 (Leaf C') -> Page 7 (Internal B') -> Page 8 (New Root A')`, đồng thời nối mũi tên nét đứt tái sử dụng lại `Internal D (Page 4)` và `Leaf E (Page 6)` của cây cũ!
 
 ```mermaid
 flowchart TD
@@ -122,6 +170,11 @@ Trong **$B^\varepsilon$-Tree** (do *Brodal & Fagerberg* đề xuất năm 2003),
 - Một phần nhỏ kích thước $B^\varepsilon$ chứa các **Khóa phân tách và Con trỏ nhánh con (`Pivots & Child Pointers`)**.
 - Phần dung lượng lớn còn lại $B - B^\varepsilon$ làm **Giỏ chứa thông điệp tạm thời (`Update / Message Buffer`)**.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hộp trên cùng (`Root Internal Node`)**: Thay vì chỉ chứa các biển chỉ đường (`Pivots: K < 50 | K >= 50`), nút gốc dành phần lớn diện tích cho hộp **`Message Buffer`** để gom tất cả các lệnh `INSERT(65)`, `DELETE(12)`, `UPDATE(80)` mới gửi vào mà chưa cần đi xuống đĩa!
+> 2. **Theo dõi 2 mũi tên đậm `Batch Flush khi đầy` đi xuống 2 nút con**: Chỉ khi nào giỏ `Message Buffer` ở nút trên bị đầy tràn, hệ thống mới phân loại các thông điệp theo mốc khóa `50`: gom thông điệp `Key = 12` xả xuống `Child 1 (K < 50)`, và gom cả lô `Key = 65, Key = 80` xả xuống `Child 2 (K >= 50)` trong một lần đọc/ghi đĩa duy nhất!
+
 ```mermaid
 flowchart TD
     subgraph RootBe["Root Internal Node (Bε-Tree)"]
@@ -171,6 +224,12 @@ Giả sử kích thước mỗi nút là $B = 100$ mục, chọn $\varepsilon = 
 **Bài toán**: Trong WiredTiger, các luồng đọc (`Reader Threads`) duyệt qua các trang trong RAM mà không giữ khóa `RWLatch` để đạt tốc độ tối đa. Nhưng nếu đúng lúc `Reader Thread 1` đang đọc dở dữ liệu tại địa chỉ bộ nhớ `0x7F8000` (thuộc `Page P50`), luồng thu hồi bộ nhớ (`Eviction Thread`) quyết định trục xuất `Page P50` khỏi RAM và gọi hàm `free(0x7F8000)` thì sao? `Reader Thread 1` sẽ truy cập vào vùng nhớ đã bị giải phóng (`Use-After-Free`) và làm sập toàn bộ tiến trình Database (`Segmentation Fault`)!
 
 WiredTiger giải quyết bài toán này hoàn toàn không dùng khóa chặn thông qua cơ chế **Hazard Pointers**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào cột `Thread Slot` bên trái**: Mỗi luồng xử lý (`Thread 1, 2, 3`) được cấp riêng 1 ô bảng thông báo công khai trong RAM.
+> 2. **Đọc cột `Hazard Pointer (Address)` ở giữa**: Trước khi đọc một trang trên RAM, luồng đọc ghi công khai địa chỉ bộ nhớ của trang đó lên ô bảng của mình (ví dụ `Thread 1` ghi `0x7F8000 (Page P50)` như treo biển *"Tôi đang ở trong căn phòng 0x7F8000, cấm đập phá!"*).
+> 3. **Kết quả với luồng dọn bộ nhớ (`Eviction Thread`)**: Trước khi xóa bất kỳ trang nào khỏi RAM, luồng dọn dẹp bắt buộc phải liếc qua bảng này — hễ thấy địa chỉ trang đang nằm trên bảng của bất kỳ luồng nào thì lập tức dừng tay không được `free()`!
 
 ```text
 Bảng Hazard Pointer Table toàn cục trong RAM (Mỗi Worker Thread sở hữu 1 ô riêng):
@@ -225,6 +284,12 @@ Cứ mỗi Block ở tầng dưới $L_1$, hệ thống lấy khóa đầu tiên
 | **Khóa tại $L_0$** | `5*` *(Fence)* | `10` *(Real)* | **`18*` *(Fence)*** | `30` *(Real)* | `33*` *(Fence)* | `50` *(Real)* | `55*` *(Fence)* |
 | **Con trỏ xuống $L_1$ (`child_block`)** | $\downarrow$ `Block 0`<br/>`[5, 12]` | $\downarrow$ `Block 0`<br/>`[5, 12]` | **$\downarrow$ `Block 1`<br/>`[18, 25]`** | $\downarrow$ `Block 1`<br/>`[18, 25]` | $\downarrow$ `Block 2`<br/>`[33, 42]` | $\downarrow$ `Block 2`<br/>`[33, 42]` | $\downarrow$ `Block 3`<br/>`[55, 68]` |
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khung dưới (`Tầng L1 trên SSD`)**: Dữ liệu ở tầng dưới được chia thành 4 khối nhỏ `Block 0..3`, trong đó chữ số đầu tiên của mỗi khối là `5`, `18`, `33`, `55`.
+> 2. **Nhìn lên khung trên (`Tầng L0`)**: Cả 4 chữ số đầu khối kia được rút lên gắn dấu sao (`5*`, `18*`, `33*`, `55*`) gọi là **Fence Pointers** xen kẽ với các khóa thật (`10, 30, 50`) của tầng `L0`.
+> 3. **Theo dõi mũi tên đậm từ ô `18* (Fence)` xuống `Block 1 [18, 25]`**: Khi cần tìm khóa `K = 25`, hệ thống tìm trên `L0` thấy `25` rơi vào sau mốc `18*`, liền trượt thẳng theo mũi tên của `18*` xuống đúng `Block 1 [18, 25]` ở tầng dưới để lấy ra `25` ngay lập tức mà không cần tìm kiếm nhị phân lại trên cả tầng `L1`!
+
 ```mermaid
 flowchart TD
     subgraph Level0["Tầng L0 (Chứa cả Real Keys & Fence Pointers (*) từ L1)"]
@@ -275,6 +340,12 @@ Nếu thử dùng cấu trúc Copy-on-Write trực tiếp trong RAM với lệnh
 1. **Mapping Table (Bảng ánh xạ trung gian)**: Mọi nút trong Bw-Tree **tuyệt đối không lưu địa chỉ bộ nhớ vật lý (`0x7F00...`) của nhau**, mà chỉ lưu **Mã số trang logic (`Logical Page ID — PID`)** (ví dụ `PID = 102`). Một bảng **Mapping Table** trung tâm ánh xạ từ `PID 102` sang địa chỉ bộ nhớ vật lý hiện tại. Khi trang `102` đổi địa chỉ vật lý mới, hệ thống chỉ cần thực hiện **đúng `1` lệnh `CAS` duy nhất tại ô `MappingTable[102]`** — cả nút cha lẫn nút anh em vẫn giữ nguyên số `PID = 102` mà không cần sửa một bit nào!
 2. **Delta Records & Delta Chains (Chuỗi bản ghi chênh lệch bất biến)**: Thay vì chép lại cả trang `8 KB` mỗi khi sửa `1` dòng, mọi trang gốc (**Base Page**) đều bất biến; mỗi thao tác sửa chỉ cấp phát một mẩu giấy ghi chú nhỏ (**Delta Record**) trỏ vào đầu trang hiện tại rồi dùng `CAS` cập nhật `MappingTable[PID]` trỏ vào mẩu Delta mới đó!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khung bên trái (`Các nút cha & anh em chỉ lưu Logical PID`)**: Cả nút cha (`Internal Node`) lẫn nút anh em bên trái (`Left Sibling`) đều chỉ ghi con số mã trang ảo **`PID 102`** chứ không ghi địa chỉ RAM thực tế.
+> 2. **Nhìn vào khung ở giữa (`1. Mapping Table`)**: Ô `MappingTable[102]` đóng vai trò "tổng đài chuyển mạch", đang giữ địa chỉ RAM mới nhất là `0x9000`.
+> 3. **Theo dõi chuỗi mũi tên ở khung bên phải (`2. Chuỗi Delta bất biến`)**: Trang gốc `Base Page (0x7F00)` chứa `[10, 20, 40]` nằm im không bao giờ bị sửa. Khi chèn `35`, hệ thống móc thêm mẩu giấy `InsertDelta (0x8500)` vào trước `0x7F00`; khi xóa `20`, hệ thống móc tiếp mẩu giấy `DeleteDelta (0x9000)` vào trước `0x8500` và dùng **đúng 1 lệnh `CAS`** đổi ô `MappingTable[102]` sang `0x9000`!
+
 ```mermaid
 flowchart LR
     subgraph TreePointers["Các nút cha & anh em chỉ lưu Logical PID"]
@@ -321,6 +392,12 @@ Giả sử trang lá **`PID = 102`** ban đầu là một **Base Page** nằm t�
 Đây là phần tinh túy nhất của Chương 6: *Làm thế nào để tách một trang `PID 102` thành hai trang (`PID 102` và `PID 105`) và cập nhật nút cha `Parent PID 50` mà không dùng Latch, trong khi lệnh `CAS` chỉ sửa được từng trang một?*
 
 Bw-Tree kế thừa ý tưởng **B-link Tree của Lehman & Yao** và chia quá trình tách trang thành **2 pha nguyên tử độc lập (`Two-Phase Split`)**, mỗi pha chỉ cần đúng `1` lệnh `CAS`:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào bước `1` (Chuẩn bị ngầm)**: Luồng ghi tạo trước trang con phải mới `PID 105` chứa nửa dữ liệu lớn `[35, 40, 50]`. Lúc này chưa ai biết đến sự tồn tại của `PID 105`.
+> 2. **Theo dõi bước `2 — PHA 1 (Child Split)`**: Luồng ghi dùng 1 lệnh `CAS` gắn tờ giấy báo **`Split Delta (Separator = 35, Side-Link = PID 105)`** vào đầu trang con trái `PID 102`. Ngay giây phút này, nếu có luồng đọc nào đi xuống `PID 102` tìm số `40`, tờ giấy `Split Delta` sẽ chỉ đường cho nó rẽ ngang sang `PID 105` ngay lập tức!
+> 3. **Theo dõi bước `3 — PHA 2 (Parent Update)`**: Cuối cùng, luồng ghi mới dùng lệnh `CAS` thứ hai gắn biển chỉ đường `Index Term Delta (Key = 35 -> PID 105)` lên nút cha `Parent PID 50` để hoàn tất việc tách trang mà không khóa bất kỳ nút nào!
 
 ```mermaid
 sequenceDiagram

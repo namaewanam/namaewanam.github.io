@@ -7,6 +7,7 @@ tags: ["database-internals", "b-tree", "slotted-page", "compaction"]
 ---
 
 ## Table of Contents
+0. [Khởi động cho người mới: Tại sao B-Tree sách giáo khoa chưa đủ dùng trong Production?](#beginner-warmup)
 1. [Page Header và cấu trúc B-link Tree (Lehman & Yao)](#page-header)
 2. [Tìm kiếm nhị phân với Indirection Vector (Offset Array)](#binary-search-indirection)
 3. [Lan truyền Split và Merge bằng Breadcrumbs](#breadcrumbs-split-merge)
@@ -18,11 +19,39 @@ tags: ["database-internals", "b-tree", "slotted-page", "compaction"]
 
 ---
 
-Sau khi nắm vững cấu trúc **Slotted Page** ở Chương 3, Chương 4 đi sâu vào cách kết hợp các Slotted Page đơn lẻ thành một cấu trúc chỉ mục **B-Tree (cụ thể là `B+Tree` và `B-link Tree`)** hoàn chỉnh trên đĩa. Khoảng cách giữa B-Tree lý thuyết trong sách giáo khoa và B-Tree thực tế trong PostgreSQL hay MySQL InnoDB nằm ở bốn bài toán kỹ thuật cốt lõi:
-1. Làm sao đọc và tách trang đồng thời mà không phải khóa cứng toàn bộ nhánh cây?
-2. Làm sao tìm kiếm nhị phân $O(\log K)$ trên các bản ghi có độ dài thay đổi mà không tốn chi phí sắp xếp vật lý?
-3. Làm sao lan truyền thao tác tách nút (`Split`) từ lá lên gốc khi các trang con không lưu con trỏ ngược lên trang cha?
-4. Làm sao tối ưu hóa tỷ lệ lấp đầy trang (`Fill Factor`) và giảm chiều cao cây thông qua nén khóa?
+## Khởi động cho người mới: Tại sao B-Tree sách giáo khoa chưa đủ dùng trong Production? {#beginner-warmup}
+
+### 1. Bốn khoảng cách lớn giữa B-Tree lý thuyết và B-Tree trong PostgreSQL / MySQL InnoDB
+Sau khi nắm vững nguyên lý cây **B+Tree** ở Chương 2 và cấu trúc **Slotted Page** ở Chương 3, người đọc có thể nghĩ rằng việc ghép các Slotted Page lại thành một cây B+Tree đã hoàn tất. Thế nhưng, khi đưa B-Tree vào chạy thực tế trong **PostgreSQL** hay **MySQL InnoDB** — nơi hàng nghìn kết nối cùng lúc bắn các câu lệnh `SELECT`, `INSERT`, `UPDATE`, `DELETE` — mô hình B-Tree trong sách giáo khoa lập tức lộ ra **4 điểm nghẽn thực chiến**:
+
+1. **Làm sao tìm kiếm nhị phân (`Binary Search`) trong trang khi các dòng dữ liệu có độ dài ngắn dài khác nhau và nằm lộn xộn?**
+   - Khi chạy `SELECT * FROM users WHERE username = 'charlie'`, trang lá `16 KB` có thể chứa 200 bản ghi có độ dài co giãn bất kỳ. Nếu không sắp xếp lại các bản ghi nặng nề dưới đáy trang mỗi khi `INSERT`, làm sao CPU nhảy thẳng tới phần tử đứng giữa trang trong $\mathcal{O}(\log K)$ bước?
+   - **Giải pháp thực tế**: Duy trì một mảng chỉ mục con trỏ nhỏ gọn đã sắp xếp (**`Indirection Vector`** trong PostgreSQL, hay **`Page Directory`** dạng thưa trong MySQL InnoDB).
+2. **Làm sao vừa tách trang (`Page Split`) vừa cho phép hàng nghìn luồng khác đọc dữ liệu mà không phải khóa cứng toàn bộ cây?**
+   - Trong sách giáo khoa, khi một trang lá bị đầy và tách đôi, luồng ghi phải khóa cả trang cha lẫn trang con. Nếu hàng nghìn lệnh `SELECT` phải xếp hàng chờ ở nút gốc (`Root`), database sẽ đứng hình!
+   - **Giải pháp thực tế**: Biến thể **B-link Tree (Lehman & Yao)** đặt thêm một "cột mốc chặn trên" (**`High Key`**) và mũi tên rẽ ngang (**`Right-Sibling Pointer`**) ngay trong mỗi trang, kết hợp với dấu vết đường đi trên RAM (**`Breadcrumbs`**) để tách trang từ dưới lên mà không cần khóa toàn cây.
+3. **Làm sao tối ưu khi ứng dụng chèn khóa tự tăng (`AUTO_INCREMENT` / `BIGSERIAL` / `UUIDv7`)?**
+   - Nếu người dùng chạy `INSERT INTO orders ...` với `id` tăng dần `1, 2, 3...`, mọi bản ghi mới đều dồn về trang lá ngoài cùng bên phải. Nếu cứ tách đôi `50/50` theo sách giáo khoa, toàn bộ nửa trái của mọi trang đã tách sẽ bị bỏ trống vĩnh viễn $50\%$ dung lượng!
+   - **Giải pháp thực tế**: Cơ chế **Right-Only Appends (Fast-Path Split)** nhận diện chèn tuần tự ở cực phải để giữ trang cũ đầy $99\% - 100\%$ và mở trang mới tinh ở bên phải.
+4. **Làm sao nén khóa chỉ mục và tái sử dụng không gian khi xóa (`DELETE`) mà không gây phân mảnh?**
+   - Các chuỗi khóa dài làm giảm số nhánh con (`Fanout`), còn việc gộp trang (`Merge`) ngay khi vơi dưới $50\%$ gây ra hiện tượng tách-gộp liên hồi (**Thrashing**).
+   - **Giải pháp thực tế**: Cắt tỉa phần đầu/đuôi của khóa (**`Prefix & Suffix Truncation`**) và dùng danh sách liên kết rác (**`Free Space Management`**) kết hợp dọn dẹp tại chỗ (**`Vacuum / In-Page Compaction`**).
+
+---
+
+### 2. Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+Trước khi đi vào từng kỹ thuật triển khai chi tiết của Chương 4, người đọc hãy điểm qua 7 thuật ngữ cốt lõi trong bảng đối chiếu dưới đây:
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database thực tế (PostgreSQL / MySQL InnoDB / SQLite) là gì? |
+| :--- | :--- | :--- |
+| **`Magic Number`** | "Con dấu nhận diện hàng thật" đóng ở ngay trang bìa tập hồ sơ để tránh mở nhầm file văn bản hay file ảnh sang file cơ sở dữ liệu. | Chuỗi byte cố định ở đầu file/trang (ví dụ SQLite có `16 bytes` `"SQLite format 3\0"`; mỗi trang cũng có cờ `Page Type` phân biệt `Root`, `Internal`, `Leaf`). |
+| **`Indirection Vector / Page Directory`** | "Hộp thẻ mục lục thư viện": sách dưới kệ để lộn xộn theo thứ tự nhập kho, nhưng các tấm thẻ nhỏ `2 bytes` trên hộp mục lục luôn xếp đúng thứ tự A–Z để tra cứu nhị phân. | Trong PostgreSQL là mảng **`ItemIdData` (`Line Pointers`)** trỏ tới từng Tuple; trong MySQL InnoDB là **`Page Directory`** ở cuối trang (cứ `4–8` bản ghi gom thành `1 Slot` đại diện để Binary Search). |
+| **`Breadcrumbs` (Dấu vết đường đi trên Stack)** | "Rải vụn bánh mì của Hansel & Gretel": khi đi từ đỉnh cây xuống lá, luồng ghi nhớ lại các ngã rẽ vào một ngăn xếp (`Stack`) trên RAM để lát nữa biết đường quay ngược lên báo tin tách trang cho nút cha. | Trong PostgreSQL là cấu trúc `BTStack` (`src/backend/access/nbtree`) lưu chuỗi `(PageID, Offset)` trong RAM của tiến trình khi hạ cây, giúp các trang con trên đĩa không cần lưu con trỏ `parent_page_id`. |
+| **`Right-Only Appends` (Tối ưu chèn cực phải)** | Khi xếp sách có mã số tăng dần (`1, 2, 3...`), thủ thư giữ nguyên kệ cũ đầy kín $100\%$ rồi mới kê thêm kệ mới ở bên phải, thay vì cưa đôi kệ cũ thành hai kệ lưng chừng $50\%$. | InnoDB theo dõi con trỏ `PAGE_LAST_INSERT` trong Header: nếu khóa mới lớn hơn khóa vừa chèn ở cuối trang, hệ thống tách trang ở điểm cuối (**Fast-Path Split `99/1`**) thay vì tách giữa `50/50`. |
+| **`B-Link Tree & High Key` (Khóa chặn trên)** | "Biển báo giới hạn số nhà tối đa của con hẻm": nếu khách đi tìm nhà số `35` mà thấy đầu hẻm ghi `High Key = 28`, khách biết ngay nhà số `35` đã tách sang hẻm kế bên phải, cứ rẽ ngang sang phải là thấy! | Cài đặt chuẩn mực trong PostgreSQL (`nbtree` dựa trên thuật toán *Lehman & Yao*): mục đầu tiên (`Offset 1`) trên mỗi trang B-Tree (trừ trang cực phải) luôn lưu giá trị **`High Key`** kèm con trỏ `btpo_next`. |
+| **`Prefix & Suffix Truncation` (Cắt tỉa tiền tố & hậu tố)** | - **Prefix**: Cả trang cùng ở phố `"Nguyễn Huệ"` thì ghi tên phố 1 lần ở đầu trang.<br/>- **Suffix**: Biển báo phân ranh giới giữa `"An_12345"` và `"Bình_99999"` chỉ cần ghi ngắn gọn chữ `"B"` là đủ! | PostgreSQL (v12+), SQLite và WiredTiger áp dụng **Suffix Truncation** khi tách trang lá đẩy khóa phân cách lên `Internal Page`, giúp khóa điều hướng ngắn đi nhiều lần và tăng vọt hệ số `Fanout`. |
+| **`Free Space Management & Vacuum / Compaction`** | Khi có khách trả ghế trong rạp phim: tạm thời ghi nhận ghế trống vào danh sách chờ tái sử dụng ngay; khi cần chỗ lớn mới dồn các khách còn ngồi sát lại với nhau. | InnoDB nối các bản ghi vừa bị `DELETE` vào danh sách liên kết rác **`FREE` (`PAGE_FREE` / `Garbage Offset`)** để `INSERT` sau chèn đè lên ngay; nếu vẫn thiếu chỗ mới chạy **Page Reorganization / Compaction**. |
 
 ---
 
@@ -60,6 +89,16 @@ Mỗi nút của B-Tree tương ứng với một Page vật lý cố định tr
 - **Free Space Pointers (`lower_offset`, `upper_offset`) & `fragmented_bytes`**: Theo dõi vùng trống liên tục ở giữa trang (`upper - lower`) cũng như tổng số byte bị phân mảnh do các bản ghi đã xóa nằm rải rác ở phần đáy trang.
 - **Right-Sibling Pointer & High Key**: Trái tim của biến thể **B-link Tree** (như cài đặt `nbtree` trong PostgreSQL), phục vụ đồng thời cả hai mục đích: tăng tốc độ quét khoảng (`Range Scan`) bằng cách trượt ngang qua chuỗi Leaf Page và đảm bảo tính đúng đắn khi tách trang đồng thời mà không cần giữ Latch ở nút cha.
 
+Để đối chiếu giữa cấu trúc Header lý thuyết và thực tế sản phẩm, hãy quan sát bức tranh giải phẫu chi tiết một **trang B+Tree (`Page 3`)** trong **MySQL InnoDB** sau khi chạy lệnh `INSERT INTO t VALUES (0, "A"), (1, "B"), (2, "C");`:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào bảng thông số Header ở góc dưới bên trái (`Index ID: 15`, `Level: 0`, `Prev/Next`, `Directory`)**: Đây chính là `INDEX Header` của InnoDB ghi nhận trang này ở tầng lá (`Level: 0`), đang có `N_Recs: 3` bản ghi người dùng, `Garbage Size: 0` (chưa có rác), và ở góc dưới bên phải là con trỏ **`Last Insert: 189`** cùng đỉnh vùng cấp phát **`Heap Top: 216`**.
+> 2. **Nhìn lên hai cột mốc cố định `Infimum (Offset 99)` và `Supremum (Offset 112)` ở hai góc trên**: Mọi trang B+Tree của InnoDB luôn khởi tạo sẵn 2 bản ghi hệ thống này làm điểm đầu và điểm cuối.
+> 3. **Theo dõi dây chuyền mũi tên `Next Record` ở giữa trang (`Offset 125 -> 157 -> 189`)**: Từ `Infimum`, mũi tên dẫn qua 3 bản ghi người dùng `Key: 0 ("A")` $\to$ `Key: 1 ("B")` $\to$ `Key: 2 ("C")` rồi cắm về đích `Supremum`, mỗi bản ghi dài đúng `32 bytes` và lưu đầy đủ thông tin giao dịch (`Trx ID`, `Roll Ptr`) lẫn cờ trạng thái (`Deleted: false`).
+
+![Cấu trúc chi tiết bên trong một trang B+Tree của MySQL InnoDB](./images/innodb-detailed-page.png "Cấu trúc chi tiết một trang B+Tree 16 KB của InnoDB: từ FIL Header, INDEX Header, Infimum/Supremum, chuỗi User Records cho tới Page Directory ở đáy trang — Nguồn: Jeremy Cole")
+
 ### Ví dụ chạy tay (Dry Run): 2 luồng Đọc/Ghi đồng thời trên B-link Tree
 
 Giả sử nút cha `Internal P10` ban đầu có mục chỉ đường: mọi khóa trong đoạn `(10, 50]` đều đi xuống trang lá **`Page L1`**. Ban đầu `Page L1` đang chứa 4 khóa và đã đầy:
@@ -95,7 +134,11 @@ Trong Slotted Page, hộp thẻ mục lục đó chính là mảng **Slot Offset
 - **Vùng Data Cells ở đáy trang**: Giữ nguyên vị trí vật lý lúc chèn, **không sắp xếp** theo khóa.
 - **Mảng `slot[]` ở đầu trang**: Mỗi phần tử chỉ dài đúng `2 bytes` (lưu `offset` trong phạm vi `0..65535`). Mảng `slot[]` luôn được duy trì **sắp xếp nghiêm ngặt theo thứ tự tăng dần của khóa** mà nó trỏ tới.
 
-![Minh họa quá trình chèn khóa và tách nút (Node Split) trong B-Tree](./images/btree-insertion-split.png)
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Sơ đồ Slot Offset Array bên dưới):**
+> 1. **Nhìn khối bên trái (`Slot Offset Array`)**: Các ô `slot[0..3]` xếp đúng thứ tự bảng chữ cái `alice -> bob -> charlie -> david`. Đây là "hộp thẻ mục lục" — mỗi thẻ chỉ ghi một con số `offset`.
+> 2. **Nhìn khối bên phải (`Data Cells`)**: Các bản ghi nằm lộn xộn theo thứ tự chèn (`charlie` ở `7800`, `alice` ở `7900`...). Không ai phải dời chúng đi.
+> 3. **Theo dõi các mũi tên**: Mỗi thẻ trỏ thẳng tới đúng bản ghi của nó. Khi tìm kiếm nhị phân, hệ thống chỉ "lật" bên trái (`2 bytes` mỗi ô), rồi đi theo mũi tên đúng một lần để đọc dữ liệu.
 
 ```mermaid
 flowchart LR
@@ -118,6 +161,17 @@ flowchart LR
     S2 --> C2
     S3 --> C3
 ```
+
+#### Trong MySQL InnoDB thực tế: Page Directory là một Indirection Vector "thưa"
+InnoDB không giữ một slot cho **mỗi** bản ghi như sơ đồ trên. Để tiết kiệm chỗ, mỗi slot của **Page Directory** chỉ trỏ tới bản ghi "trưởng nhóm" của một nhóm `4–8` bản ghi liền nhau (các bản ghi trong nhóm nối với nhau bằng con trỏ `next_record`). Tìm kiếm diễn ra theo 2 bước: **Binary Search trên các slot** để tìm đúng nhóm, rồi **quét tuyến tính tối đa 8 bản ghi** trong nhóm đó.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (*Page Directory của InnoDB* bên dưới):**
+> 1. **Nhìn đáy trang (Page Directory)**: Các slot xếp từ cuối trang ngược lên. Slot đầu luôn trỏ tới bản ghi giả `infimum` (nhỏ hơn mọi khóa), slot cuối trỏ tới `supremum` (lớn hơn mọi khóa).
+> 2. **Theo dõi mũi tên từ slot lên vùng User Records**: Mỗi mũi tên chỉ trỏ tới bản ghi **cuối nhóm**. Con số `n_owned` trên bản ghi đó cho biết nhóm có bao nhiêu bản ghi.
+> 3. **Theo dõi các mũi tên `next_record`**: Chúng nối toàn bộ bản ghi thành một danh sách liên kết theo đúng thứ tự khóa. Ví dụ, tìm `id = 23`: Binary Search trên slot thấy `23` thuộc nhóm của slot thứ 2 -> nhảy tới bản ghi trước đó -> đi theo `next_record` vài bước là gặp `23`.
+
+![Cấu trúc Page Directory (Indirection Vector thưa) trong MySQL InnoDB](./images/innodb-page-directory.png "Cách InnoDB dùng Page Directory (mỗi Slot quản lý 4–8 bản ghi) kết hợp tìm kiếm nhị phân (Binary Search) trong trang — Nguồn: Jeremy Cole")
 
 ### Ví dụ chạy tay từng bước (Dry Run)
 
@@ -178,6 +232,12 @@ Giả sử cây B-Tree hiện có 3 tầng và giao dịch thực hiện lệnh 
   - `slot[2]` (`40 <= K < 50`) $\to$ `Page 89`
   - `slot[3]` (`50 <= K < 60`) $\to$ `Page 92`
 - **`Leaf (Page 89)`**: Đang chứa `[40, 42, 45, 49]` (đã đầy tối đa `4` bản ghi).
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Lan truyền Split bằng Breadcrumbs bên dưới):**
+> 1. **Mũi tên liền (đi xuống, ô `1 -> 2 -> 3`)**: Pha tìm kiếm. Ở mỗi tầng, hệ thống ghi lại "mẩu bánh mì" `(page, slot)` vào Stack rồi mới bước xuống.
+> 2. **Ô `3` (Leaf đầy)**: Trang lá bị tách đôi, sinh ra khóa phân cách `45` cần gửi lên cha.
+> 3. **Mũi tên nét đứt (đi ngược lên, `4 -> 5`)**: Pha lan truyền. Hệ thống `pop` Stack để biết ngay cha là ai và chèn vào slot nào — không cần tìm lại từ gốc. Nếu cha cũng đầy, quá trình lặp lại thêm một tầng.
 
 ```mermaid
 flowchart TD
@@ -248,6 +308,12 @@ Hãy xét một nghịch lý thú vị: Nếu khóa chính là số tự tăng `
 - Giả sử `Page L1` chứa các khóa `[1..100]` và đã đầy.
 - Khi chèn khóa `101`, nếu tách `50/50`: `Page L1` giữ `[1..50]` (đầy `50%`), `Page L2` mới nhận `[51..101]` (đầy `50%`).
 - Vì mọi khóa tiếp theo được sinh ra sẽ là `102, 103, 104...` (luôn `> 51`), chúng sẽ luôn đi vào `Page L2` và các trang phía sau. **Nửa trống `50%` của `Page L1` sẽ không bao giờ nhận thêm bất kỳ bản ghi nào nữa trong suốt vòng đời của bảng!** Toàn bộ bảng dữ liệu sẽ bị lãng phí đúng `50%` dung lượng đĩa và RAM!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (So sánh tách 50/50 và Fast-Path Split bên dưới):**
+> 1. **Khối trên (tách 50/50)**: `Page L1` chỉ còn nửa đầy, và vì mọi khóa mới đều lớn hơn `101`, nửa trống đó **không bao giờ được lấp lại**.
+> 2. **Khối dưới (Fast-Path 99/1)**: `Page L1` được giữ nguyên đầy `100%`, chỉ khóa mới `101` được đặt sang trang mới. Kết quả: mọi trang đều đầy gần như tuyệt đối.
+> 3. **Liên hệ thực tế**: Đây là lý do một bảng dùng `BIGSERIAL` / `AUTO_INCREMENT` trong PostgreSQL hoặc InnoDB thường nhỏ gọn hơn hẳn bảng cùng dữ liệu nhưng dùng `UUIDv4`.
 
 ```mermaid
 flowchart TB
@@ -363,6 +429,17 @@ Khi một Slotted Page trải qua hàng trăm lượt `DELETE` và `UPDATE` ở 
 
 **Mental Model — "Dồn hàng ghế rạp chiếu phim" (In-Page Defragmentation / Compaction):**
 Thay vì xây thêm phòng chiếu mới (tách trang), nhân viên chỉ việc yêu cầu những khán giả đang ngồi rải rác ở cuối phòng dồn sát lại về phía cuối hàng ghế để gộp tất cả các ghế trống lẻ tẻ thành một dãy ghế trống liên tục lớn ở giữa phòng, sau đó cập nhật lại số ghế trên bảng sơ đồ (`Slot Offset Array`).
+
+### Trong MySQL InnoDB thực tế: Danh sách bản ghi đã xóa (`PAGE_FREE` list)
+Trước khi phải dồn trang, InnoDB còn một bước rẻ hơn: khi một bản ghi bị xóa (sau khi giao dịch `COMMIT` và tiến trình `purge` dọn xong), bản ghi đó được tháo khỏi chuỗi `next_record` của các bản ghi còn sống và **nối vào một danh sách liên kết riêng gọi là `PAGE_FREE`**. Lần `INSERT` sau, nếu bản ghi mới vừa vặn với ô ở đầu danh sách này, InnoDB dùng lại ngay ô đó mà không cần dồn trang.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (*Xóa bản ghi trong trang InnoDB* bên dưới):**
+> 1. **Nhìn chuỗi mũi tên chính (`infimum -> ... -> supremum`)**: Đây là danh sách các bản ghi còn sống, xếp theo thứ tự khóa. Bản ghi vừa xóa đã bị "nhảy cóc" qua — bản ghi đứng trước nó giờ trỏ thẳng tới bản ghi đứng sau.
+> 2. **Nhìn mũi tên xuất phát từ `PAGE_FREE` trong INDEX Header**: Nó trỏ tới bản ghi vừa xóa. Ô này vẫn chiếm chỗ trong trang, nhưng đã được đánh dấu là "ghế trống có thể ngồi lại".
+> 3. **Ý nghĩa thực tế**: Ghế trống chỉ được dùng lại nếu bản ghi mới đủ nhỏ. Khi có quá nhiều ghế trống lẻ tẻ không vừa ai, InnoDB mới dồn trang (In-Page Compaction) như ví dụ chạy tay bên dưới.
+
+![Quản lý bản ghi bị xóa (Deleted Records Free List) trong trang B+Tree của InnoDB](./images/innodb-record-delete.png "Khi xóa bản ghi trong trang, InnoDB đánh dấu cờ Deleted và nối bản ghi đó vào danh sách liên kết rác (FREE list) để tái sử dụng không gian ngay lập tức — Nguồn: Jeremy Cole")
 
 ### Ví dụ chạy tay từng bước (Dry Run): In-Page Compaction trước khi Split
 

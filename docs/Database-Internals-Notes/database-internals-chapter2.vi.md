@@ -12,6 +12,7 @@ tags:
 ---
 
 ## Table of Contents
+0. [Khởi động cho người mới: Tủ hồ sơ 3 tầng và Bảng từ điển thuật ngữ B+Tree](#beginner-warmup)
 1. [Tại sao Binary Search Tree (BST) không phù hợp cho Disk Storage?](#why-not-bst)
 2. [Từ Binary Search Tree đến B-Tree: Tăng Fanout để ép lùn chiều cao](#from-bst-to-btree)
 3. [Phân biệt B-Tree truyền thống và B+Tree trong Database](#btree-vs-bplustree)
@@ -19,6 +20,52 @@ tags:
 5. [Ví dụ chạy tay (Step-by-Step Dry Run): INSERT, Leaf Split (Copy-up) & Internal Split (Push-up)](#lookup-split-merge)
 6. [Ví dụ chạy tay quá trình DELETE: Underflow, Redistribution và Node Merge](#delete-underflow-merge)
 7. [Tóm tắt & Ghi nhớ cốt lõi (Key Takeaways)](#key-takeaways)
+
+---
+
+## Khởi động cho người mới: Tủ hồ sơ 3 tầng và Bảng từ điển thuật ngữ B+Tree {#beginner-warmup}
+
+### 1. Ẩn dụ đời thực: Tìm 1 hồ sơ trong nhà kho 100 GB và Chiếc thùng nhựa 16 KB
+Trước khi đi vào các công thức toán học và thuật toán tách/gộp trang, hãy hình dung bài toán vật lý diễn ra mỗi khi lập trình viên gõ câu lệnh quen thuộc trong **MySQL InnoDB** hoặc **PostgreSQL**:
+
+```sql
+SELECT * FROM users WHERE id = 23;
+```
+
+- **Bối cảnh nhà kho dưới tầng hầm (Ổ đĩa cứng HDD / SSD)**:
+  - Giả sử bảng `users` có **16 triệu dòng dữ liệu**, nặng khoảng **`100 GB`**, được cất dưới một nhà kho khổng lồ ở tầng hầm (ổ đĩa).
+  - Tuy nhiên, có một quy tắc vật lý bất di bất dịch của phần cứng máy tính: **Nhân viên thủ kho (Storage Engine) không bao giờ được phép xuống tầng hầm cầm lên đúng 1 tờ giấy lẻ của khách hàng `id = 23`**. Mỗi chuyến đi xuống tầng hầm, thủ kho bắt buộc phải bê nguyên một **thùng nhựa tiêu chuẩn nặng `16 KB` (`16.384 bytes` — gọi là 1 `Disk Page` trong MySQL InnoDB, hoặc `8 KB` trong PostgreSQL)** lên bàn làm việc trên tầng trệt (`RAM Buffer Pool`) rồi mới được mở thùng ra xem bên trong có gì!
+  - Nếu không có mục lục, để tìm khách hàng `id = 23` trong `100 GB` ($\approx 6,5\text{ triệu}$ thùng nhựa `16 KB`), thủ kho phải bê từng thùng lên kiểm tra — một thảm họa gọi là **Full Table Scan**.
+
+- **Tại sao không dùng Cây nhị phân (Binary Search Tree) như học ở môn Cấu trúc dữ liệu?**
+  - Trên RAM, cây nhị phân rẽ nhánh 2 hướng (`trái / phải`) tại mỗi nút. Với 16 triệu khách hàng, cây nhị phân cao tới $\log_2(16.000.000) \approx \mathbf{24\text{ tầng}}$.
+  - Nếu mỗi nút của cây nhị phân đặt trong 1 thùng nhựa `16 KB` dưới hầm, thủ kho phải chạy lên chạy xuống tầng hầm **24 chuyến liên tiếp**, mà mỗi thùng `16 KB` mở ra chỉ viết vỏn vẹn **1 con số duy nhất** (`24 bytes`), bỏ trống lãng phí $99,8\%$ cái thùng!
+
+- **Giải pháp thiên tài của B+Tree — Hệ thống tủ mục lục 3 tầng siêu bè ngang**:
+  - Thay vì mỗi thùng chỉ ghi 1 con số, kỹ sư Database tận dụng triệt để sức chứa `16 KB` của chiếc thùng nhựa:
+    - **Tầng 1 — Thùng Gốc (`Root Page`, chỉ 1 thùng duy nhất đặt sẵn trên bàn RAM)**: Không chứa hồ sơ khách hàng dày cộp, mà chỉ chứa một danh sách **1.000 tấm thẻ chỉ đường siêu nhỏ** (`Separator Keys`). Ví dụ: *"Từ mã `1..16.000` xuống Thùng Trung Gian #A; từ `16.001..32.000` xuống Thùng Trung Gian #B..."*.
+    - **Tầng 2 — 1.000 Thùng Trung Gian (`Internal Pages`, cũng được giữ sẵn trên bàn RAM vì chỉ tốn ~16 MB)**: Mỗi thùng này lại chứa tiếp **1.000 tấm thẻ chỉ đường** trỏ xuống $1.000 \times 1.000 = \mathbf{1.000.000}$ thùng hồ sơ thực tế dưới tầng hầm!
+    - **Tầng 3 — 1.000.000 Thùng Đáy (`Leaf Pages` nằm dưới đĩa)**: Mỗi thùng đáy chứa khoảng **16 bộ hồ sơ khách hàng đầy đủ** (tổng cộng $1.000.000 \times 16 = \mathbf{16\text{ triệu khách hàng}}$!).
+  - **Kết quả kỳ diệu khi chạy `SELECT * FROM users WHERE id = 23;`**:
+    1. **Bước 1 (Trên RAM — 0ms đọc đĩa)**: Nhìn vào **Thùng Gốc (`Root Page`)**, thấy `23` nhỏ hơn mốc `16.000` $\to$ rẽ sang **Thùng Trung Gian #A**.
+    2. **Bước 2 (Trên RAM — 0ms đọc đĩa)**: Nhìn vào **Thùng Trung Gian #A**, thấy `23` nằm giữa mốc `[16 .. 32)` $\to$ biết chính xác hồ sơ nằm ở **Thùng Đáy `#402`**.
+    3. **Bước 3 (Chỉ 1 chuyến xuống hầm duy nhất — 1 Disk I/O)**: Chạy xuống hầm bê đúng **Thùng Đáy `#402`** lên, mở ra lấy trọn bộ hồ sơ của `id = 23`!
+
+---
+
+### 2. Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+Trước khi đi sâu vào chi tiết kỹ thuật, người đọc hãy đối chiếu nhanh 7 thuật ngữ cốt lõi của Chương 2 qua bảng từ điển thực tế dưới đây:
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database thực tế (PostgreSQL / MySQL InnoDB / SQLite) là gì? |
+| :--- | :--- | :--- |
+| **`Disk Block / Page` (`4 KB` – `16 KB`)** | "Chiếc thùng nhựa tiêu chuẩn" — đơn vị nhỏ nhất mà ổ cứng và Database trao đổi với RAM trong mỗi lần đọc/ghi. Không thể đọc nửa thùng. | Mỗi Node của cây B+Tree chính là **1 Page vật lý**: PostgreSQL dùng Page `8 KB` (`8.192 bytes`), MySQL InnoDB dùng Page `16 KB` (`16.384 bytes`), SQLite mặc định `4 KB`. |
+| **`Fanout` (Hệ số phân nhánh)** | Số lượng "ngăn chỉ đường" (mũi tên rẽ nhánh) tối đa mà 1 thùng chỉ mục có thể trỏ xuống tầng dưới. Fanout càng lớn thì cây càng lùn. | Một `Internal Page` `16 KB` của InnoDB chứa được khoảng **`1.000` đến `1.200` cặp `(Key, Child Page ID)`** $\implies \text{Fanout} \approx 1.000$, giúp cây 3–4 tầng quản lý hàng trăm triệu dòng. |
+| **`Root Node` / `Internal Node` / `Leaf Node`** | - **Root**: Tấm bảng sơ đồ tổng ở cổng chính.<br/>- **Internal**: Các biển chỉ đường ở ngã ba.<br/>- **Leaf**: Các kệ chứa hàng thật ở tầng đáy cùng. | - **`Root Page`**: Trang đỉnh cây (điểm bắt đầu của mọi truy vấn Index).<br/>- **`Internal Pages` (Non-Leaf)**: Chỉ lưu khóa phân cách + số trang con.<br/>- **`Leaf Pages` (Level 0)**: Nơi chứa dữ liệu dòng (InnoDB Clustered Index) hoặc địa chỉ `TID` (PostgreSQL). |
+| **`Separator Key` (Khóa phân cách)** | Con số ghi trên "biển báo phân làn giao thông" ở ngã rẽ: nhỏ hơn số này thì rẽ trái, lớn hơn hoặc bằng số này thì rẽ phải. | Là các giá trị khóa nằm trên `Root` và `Internal Pages`. Chúng không mang theo dữ liệu dòng mà chỉ làm mốc ranh giới $[K_i, K_{i+1})$ để điều hướng luồng `SELECT` xuống đúng nhánh con. |
+| **`Sibling Pointers` (Con trỏ anh em kế cận)** | "Cửa thông phòng" nối trực tiếp giữa các phòng chứa hồ sơ liền kề ở tầng trệt, giúp đi bộ sang phòng bên cạnh mà không cần leo ngược lên cầu thang. | Hai con trỏ `prev_page` (`FIL_PAGE_PREV`) và `next_page` (`FIL_PAGE_NEXT`) nối tất cả các `Leaf Pages` thành danh sách liên kết đôi, giúp lệnh `WHERE id BETWEEN 10 AND 500` hoặc `ORDER BY id` trượt ngang siêu tốc. |
+| **`Page Split` (Tách trang khi đầy)** | Khi 1 thùng nhựa đã nhét kín 100% mà cần nhét thêm hồ sơ mới: phải lấy thêm 1 thùng mới, san một nửa hồ sơ sang thùng mới, rồi báo lên bảng sơ đồ tầng trên. | Xảy ra khi `INSERT` hoặc `UPDATE` làm tràn `Page`. Gồm **Leaf Split (`Copy-up`)** — sao chép khóa đầu của trang mới lên cha, và **Internal Split (`Push-up`)** — đẩy khóa giữa lên tầng cao hơn. |
+| **`Page Merge / Rebalancing` (Gộp trang khi vơi)** | Khi xóa bớt hồ sơ làm 2 thùng cạnh nhau đều vơi quá nửa: dồn chung đồ của 2 thùng vào 1 thùng rồi cất thùng rỗng vào kho để tiết kiệm diện tích. | Xảy ra khi `DELETE` làm trang bị đói phần tử (**Underflow**): hệ thống mượn khóa từ trang anh em (**Redistribution**) hoặc gộp 2 trang làm 1 (**Merge**) rồi thu hồi trang trống vào `Free List / FSM`. |
 
 ---
 
@@ -68,9 +115,27 @@ flowchart TB
     Root -->|"Nhánh 3: k >= 70"| L3["Child Node 3 (Page #4)<br/>Keys: [ 80 | 90 ]"]
 ```
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào đỉnh cây (`Root Node - Page #1`)**: Trang gốc chứa `2` khóa phân cách (**Separator Keys**) là `30` và `70`, chia toàn bộ không gian số thành **`3` làn đường** (`2 + 1 = 3` nhánh con).
+> 2. **Theo dõi các mũi tên phân luồng xuống tầng dưới**:
+>    - Nếu câu lệnh SQL tìm `WHERE id = 20`: vì `20 < 30`, hệ thống đi theo **Nhánh 1** bên trái xuống `Page #2`.
+>    - Nếu tìm `WHERE id = 50`: vì `30 <= 50 < 70`, hệ thống đi theo **Nhánh 2** ở giữa xuống `Page #3`.
+>    - Nếu tìm `WHERE id = 85`: vì `85 >= 70`, hệ thống đi theo **Nhánh 3** bên phải xuống `Page #4`.
+> 3. **Kết quả**: Chỉ với `1` bước nhảy từ `Root` xuống `Child`, hệ thống đã loại bỏ được $2/3$ số trang không liên quan. Khi tăng từ `2` khóa lên `1.000` khóa trên mỗi trang, mỗi bước nhảy sẽ loại bỏ được $99,9\%$ dữ liệu!
+
 - **Cơ chế tự cân bằng từ dưới lên (Bottom-up Self-Balancing)**:
   - Khác hoàn toàn với Binary Search Tree (vốn mọc dài thêm từ lá xuống dưới mỗi khi chèn khóa mới, dễ bị lệch thành cây suy biến), B-Tree luôn chèn khóa mới vào tầng Leaf và **chỉ phát triển chiều cao từ dưới đẩy ngược lên Root** thông qua cơ chế tách trang (`Node Split`).
   - Nhờ đó, **mọi Leaf Node trong B-Tree luôn nằm ở cùng một độ sâu tuyệt đối** tính từ Root — đảm bảo chi phí tìm kiếm mọi bản ghi đều đồng đều và có thể dự đoán trước.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khối màu xanh dương trên cùng (Root Node)**: Bên trong có `2` ô vuông sáng màu ghi số **`7`** và **`16`** (đây là 2 `Separator Keys`). Xen kẽ ở bên trái, ở giữa và bên phải 2 ô số này là **`3` chấm tròn nhỏ** đại diện cho `3` con trỏ địa chỉ (`Child Pointers`).
+> 2. **Theo dõi 3 mũi tên đen bắn ra từ 3 chấm tròn**:
+>    - Chấm tròn bên trái số `7` trỏ xuống khối con bên trái chứa các khóa **`[1, 2, 5, 6]`** (mọi số đều `< 7`).
+>    - Chấm tròn nằm giữa `7` và `16` trỏ xuống khối con ở giữa chứa các khóa **`[9, 12]`** (mọi số đều nằm trong khoảng `(7, 16)`).
+>    - Chấm tròn bên phải số `16` trỏ xuống khối con bên phải chứa các khóa **`[18, 21]`** (mọi số đều `> 16`).
+> 3. **Kết quả**: Quy tắc vàng của B-Tree luôn được bảo toàn ở mọi node: **Nếu một node có $k$ khóa phân cách, nó sẽ có đúng $k + 1$ con trỏ chấm tròn kẹp giữa các khóa đó để quản lý $k + 1$ trang con**.
 
 ![Cấu trúc cây B-Tree](./images/btree-structure.svg "Cấu trúc phân nhánh của một cây B-Tree điển hình")
 *Hình 2.1: Cấu trúc phân nhánh của B-Tree — một node chứa $k$ khóa phân tách (Separator Keys) sẽ quản lý $k + 1$ con trỏ trỏ xuống các trang con*
@@ -96,6 +161,12 @@ Trong B-Tree nguyên bản, cả **Internal Nodes** lẫn **Leaf Nodes** đều 
 | **Liên kết ngang giữa các Leaf Nodes** | Không có liên kết ngang giữa các lá. | Các trang lá nối với nhau thành danh sách liên kết đôi (**Sibling Pointers**: `prev_page` $\leftrightarrow$ `next_page`). |
 | **Hiệu năng Range Scan (`BETWEEN`, `>`, `<`, `ORDER BY`)** | Chậm (phải nhảy zíc-zắc lên cha xuống con). | **Cực nhanh**: chỉ cần 1 lần đi từ Root xuống điểm bắt đầu ở tầng Leaf, sau đó trượt ngang tuần tự qua các Leaf Pages kế tiếp! |
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khung trên (`Tầng điều hướng - Internal Nodes`)**: Các trang `Root Page: [50]`, `Internal Page A: [20 | 35]` và `Internal Page B: [70 | 90]` hoàn toàn **không chứa bất kỳ dữ liệu `v1, v2...` nào**. Chúng chỉ chứa các con số làm biển báo phân luồng.
+> 2. **Nhìn xuống khung dưới (`Tầng dữ liệu - Leaf Nodes`)**: Hãy chú ý các con số `20, 35, 50, 70, 90` vừa xuất hiện ở tầng trên thì **vẫn xuất hiện lại đầy đủ ở tầng lá** kèm theo dữ liệu thật (`20:v3`, `35:v5`, `50:v7`...).
+> 3. **Theo dõi mũi tên hai chiều `<-->` nối giữa `Leaf 1` đến `Leaf 6`**: Giả sử ứng dụng chạy lệnh `SELECT * FROM orders WHERE id BETWEEN 20 AND 75;`. Hệ thống chỉ cần đi từ `Root [50]` $\to$ `Internal A [20|35]` $\to$ đáp xuống `Leaf 2` tại khóa `20:v3`, rồi cứ thế **đi bộ ngang sang phải** qua `Leaf 3` $\to$ `Leaf 4` $\to$ `Leaf 5` mà không cần trèo ngược lên tầng trên lần nào nữa!
+
 ```mermaid
 flowchart TB
     subgraph InternalLayer["Tầng điều hướng (Internal Nodes: Chỉ chứa Separator Keys + Child Page Pointers)"]
@@ -120,8 +191,28 @@ flowchart TB
     I2 --> Leaf6
 ```
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khối trên cùng (Internal/Root Node chứa `[3 | 5]`)**: Dưới chân số `3` và `5` là 3 ô trắng chứa chấm tròn đen: nhánh trái (`< 3`) trỏ xuống lá `[1, 2]`; nhánh giữa (`3 <= k < 5`) trỏ xuống lá `[3, 4]`; nhánh phải (`>= 5`) trỏ xuống lá `[5, 6, 7]`.
+> 2. **Theo dõi các mũi tên thẳng đứng dưới đáy 3 Leaf Nodes (`d1, d2, ..., d7`)**: Chỉ ở tầng lá dưới cùng này mới có các mũi tên chỉ thẳng vào dữ liệu bản ghi thực sự $d_1, d_2, \dots, d_7$. Hãy để ý khóa `3` và `5` ở nút gốc được **nhân bản xuống đầu trang lá thứ hai (`3 -> d3`) và trang lá thứ ba (`5 -> d5`)**.
+> 3. **Theo dõi ô màu đỏ sẫm ở góc phải mỗi Leaf Node**: Mũi tên cong xuất phát từ ô đỏ sẫm của trang lá trước cắm thẳng vào đầu trang lá kế tiếp (`[1, 2] -> [3, 4] -> [5, 6, 7]`), minh họa trực quan con trỏ **`Sibling Pointer` (`next_page`)** giúp quét tuần tự toàn bộ tập dữ liệu $d_1 \to d_7$.
+
 ![Cấu trúc B+Tree](./images/bplustree-structure.png "Cấu trúc B+Tree với các Leaf Nodes liên kết tuần tự")
 *Hình 2.2: Trong B+Tree, dữ liệu thực chỉ nằm ở tầng lá (Leaf Nodes) và các lá được nối ngang với nhau để tối ưu Range Scan*
+
+### Cận cảnh một trang điều hướng thực tế (`Non-Leaf / Internal Page`) trong MySQL InnoDB
+Để thấy rõ cách một hệ quản trị cơ sở dữ liệu thương mại hiện thực hóa tầng điều hướng của B+Tree trên đĩa, hãy quan sát cấu trúc bên trong một **Non-Leaf Page (`Page 3`)** thực tế của **MySQL InnoDB**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai cột mốc biên `Infimum` (trái) và `Supremum` (phải) của `Page 3`**: Giống như mọi trang khác trong InnoDB, trang điều hướng `Level N Non-Leaf` cũng bắt đầu từ mốc xuất phát `Infimum` và kết thúc ở mốc đích `Supremum`.
+> 2. **Theo dõi dây chuyền mũi tên `Next Record` ở giữa trang**:
+>    - Từ `Infimum`, mũi tên dẫn tới ô chỉ đường thứ nhất: **`Min Key: 0 | Page: 4`**. Ô này mang ý nghĩa: *"Mọi khóa bắt đầu từ `0` trở đi (cho tới trước mốc kế tiếp) đều nằm ở trang con số `4` (`Page: 4`)"*.
+>    - Đi tiếp theo mũi tên `Next Record` sang ô chỉ đường thứ hai: **`Min Key: 4 | Page: 5`**. Ô này mang ý nghĩa: *"Mọi khóa từ `4` trở đi đều nằm ở trang con số `5` (`Page: 5`)"*.
+> 3. **Kết quả**: Toàn bộ trang nội bộ `Page 3` không hề chứa một byte dữ liệu khách hàng nào — mỗi ô chỉ tốn vài byte để lưu cặp **`(Min Key, Child Page Number)`**, giải thích vì sao một trang `16 KB` của InnoDB có thể nhét vừa hơn `1.000` ô chỉ đường như vậy!
+
+![Cấu trúc trang nội bộ Non-Leaf Page trong MySQL InnoDB](./images/innodb-non-leaf-page.png "Cấu trúc trang nội bộ (Non-Leaf Page) chứa các Separator Keys và con trỏ Child Page Number trong MySQL InnoDB — Nguồn: Jeremy Cole")
+*Hình 2.3: Bên trong một Non-Leaf Page (Internal Node) của MySQL InnoDB — mỗi bản ghi chỉ lưu khóa nhỏ nhất của nhánh con (`Min Key` / Separator Key) kèm số thứ tự trang con (`Page: 4`, `Page: 5`)*
 
 ---
 
@@ -176,6 +267,12 @@ Luồng A tìm k = 35, đi xuống Page L1 (nhưng L1 vừa bị Luồng B tách
   ^ Luồng A thấy 35 >= High Key (30) -> Tự động trượt ngang sang L2 để lấy 35!
 ```
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào `Leaf Page L1` ở bên trái**: Khi Luồng A được trang cha chỉ xuống `L1` để tìm khóa `35`, trang `L1` vừa bị một luồng khác cắt đôi và hiện chỉ còn giữ `[20 | 25]` với mốc chặn trên **`High Key = 30`**.
+> 2. **Theo dõi phép so sánh tại `L1` và mũi tên `right sibling` (`----->`)**: Luồng A so sánh khóa cần tìm `35` với `High Key = 30`. Vì $35 \ge 30$, Luồng A biết ngay khóa `35` đã dọn nhà sang trang hàng xóm bên phải và đi thẳng theo mũi tên `right sibling` sang `Leaf Page L2`.
+> 3. **Kết quả tại `Leaf Page L2`**: Luồng A kiểm tra thấy $35 < \text{High Key (50)}$ và tìm thấy ngay khóa `35` trong `[30 | 35 | 40]` mà không cần quay ngược lên trang gốc!
+
 ### 3. Sibling Pointers (Con trỏ anh em hai chiều)
 - Trong phần Header của mỗi Leaf Page luôn dành sẵn 2 trường `prev_page_id` (Left Sibling) và `next_page_id` (Right Sibling) nối tất cả các trang lá thành một **Doubly Linked List**.
 - Nhờ đó, câu truy vấn `SELECT * FROM logs WHERE id >= 20 ORDER BY id ASC LIMIT 100` chỉ cần đi từ Root xuống Leaf 1 lần tại khóa `20`, rồi trượt sang phải theo `next_page_id`; nếu truy vấn `ORDER BY id DESC` thì trượt ngược sang trái theo `prev_page_id`.
@@ -184,7 +281,22 @@ Luồng A tìm k = 35, đi xuống Page L1 (nhưng L1 vừa bị Luồng B tách
 
 ## Ví dụ chạy tay (Step-by-Step Dry Run): INSERT, Leaf Split (Copy-up) & Internal Split (Push-up) {#lookup-split-merge}
 
-Để nắm thật chắc cách cây B+Tree tự cân bằng và phát triển chiều cao từ dưới lên, phần dưới đây minh họa từng bước chạy tay trên một cây **B+Tree bậc $M = 4$**:
+Để nắm thật chắc cách cây B+Tree tự cân bằng và phát triển chiều cao từ dưới lên, trước hết hãy quan sát bức tranh toàn cảnh quá trình chèn tuần tự các khóa từ `1` đến `7` vào một cây B-Tree (mỗi node chứa tối đa `2` khóa):
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Đọc từ khung trên cùng xuống khung dưới cùng (7 bước chèn khóa từ `1` đến `7`, chữ số màu đỏ là khóa vừa được chèn)**:
+>    - Khung 1 & 2: Chèn `1` rồi `2` vào cùng một node `[1 | 2]`.
+>    - Khung 3: Khi chèn thêm `3` (màu đỏ), node bị tràn (> 2 khóa) nên **tách đôi**: `1` ở nhánh trái, `3` ở nhánh phải, và khóa giữa **`2`** được đẩy lên làm `Root`.
+> 2. **Theo dõi sự kiện tách dây chuyền ở Khung 5 và Khung 7 (cuối cùng)**:
+>    - Ở Khung 5: Khi chèn `5`, lá phải `[3 | 4]` tách đôi và đẩy `4` lên `Root` thành `[2 | 4]`.
+>    - Ở Khung 7: Khi chèn `7` (màu đỏ) vào lá `[5 | 6]`, lá này tách đôi đẩy `6` lên `Root [2 | 4]`. Vì `Root [2 | 4]` cũng đã đầy 2 ô, bản thân `Root` lại **tách đôi lần nữa** thành `[2]` và `[6]`, đồng thời đẩy khóa đứng giữa là **`4`** lên đỉnh cao nhất tạo thành tầng thứ 3!
+> 3. **Kết quả**: Cây chỉ mọc cao thêm khi sự kiện tách trang lan truyền từ đáy lá lên tận `Root`, giữ cho mọi nhánh lá `[1]`, `[3]`, `[5]`, `[7]` luôn nằm ở cùng một độ sâu tuyệt đối.
+
+![Minh họa quá trình chèn khóa và tách nút (Node Split) trong B-Tree](./images/btree-insertion-split.png "Quá trình chèn tuần tự các khóa 1..7 làm tách nút lá và lan truyền lên nút gốc")
+*Hình 2.4: Quá trình chèn khóa từ 1 đến 7 — khi nút con bị đầy và tách đôi, khóa phân cách được đẩy lên nút cha; khi nút gốc cũng đầy, cây mới tăng thêm 1 tầng chiều cao*
+
+Bây giờ, phần dưới đây minh họa chi tiết từng bước chạy tay trên một cây **B+Tree bậc $M = 4$** (phân biệt rõ `Copy-up` ở tầng lá và `Push-up` ở tầng nội bộ):
 - Mỗi node có tối đa $M = 4$ con trỏ nhánh con (`Fanout tối đa = 4`).
 - Mỗi node chứa **tối đa $M - 1 = 3$ khóa**.
 - Ngay khi chèn khóa thứ `4` vào một node đang có `3` khóa, node đó rơi vào trạng thái **Tràn (Overflow — 4 khóa)** và bắt buộc phải **Tách đôi (Split)** tại vị trí giữa ($\lfloor 4/2 \rfloor = \text{index } 2$): 2 khóa đầu ở lại trang trái, 2 khóa sau chuyển sang trang phải mới.
@@ -214,6 +326,12 @@ Ban đầu cây chỉ có 1 trang duy nhất là `Node L1` (đóng vai trò vừ
    - Lấy khóa đầu tiên của trang phải `L2` là **`25`** làm khóa phân tách (**Separator Key**).
    - Vì `L1` chưa có trang cha, hệ thống cấp phát một **Root Page mới `R1`** và **sao chép (`Copy-up`)** khóa `25` lên `R1`.
    - **Chú ý**: Khóa `25` vừa nằm trên `R1` (để làm mốc điều hướng: $< 25$ đi sang `L1`, $\ge 25$ đi sang `L2`), vừa **vẫn được giữ nguyên ở đầu trang lá `L2`** (vì trong B+Tree, tầng lá phải chứa dữ liệu của mọi khóa!). Lúc này chiều cao cây tăng từ $h = 1$ lên $h = 2$:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai trang lá `Leaf L1` và `Leaf L2` ở dưới**: Trang cũ đã được chia đôi thành `L1 [10 | 20]` và `L2 [25 | 30]`.
+> 2. **Theo dõi con số `25` in đậm**: Số `25` đứng đầu trang lá phải `L2` được **sao chép (`Copy-up`)** lên làm khóa phân cách trên `Root Page R1`.
+> 3. **Kết quả**: Khóa `25` xuất hiện ở **cả hai nơi** — trên `R1` làm biển chỉ đường (`k < 25` sang trái, `k >= 25` sang phải) và dưới `Leaf L2` để giữ nguyên bản ghi dữ liệu của khách hàng `id = 25`.
 
 ```mermaid
 flowchart TB
@@ -277,6 +395,12 @@ Hãy tiếp tục chèn tuần tự các khóa tăng dần vào cây đang có �
      - `I2` chỉ giữ khóa `[80]` (quản lý 2 lá `L4, L5`). **Lưu ý: Khóa `60` biến mất khỏi `I2` vì đã được `Push-up` lên `R_new`!**
      - Chiều cao của cây B+Tree chính thức tăng từ **$h = 2$ lên $h = 3$**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn xuống góc dưới bên phải (`Leaf L5: [80 | 90]`)**: Khi `L4` tách ra `L5`, khóa `80` được **`Copy-up`** lên `Internal Node I2` (nên số `80` vừa có ở `L5`, vừa có ở `I2`).
+> 2. **Nhìn lên Tầng 2 (`I1` và `I2`) và Tầng 1 (`New Root R_new`)**: Khi nút nội bộ cũ `[25 | 40 | 60 | 80]` bị tràn và tách thành `I1` và `I2`, khóa ở giữa là **`60`** được **`Push-up` (đẩy hẳn)** lên `R_new`.
+> 3. **Kết quả**: Hãy đối chiếu sự khác biệt — số `80` lặp lại ở cả `L5` và `I2`, nhưng số `60` sau khi nhảy lên `R_new` thì **biến mất hoàn toàn khỏi tầng 2 (`I1`/`I2`)** (tất nhiên bản ghi gốc `60` vẫn nằm an toàn ở `Leaf L4` dưới đáy!).
+
 ```mermaid
 flowchart TB
     RNew["<b>New Root Page R_new (Tầng 1)</b><br/>Keys: [ <b>60</b> ]<br/><i>(Khóa 60 được PUSH-UP từ tầng Internal lên, không lặp lại ở I2!)</i>"]
@@ -320,6 +444,12 @@ Trong B+Tree bậc $M = 4$ (tối đa `3` khóa/node), ngưỡng lấp đầy t�
     3. **Di chuyển khóa đầu tiên của `L2` là `30` sang cuối `L1`** $\implies$ `L1` trở thành `[10, 30]`, còn `L2` trở thành `[40, 50]`.
     4. **Cập nhật (Rotate) khóa phân tách trên trang cha**: Vì khóa nhỏ nhất của `L2` bây giờ là **`40`**, khóa phân tách trên trang cha được đổi từ `30` thành **`40`**!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khung bên trái (`1. Trước khi xóa 20`)**: Trang `Leaf L1` đang có `[10 | 20]` (vừa đủ mức tối thiểu 2 khóa), còn trang anh em `Leaf L2` có tới 3 khóa `[30 | 40 | 50]`.
+> 2. **Nhìn sang khung bên phải (`2. Sau khi DELETE 20`)**: Khi mất khóa `20`, `L1` mượn khóa `30` từ đầu `L2` sang thành `L1: [10 | 30]`.
+> 3. **Kết quả trên `Parent Page`**: Vì trang phải `L2` bây giờ bắt đầu từ số **`40`** (`[40 | 50]`), tấm biển chỉ đường trên `Parent Page` được cập nhật từ `[30]` thành **`[40]`** mà không phải xóa bỏ trang nào.
+
 ```mermaid
 flowchart TB
     subgraph BeforeRedist["1. Trước khi xóa 20 (Ngưỡng tối thiểu = 2 khóa/node)"]
@@ -343,6 +473,12 @@ flowchart TB
     2. **Gộp (`Merge`) toàn bộ phần tử của `L2` và `L3` về chung một trang** (hoặc gộp `L1` và `L2`): gộp `L2 [25]` và `L3 [40, 50]` thành trang `L2 = [25, 40, 50]`, giải phóng trang `L3` trả về Free Page List.
     3. **Kéo xuống / Xóa khóa phân tách `40` trên trang cha `Parent`**: Vì nhánh `L3` đã biến mất, khóa phân tách `40` giữa `L2` và `L3` trên `Parent` bị xóa bỏ $\implies$ `Parent` chỉ còn `[25]`.
     - *Lưu ý đối với Internal Node Merge*: Nếu việc xóa khóa phân tách trên `Parent` làm bản thân `Parent` (một Internal Node) cũng bị Underflow và phải gộp với một Internal Node anh em khác, thì khóa phân cách trên tầng cao hơn sẽ được **kéo hẳn xuống (`Pull-down / Demote`)** nằm giữa 2 Internal Nodes đang gộp lại (ngược lại hoàn toàn với thao tác `Push-up` khi tách Internal Node!).
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khung `1. Trước khi DELETE 30`**: Cả 3 trang lá `L1 [10 | 20]`, `L2 [25 | 30]` và `L3 [40 | 50]` đều đang ở mức tối thiểu (2 khóa), không trang nào dư khóa để cho mượn.
+> 2. **Nhìn sang khung `2. Sau khi DELETE 30`**: Khi `L2` mất khóa `30` (chỉ còn `[25]`), hệ thống gom toàn bộ `L2 [25]` và `L3 [40 | 50]` vào chung một trang `Leaf L2: [25 | 40 | 50]`, xóa bỏ hoàn toàn trang `L3`.
+> 3. **Kết quả trên `Parent Page`**: Vì nhánh `L3` không còn tồn tại, khóa phân cách `40` trên `Parent Page` bị xóa đi, chỉ còn lại `[25]` phân chia giữa `L1` và `L2`.
 
 ```mermaid
 flowchart TB

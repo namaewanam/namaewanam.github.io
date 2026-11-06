@@ -17,10 +17,43 @@ tags: ["database-internals", "leader-election", "split-brain", "fencing-token", 
 
 ## Tại sao Hệ thống phân tán cần có Leader? {#why-distributed-systems-use-a-leader}
 
+### 0. Khởi động cho người mới: Tại sao cần bầu "Một vị Vua duy nhất" để ghi sổ, và làm sao chặn "Vị Vua xác sống (Zombie Leader)" vừa tỉnh dậy sau cơn hôn mê?
+
+Khi mới làm quen với cơ sở dữ liệu phân tán (như **PostgreSQL Streaming Replication, MongoDB Replica Set, Apache Kafka, etcd, CockroachDB, TiKV**), người mới thường thắc mắc 3 câu hỏi cốt lõi:
+
+1. **Tại sao có tới 3–5 máy chủ mạnh ngang nhau mà lại chỉ cho phép đúng 1 máy làm `Leader (Primary)` để nhận lệnh Ghi (`INSERT/UPDATE/DELETE`)?**
+   - Hãy tưởng tượng một nhóm 5 kế toán viên cùng quản lý một cuốn sổ quỹ công ty chỉ còn `100 USD`. Nếu cho phép cả 5 người tự do cầm bút gạch sửa sổ cùng một lúc mà không hỏi nhau, người thứ nhất cho rút `80 USD` ở đầu phòng, cùng giây đó người thứ hai cũng cho rút `80 USD` ở cuối phòng $\implies$ quỹ công ty lập tức bị rút âm thành `-60 USD`!
+   - Thay vì để 5 người cãi nhau trên từng con chữ, cách đơn giản và nhanh gọn hơn cả là **bầu ra đúng 1 Kế toán trưởng (`Leader / Primary`) cầm cây bút duy nhất**. Mọi lệnh rút tiền bắt buộc phải xếp hàng qua tay `Leader` để `Leader` đánh số thứ tự `1, 2, 3...`, rồi `Leader` mới đọc cho 4 thư ký (`Followers / Replicas`) chép lại y hệt vào sổ dự phòng!
+2. **Tại sao bầu nhầm 2 Leader cùng lúc (`Split-Brain`) lại là cơn ác mộng tồi tệ nhất của Database?**
+   - Giả sử bức tường ngăn giữa phòng họp bị sập làm chia phòng thành 2 nửa không nhìn thấy nhau (**Network Partition**). Nửa bên phải vẫn có Kế toán trưởng cũ (`Leader 1`) đang ký duyệt chi tiêu; trong khi nửa bên trái tưởng Kế toán trưởng cũ đã chết nên tự bầu ra một Kế toán trưởng mới (`Leader 2`) cũng ký duyệt chi tiêu trên cùng tài khoản đó! Đến khi dọn bức tường ra, hai cuốn sổ cái đã ghi đè nát bét lên nhau — hiện tượng "Một nước hai Vua" này gọi là **Split-Brain**.
+3. **Nếu đã bầu cử cực kỳ cẩn thận rồi, tại sao vẫn cần thẻ bài `Fencing Token` (Số thứ tự tăng dần tại quầy ngân hàng)?**
+   - Hãy tưởng tượng `Leader 1` đang cầm lệnh rút tiền định đưa cho Thủ quỹ kho bạc (`Storage Server`), thì bất ngờ `Leader 1` bị đứng hình (do **JVM Stop-The-World GC Pause** kéo dài `15 giây`). Hội đồng thấy `Leader 1` bất tỉnh quá lâu nên bầu `Leader 2` lên thay thế và cấp cho `Leader 2` tấm thẻ bài nhiệm kỳ số **`#34`** (cao hơn thẻ **`#33`** của `Leader 1`).
+   - Sau khi `Leader 2` đã dùng thẻ **`#34`** cập nhật số dư mới vào kho bạc xong xuôi, đột nhiên `Leader 1` tỉnh dậy sau cơn GC Pause! Trong não của `Leader 1` lúc đó vẫn đinh ninh mình là Vua hợp pháp nên nó cầm tờ lệnh cũ kỹ kèm thẻ **`#33`** chạy tới quầy Thủ quỹ đòi ghi đè dữ liệu!
+   - Nhờ có quy tắc **Fencing Token**, Thủ quỹ kho bạc nhìn vào số thẻ thấy **`#33 < #34` (số thẻ lớn nhất đã từng phục vụ)** nên lập tức đuổi cổ "Vị Vua xác sống" (`Zombie Leader 1`) về chỗ, cứu dữ liệu khỏi bị ghi đè!
+
+Hãy điểm qua bảng từ điển thuật ngữ nhanh dưới đây trước khi mổ xẻ từng thuật toán trong Chương 10:
+
+#### Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (CockroachDB / TiKV / Cassandra / etcd / DynamoDB) là gì? |
+| :--- | :--- | :--- |
+| **`Leader / Coordinator` vs `Follower / Replica`** | **Leader**: Vị chủ toạ duy nhất cầm búa gõ chốt thứ tự giao dịch.<br/>**Follower**: Các thư ký ngồi chép lại biên bản từ Leader để dự phòng khi Leader ngất xỉu và phụ giúp trả lời các câu hỏi tra cứu (`Read`). | Trong **PostgreSQL (`Primary` vs `Standby`)**, **MongoDB (`Primary` vs `Secondary`)**, **Kafka (`Partition Leader` vs `ISR Follower`)**, và **etcd / CockroachDB / TiKV (`Raft Leader` vs `Raft Follower`)**: Mọi lệnh ghi đi vào Leader; dữ liệu lớn được chia thành hàng nghìn phân vùng (*Shards/Ranges*) để mỗi máy chủ làm Leader của một số phân vùng (**Multi-Raft**). |
+| **`Split-Brain`**<br/>*(Thảm hoạ hai Vua cùng ra lệnh ghi đè dữ liệu)* | Công ty bị chia cắt liên lạc làm 2 chi nhánh, mỗi chi nhánh đều tự nhận mình có Tổng giám đốc hợp pháp và cùng bán 1 căn hộ duy nhất cho 2 khách hàng khác nhau. | Sự cố nghiêm trọng trong **Elasticsearch cũ, MySQL / PostgreSQL Failover tự chế** hoặc **Bully Algorithm** khi đứt cáp mạng làm cả hai nhánh đều tự phong `Primary`, dẫn tới mất mát dữ liệu (*Lost Updates / Data Corruption*) không thể tự khôi phục. |
+| **`Epoch / Term Number`**<br/>*(Số nhiệm kỳ tăng dần)* | Số thứ tự triều đại của các đời Vua (`Triều đại thứ 1 -> Triều đại thứ 2 -> Triều đại thứ 3...`), không bao giờ được phép giảm hay trùng lặp. | Biến `currentTerm` trong **etcd / TiKV / CockroachDB (Raft)**, `epoch` trong **ZooKeeper (`zxid`)**, hoặc `controller_epoch` / `leader_epoch` trong **Apache Kafka**. Mỗi lần mở cuộc bầu cử mới, con số này bắt buộc tăng thêm ít nhất `+1`. |
+| **`Fencing Token`**<br/>*(Thẻ bài chặn Zombie Leader tại tầng Storage)* | Số thứ tự lấy phiếu ở quầy giao dịch ngân hàng (`#33`, `#34`, `#35`). Quầy thủ quỹ đã phục vụ đến phiếu `#34` thì ai cầm phiếu `#33` chạy tới muộn sẽ bị từ chối thẳng thừng. | Khi một **Kafka Broker / HDFS NameNode / TiKV Leader** cũ bị treo *GC Pause* rồi tỉnh dậy gửi lệnh ghi trễ xuống tầng lưu trữ, tầng Storage kiểm tra thấy `request_token (33) < max_seen_token (34)` nên lập tức trả lỗi `StaleEpoch / StaleFencingToken` và chặn đứng gói tin. |
+| **`Lease-Based Leadership`**<br/>*(Quyền làm Leader có thời hạn thuê bao theo đồng hồ Monotonic)* | Hợp đồng thuê nhà có thời hạn đúng `10 giây`: Các cử tri cam kết trong 10 giây tới tuyệt đối không bầu ai khác, nên vị Vua hiện tại cứ yên tâm trả lời dân chúng ngay tại chỗ mà không cần quay lại hỏi ý kiến cử tri mỗi giây. | Cơ chế **Leader Lease** trong **CockroachDB, Google Spanner, YugabyteDB, etcd (`ReadIndex / LeaseRead`)**: Cho phép Leader trả lời câu lệnh `SELECT` ngay từ RAM cục bộ (`0 ms` độ trễ mạng) mà vẫn đảm bảo dữ liệu mới nhất (*Linearizable Read*), miễn là đồng hồ phần cứng không bị trôi lệch quá ngưỡng bảo vệ (*Guard Band*). |
+| **`Bully Algorithm`**<br/>*(Thuật toán Kẻ bắt nạt)* | Trong nhóm, ai có số thứ tự (cấp bậc ID) to nhất còn sống thì người đó có quyền "quát" những người số nhỏ hơn phải im lặng nhường ghế chỉ huy cho mình. | Thuật toán bầu cử cổ điển dựa trên ID (`ID=5` trấn áp `ID=4, 3, 2, 1`): Đơn giản nhưng tốn $O(N^2)$ gói tin và **dễ dính lỗi Split-Brain** khi đứt cáp mạng vì không đòi hỏi đa số phiếu (*Majority Quorum*). |
+| **`Next-In-Line`** | Vị Vua đương nhiệm lúc còn khoẻ luôn viết sẵn tờ "Di chúc truyền ngôi" (`Danh sách Thái tử số 1, số 2...`) gửi kèm mỗi nhịp tim hàng ngày. Khi Vua băng hà, cả triều đình cứ nhìn tờ di chúc mà gọi ngay Thái tử số 1 lên ngôi! | Cải tiến của Bully giúp giảm số gói tin lúc bầu cử từ $O(N^2)$ xuống tuyến tính $O(N)$ vì node phát hiện lỗi chỉ cần nhắn thẳng cho ứng viên đầu bảng trong danh sách dự phòng. |
+| **`Candidate / Ordinary`** | Chia công ty thành 2 nhóm: Chỉ có **Ban Giám Đốc (`Candidates` — máy chủ cấu hình khủng)** mới được quyền ứng cử chức Tổng giám đốc, còn **Nhân viên (`Ordinary` — máy nhỏ)** chỉ đi bỏ phiếu chứ không tự ứng cử. | Tương tự khái niệm **Voter / Non-Voting Learner / Priority Node** trong **MongoDB Replica Set (`priority: 0`)**, **etcd Learner**, hoặc tách cụm **Kafka KRaft Controller Quorum** riêng khỏi các Broker lưu trữ. |
+| **`Invitation Algorithm`**<br/>*(Thuật toán Lời mời / Hợp nhất nhóm)* | Khi đứt liên lạc, mỗi nhóm nhỏ tự bầu 1 nhóm trưởng tạm thời để làm việc tiếp. Khi có sóng điện thoại trở lại, nhóm trưởng lớn gửi "Thiệp mời (`Invitation`)" gộp các nhóm nhỏ lại thành 1 đại gia đình duy nhất. | Tư tưởng bầu cử theo hướng hợp nhất phân vùng (*Election by Merge*), ưu tiên tính sẵn sàng cục bộ lúc đứt mạng rồi tự động gộp cụm khi mạng nối lại. |
+| **`Ring Election Algorithm`**<br/>*(Thuật toán Vòng tròn logic)* | Các thành viên ngồi quanh một chiếc bàn tròn và chuyền tay nhau 1 tờ giấy bầu cử theo chiều kim đồng hồ: Mỗi người ghi số ID của mình vào tờ giấy (hoặc giữ lại số lớn nhất); khi tờ giấy đi hết 1 vòng quay về chỗ người phát động thì ai có số to nhất trên giấy sẽ làm Leader. | Thuật toán Chang & Roberts (`1979`): Không cần phát sóng rộng (*Broadcast*), mỗi node chỉ nói chuyện với đúng người kế bên trên vòng tròn (nếu người kế bên chết thì nhảy cóc qua), tốn đúng $2N$ bước truyền tin. |
+
+---
+
 ### 1. Bài toán thực tế & Mental Model: Điều gì xảy ra nếu mọi node đều tự ý quyết định?
 
-Hãy tưởng tượng một phòng giao dịch ngân hàng có `5` nhân viên thu ngân (`Node 1` đến `Node 5`) cùng quản lý một cuốn sổ cái tài khoản. Khách hàng đang có số dư `$100`. Nếu hai yêu cầu rút `$80` đến cùng một lúc tại hai quầy khác nhau (`Node 1` và `Node 2`) trong một hệ thống **Không có người điều phối trung tâm (Leaderless)**:
-- Để giảm độ trễ, nếu cả `Node 1` lẫn `Node 2` đều tự kiểm tra sổ cục bộ thấy còn `$100 >= $80` và lập tức cho rút tiền, tài khoản sẽ bị rút âm thành `-$60`!
+Hãy tưởng tượng một phòng giao dịch ngân hàng có `5` nhân viên thu ngân (`Node 1` đến `Node 5`) cùng quản lý một cuốn sổ cái tài khoản. Khách hàng đang có số dư `100 USD`. Nếu hai yêu cầu rút `80 USD` đến cùng một lúc tại hai quầy khác nhau (`Node 1` và `Node 2`) trong một hệ thống **Không có người điều phối trung tâm (Leaderless)**:
+- Để giảm độ trễ, nếu cả `Node 1` lẫn `Node 2` đều tự kiểm tra sổ cục bộ thấy còn `100 USD >= 80 USD` và lập tức cho rút tiền, tài khoản sẽ bị rút âm thành `-60 USD`!
 - Để tránh xung đột trong mô hình Leaderless, mỗi giao dịch sẽ phải tự thương lượng đa số phiếu với các node khác, hoặc chấp nhận ghi chồng lấp rồi giải quyết xung đột phức tạp lúc đọc (như *Vector Clocks / Siblings* ở Chương 8).
 
 Để triệt tiêu hoàn toàn xung đột ghi ngay từ đầu, phần lớn các hệ quản trị cơ sở dữ liệu quan hệ và NewSQL hiện đại (PostgreSQL Replication, MySQL Group Replication, MongoDB, etcd, Kafka, CockroachDB, Spanner) áp dụng kiến trúc **Single-Leader (Primary-Backup / Master-Replica / Active-Passive)**:
@@ -63,6 +96,12 @@ Giao thức sử dụng đúng **3 loại bản tin**:
 1. `ELECTION`: Gửi từ một node có ID thấp lên các node có ID cao hơn để hỏi: *"Tôi định làm Leader đây, có đàn anh nào còn sống không?"*
 2. `ALIVE` (hoặc `OK`): Bản tin trả lời của node có ID cao hơn: *"Tôi còn sống và có ID lớn hơn anh! Anh hãy lui xuống để tôi lo việc bầu cử!"*
 3. `ELECTED` (hoặc `COORDINATOR`): Bản tin tuyên bố chiến thắng gửi từ tân Leader xuống toàn bộ các node có ID thấp hơn: *"Không còn ai lớn hơn tôi sống sót, từ giờ tôi là Leader mới!"*
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào 5 cột dọc từ trái sang phải (`Node 1` đến `Node 5`)**: Thứ bậc quyền lực tăng dần từ trái sang phải (`Node 5` to nhất nhưng vừa bị sập nguồn `CRASHED`). `Node 2` là người đầu tiên phát hiện `Node 5` im lặng.
+> 2. **Theo dõi các mũi tên `ELECTION` đi sang phải và `ALIVE` bắn trả về bên trái (Bước 1 -> Bước 4)**: `Node 2` hỏi các đàn anh `{3, 4, 5}` thì bị `Node 3` và `Node 4` bắn `ALIVE` bắt phải rút lui. Tiếp tục, `Node 3` hỏi `{4, 5}` thì bị `Node 4` bắn `ALIVE` bắt rút lui.
+> 3. **Kết quả ở Bước 5 & Bước 6**: Đến lượt `Node 4` hỏi đàn anh duy nhất lớn hơn mình là `Node 5` nhưng bị Timeout (dấu `x`). Biết chắc mình là kẻ mạnh nhất còn sống, `Node 4` phát thông báo `6. ELECTED` về bên trái cho toàn bộ `{1, 2, 3}`!
 
 ```mermaid
 sequenceDiagram
@@ -159,6 +198,12 @@ Trong Bully Algorithm, việc có 2 phân vùng mạng hoạt động độc l�
 
 Đó chính là tư tưởng của **Invitation Algorithm** (cũng do Garcia-Molina đề xuất năm `1982`): mỗi node ban đầu là Leader của một nhóm chỉ gồm chính nó; sau đó các Leader gửi thiệp mời (`INVITATION`) để hợp nhất các nhóm lại với nhau.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai cột đại diện cho 2 nhóm bị chia cắt trước đó**: Bên trái là `Nhóm G₁ {Node 1, Node 2}` do `Node 2` làm trưởng nhóm; bên phải là `Nhóm G₂ {Node 3, 4, 5}` do `Node 5` làm trưởng nhóm.
+> 2. **Theo dõi mũi tên `1. INVITATION` và `2, 3. ACCEPT_MERGE`**: Ngay khi cáp mạng nối lại, trưởng nhóm lớn `Node 5` gửi thiệp mời sang trưởng nhóm nhỏ `Node 2`. Thấy `ID(5) > ID(2)`, `Node 2` bảo đàn em `Node 1` cùng mình gia nhập vào nhóm của `Node 5`.
+> 3. **Kết quả ở mũi tên `4. MERGED_GROUP`**: `Node 5` chốt danh sách đại gia đình mới `{1, 2, 3, 4, 5}` dưới quyền chỉ huy duy nhất của `Node 5`.
+
 ```mermaid
 sequenceDiagram
     participant G1 as Nhóm G₁: {Node 1, Node 2}<br/>(Leader hiện tại = Node 2)
@@ -196,12 +241,24 @@ Thay vì cho các node gửi tin nhắn chằng chịt tới tất cả mọi ng
 $$N_1 \longrightarrow N_2 \longrightarrow N_3 \longrightarrow N_4 \longrightarrow N_5 \longrightarrow N_1$$
 Mỗi node $i$ chỉ cần gửi tin nhắn cho **đúng 1 người hàng xóm kế tiếp theo chiều kim đồng hồ** (`next_alive_neighbor`). Nếu người hàng xóm kế tiếp trực tiếp không phản hồi (đã chết), node $i$ chỉ việc nhảy cóc (*skip*) sang người kế tiếp nữa trên vòng tròn!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào các nút được xếp thành một vòng tròn khép kín**: Mỗi máy chủ chỉ cần biết địa chỉ của người ngồi ngay bên tay phải mình (theo chiều kim đồng hồ) và người dự phòng kế tiếp, thay vì phải nối dây chằng chịt tới tất cả mọi máy trong cụm.
+> 2. **Theo dõi đường đi một chiều quanh vòng tròn**: Khi cần bầu cử, bức thư `ELECTION` được chuyền tay lần lượt qua từng nút dọc theo đường viền vòng tròn. Nếu có một nút bị hỏng, nút đứng trước nó chỉ việc bắc cầu nhảy cóc qua nút hỏng để chuyền thư cho nút sống tiếp theo.
+> 3. **Kết quả**: Khi bức thư đi trọn 1 vòng quay về đúng tay người phát động ban đầu, danh sách trên thư đã gom đủ mặt mọi nút đang sống trong cụm để chọn ra nút có ID lớn nhất làm Leader!
+
 ![Cấu trúc liên kết vòng tròn (Ring Topology) dùng trong thuật toán bầu chọn Ring Election](./images/ring-topology-election.png)
 
 #### Ví dụ chạy tay từng bước (Worked Example 5): Trace gói tin đi quanh vòng tròn khi `Node 5` chết
 
 Giả sử 5 node được xếp theo vòng tròn: **`Node 1 -> Node 2 -> Node 3 -> Node 4 -> Node 5 -> Node 1`**.
 Đột nhiên Leader hiện tại là **`Node 5` bị sập nguồn**, và **`Node 2`** là người phát hiện ra đầu tiên. Hãy theo dõi hành trình của bức thư bầu cử đi hết 2 vòng quanh chiếc bàn tròn:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào sơ đồ `Vòng tròn vật lý ban đầu` ở trên cùng**: `Node 5` ở góc phải đã `DEAD`, vì vậy `Node 4` vẽ một đường vòng ở bên dưới để nhảy cóc qua `Node 5` và nối thẳng về `Node 1`.
+> 2. **Theo dõi `VÒNG 1 (Thu thập ứng viên)`**: Bắt đầu từ `Node 2`, mảng ứng viên mở rộng dần sau mỗi bước chuyền tay: `[2] -> [2, 3] -> [2, 3, 4] -> (nhảy qua 5) -> [2, 3, 4, 1]` rồi quay về lại `Node 2`.
+> 3. **Kết quả ở `VÒNG 2 (Công bố Tân Leader)`**: `Node 2` nhìn vào mảng `[2, 3, 4, 1]`, tìm số lớn nhất là `4` (`Node 4`), rồi chuyền thông báo `ELECTED(leader = 4)` đi thêm 1 vòng nữa để cả bàn tròn cùng biết mặt tân Leader!
 
 ```text
 Vòng tròn vật lý ban đầu:   [Node 1] ---> [Node 2] ---> [Node 3] ---> [Node 4] ---> (Node 5: DEAD)
@@ -293,6 +350,12 @@ Tại sao thảm hoạ ở `t = 15.1s` lại xảy ra? Bởi vì **Storage Serve
 
 Để chặn đứng mọi Zombie Leader, Martin Kleppmann và Alex Petrov chỉ ra nguyên tắc thiết kế bắt buộc: **Mọi quyền làm Leader đều phải đi kèm một con số nguyên tăng đơn điệu tuyệt đối gọi là `Fencing Token` (hay `Epoch` / `Term` / `Generation Number`), và chính tài nguyên đích (Storage Server) phải là người kiểm tra con số này!**
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào bước `1` (`[t = 0s]`) và hộp đóng băng `🥶` (`[t = 4.1s]`) ở cột `Leader 1`**: `Leader 1` được cấp thẻ bài nhiệm kỳ `Fencing Token = 33`, nhưng ngay khi chuẩn bị gửi lệnh ghi `"V1_CU"` thì bị đóng băng `11 giây` bởi *Stop-The-World GC Pause*.
+> 2. **Theo dõi bước `2` và bước `3` (`[t = 10s -> 12s]`) ở giữa**: Khi `Leader 1` hết hạn Lease, dịch vụ điều phối bầu `Leader 2` lên thay với số thẻ cao hơn là **`token = 34`**. `Leader 2` mang `token = 34` xuống ghi `"V2_MOI"` vào `Storage Server`, và `Storage Server` ghi sổ `max_seen_token = 34`.
+> 3. **Kết quả ở bước `4` (`[t = 15.1s]`) và hộp khiên chắn `🛡️` ở cột `Storage Server`**: Khi Zombie `Leader 1` tỉnh dậy và bắn gói tin trễ kèm thẻ cũ **`token = 33`** xuống, `Storage Server` so sánh thấy **`33 < 34` (`max_seen_token`)** nên lập tức chặn đứng và trả lỗi `StaleFencingTokenException`, bảo vệ an toàn tuyệt đối cho dữ liệu `"V2_MOI"`!
+
 ```mermaid
 sequenceDiagram
     participant L1 as Leader 1 (Old / Zombie Leader)
@@ -320,17 +383,24 @@ sequenceDiagram
    - Khi bầu sang `Leader 2`, nó nhận **`token = 34`** (`34 > 33`).
 2. **Quy tắc 2 (Trên đường truyền)**: Mọi gói tin RPC đọc/ghi do Leader gửi đi đều bắt buộc phải đính kèm `token` trong phần Header: `Write(payload, fencing_token)`.
 3. **Quy tắc 3 (Tại Storage Server đích)**: Storage Server duy trì bền vững một biến `max_seen_token` (nhãn token lớn nhất từng xử lý):
-   ```text
-   // Logic kiểm tra Fencing Token bắt buộc tại Storage Server:
-   function handle_write(payload, request_token):
-       if (request_token < this.max_seen_token):
-           // Phát hiện gói tin bóng ma từ Zombie Leader của nhiệm kỳ cũ!
-           return REJECT("Stale Fencing Token: " + request_token + " < " + this.max_seen_token)
-       
-       this.max_seen_token = request_token
-       persist_to_disk(payload, this.max_seen_token)
-       return ACK_OK
-   ```
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào câu lệnh điều kiện `if (request_token < this.max_seen_token)`**: Đây là "cổng gác" tại tầng ổ đĩa lưu trữ — bất kỳ lệnh ghi nào mang số thẻ nhỏ hơn số thẻ lớn nhất mà ổ đĩa từng thấy đều bị coi là lệnh từ Zombie Leader cũ.
+> 2. **Theo dõi nhánh `return REJECT(...)`**: Lệnh ghi mang thẻ cũ bị từ chối ngay lập tức trước khi chạm vào dữ liệu trên đĩa.
+> 3. **Kết quả ở 2 dòng cuối**: Chỉ khi `request_token >= max_seen_token`, hệ thống mới cập nhật lại cột mốc `max_seen_token` và lưu dữ liệu xuống đĩa (`persist_to_disk`).
+
+```text
+// Logic kiểm tra Fencing Token bắt buộc tại Storage Server:
+function handle_write(payload, request_token):
+    if (request_token < this.max_seen_token):
+        // Phát hiện gói tin bóng ma từ Zombie Leader của nhiệm kỳ cũ!
+        return REJECT("Stale Fencing Token: " + request_token + " < " + this.max_seen_token)
+    
+    this.max_seen_token = request_token
+    persist_to_disk(payload, this.max_seen_token)
+    return ACK_OK
+```
 
 **Các tên gọi thực tế của Fencing Token trong các hệ thống Production**:
 - **Raft (etcd, TiKV, CockroachDB, Consul)**: Gọi là **`Term`** (`currentTerm`).
@@ -367,6 +437,12 @@ Hãy hình dung các Follower ký một bản hợp đồng quy ước với `Le
 
 Ngay cả khi cả hai bên đều tuân thủ quy tắc ở Chương 8 là sử dụng **Monotonic Clock (`CLOCK_MONOTONIC`)** để không bị NTP vặn ngược, tinh thể thạch anh trên hai máy vẫn có thể chạy nhanh/chậm lệch nhau (**Clock Drift**)! Hãy tính thử một kịch bản thực tế với con số cụ thể:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai dòng giả định ở đầu sơ đồ**: Hợp đồng Lease quy định `10.000 giây`, nhưng đồng hồ của `Follower` chạy hơi nhanh (mới `9.80s` thực tế đã tưởng hết `10s`), còn đồng hồ của `Leader 1` lại chạy hơi chậm.
+> 2. **Theo dõi khe hở nguy hiểm từ `t = 9.80s` đến `t = 10.10s` trên trục thời gian dọc**: Tại `t = 9.80s`, `Follower` thấy đã hết 10s nên bầu `Leader 2` lên và ghi dữ liệu mới `x = "MOI"`. Thế nhưng tại `t = 9.90s`, đồng hồ trên `Leader 1` mới chỉ `9.80s` (`< 10s`), nên `Leader 1` vẫn ngây thơ nghĩ mình còn hạn hợp đồng!
+> 3. **Kết quả**: Khi `Client B` hỏi đọc `x` ở `t = 9.90s`, `Leader 1` trả về dữ liệu cũ `x = "CU"` ngay từ RAM của mình — làm lộ dữ liệu cũ dù có dùng Lease!
+
 ```text
 Giả sử thời hạn Lease quy ước là ΔT = 10.000 giây (10000 ms).
 Do lỗi nhiệt độ bo mạch hoặc sai số thạch anh / ảo hoá:
@@ -390,6 +466,13 @@ Trục thời gian thực tế tuyệt đối (True Physical Time):
 ```
 
 Ngoài ra, ngay cả khi đồng hồ thạch anh chỉ lệch rất ít, luồng thực thi trên `Leader 1` vẫn có thể bị tạm dừng (GC Pause hoặc Context Switch) ngay tại khe hở giữa hai dòng code sau:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào dòng kiểm tra `if (monotonic_now() < lease_expiration_time)`**: Lúc chạy dòng này, giả sử Lease vẫn còn hạn `50 ms` nữa nên điều kiện `if` trả về `true`.
+> 2. **Theo dõi dòng chú thích `<--- Nếu bị GC Pause...` ở ngay bên dưới**: Đúng khoảnh khắc vừa lọt qua cửa `if`, tiến trình bị hệ điều hành hoặc JVM tạm dừng mất `500 ms`.
+> 3. **Kết quả ở dòng `return local_storage.read(key)`**: Khi CPU chạy tiếp dòng đọc dữ liệu này, thời hạn `50 ms` kia đã bốc hơi từ lâu và cụm đã có Leader mới, dẫn tới trả về dữ liệu cũ!
+
 ```text
 // Lỗ hổng Time-of-Check to Time-of-Use (TOCTOU) trong Lease-Based Read:
 if (monotonic_now() < lease_expiration_time) {

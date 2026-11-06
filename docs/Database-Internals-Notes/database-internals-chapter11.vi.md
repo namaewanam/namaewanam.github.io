@@ -18,6 +18,36 @@ tags: ["database-internals", "replication", "consistency", "cap-theorem", "quoru
 
 ## Định lý CAP và PACELC {#cap-and-pacelc}
 
+### 0. Khởi động cho người mới: Bài toán "Cuốn sổ cái chung giữa 3 văn phòng Hà Nội — Singapore — Tokyo"
+
+Hãy tưởng tượng một ngân hàng hoặc một tài liệu Google Doc có **3 bản sao cuốn sổ cái (`Replicas`)** đặt tại 3 văn phòng: **Hà Nội**, **Singapore** và **Tokyo** để nếu 1 văn phòng mất điện thì 2 văn phòng kia vẫn phục vụ khách hàng bình thường.
+
+Khi một khách hàng ở **Hà Nội** nộp vào tài khoản `100 USD` (nâng số dư từ `0 USD` lên `100 USD`), giám đốc chi nhánh Hà Nội đứng trước hai lựa chọn nghiệt ngã:
+- **Cách 1 — Chờ cả 3 văn phòng cùng ký xác nhận rồi mới in biên lai cho khách (`Strong Consistency / Linearizability`)**:
+  - Nhân viên ở Hà Nội phải gọi điện sang cả Singapore và Tokyo, chờ cả 2 nơi ghi xong con số `100 USD` vào sổ của họ rồi mới quay ra báo với khách: *"Giao dịch thành công!"*.
+  - **Ưu điểm**: Ngay giây tiếp theo, dù khách hàng gọi điện cho bạn ở Tokyo ra cây ATM tra cứu số dư, cây ATM ở Tokyo chắc chắn hiện đúng `100 USD`!
+  - **Cái giá phải trả**: Khách ở Hà Nội phải đứng chờ đường truyền cáp quang quốc tế (`Latency` cao); tệ hơn, nếu tuyến cáp biển đi Tokyo bị cá mập cắn đứt (**Network Partition**), chi nhánh phải khóa sổ ngừng giao dịch để tránh lệch số liệu (`Hy sinh Availability`)!
+- **Cách 2 — Ghi vào sổ Hà Nội xong là in biên lai báo thành công ngay trong `1 ms`, rồi gửi thư sang Singapore và Tokyo sau (`Eventual Consistency`)**:
+  - **Ưu điểm**: Nhanh như chớp! Kể cả khi cáp quang biển bị đứt, chi nhánh Hà Nội và Tokyo vẫn độc lập nhận khách bình thường (`100% Availability`, `Latency` cực thấp).
+  - **Cái giá phải trả**: Trong vài giây bức thư đang bay sang Tokyo, nếu người bạn ở Tokyo ra cây ATM kiểm tra số dư, màn hình ở Tokyo vẫn hiện con số cũ từ hôm qua là **`0 USD` (`Stale Read`)**!
+
+Toàn bộ Chương 11 xoay quanh việc định lượng chính xác những cam kết giữa **"Đọc được dữ liệu mới đến mức nào?"** và **"Hệ thống trả lời nhanh & sẵn sàng đến mức nào?"**. Hãy nắm vững bảng từ điển dưới đây trước khi bước vào từng mô hình:
+
+#### Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (CockroachDB / TiKV / Cassandra / etcd / DynamoDB) là gì? |
+| :--- | :--- | :--- |
+| **`CAP Theorem`**<br/>*(Consistency, Availability, Partition Tolerance)* | Khi cáp quang giữa chi nhánh Hà Nội và Tokyo bị đứt (**Partition - P**), ngân hàng buộc phải chọn 1 trong 2:<br/>• **CP (Consistency)**: Đóng cửa chi nhánh bị cô lập để không bao giờ báo sai số dư.<br/>• **AP (Availability)**: Cho cả 2 chi nhánh tiếp tục giao dịch độc lập, chấp nhận sổ sách hai bên tạm thời lệch nhau. | • Nhóm **`CP` (etcd, ZooKeeper, CockroachDB, TiKV, Google Spanner)**: Dùng Raft/Paxos; nhánh nào mất đa số phiếu (*Quorum*) sẽ tự động từ chối phục vụ để bảo vệ dữ liệu tuyệt đối.<br/>• Nhóm **`AP` (Apache Cassandra, Amazon Dynamo, Riak)**: Mọi node còn sống vẫn nhận lệnh Đọc/Ghi độc lập dù đứt mạng liên vùng. |
+| **`PACELC Theorem`**<br/>*(Nếu đứt mạng: chọn A hay C; nếu mạng bình thường: chọn Latency hay Consistency)* | Mở rộng định lý CAP cho cả 99.99% thời gian **khi mạng KHÔNG bị đứt (`Else`)**: Ngay cả lúc cáp quang bình thường, hệ thống vẫn phải chọn giữa **Trả lời tức thì trong 1ms (`Latency - L`)** hay **Chờ sao chép qua mạng sang các máy khác để dữ liệu luôn chuẩn (`Consistency - C`)**. | • **CockroachDB / Spanner / TiKV (`PC/EC`)**: Đứt mạng chọn `C`, mạng bình thường cũng chọn `C` (chấp nhận tốn vài ms đồng bộ Raft).<br/>• **Cassandra / DynamoDB Eventual Read (`PA/EL`)**: Đứt mạng chọn `A`, mạng bình thường ưu tiên độ trễ cực thấp `L`.<br/>• **MongoDB Replica Set**: Cho phép cấu hình linh hoạt qua `writeConcern` và `readConcern`. |
+| **`Linearizability`**<br/>*(Tính tuyến tính hoá / Nhất quán tức thời theo thời gian thực)* | Cả thế giới như cùng nhìn vào **đúng 1 chiếc bảng đen duy nhất**. Hễ người A vừa đặt phấn xuống viết xong số `1` (hoặc bất kỳ ai đã nhìn thấy số `1` trên bảng) tại lúc `10:00:00.005`, thì từ mili-giây `.006` trở đi, mọi người khác trên Trái Đất nhìn lên bảng bắt buộc phải thấy số `1`! | Mức nhất quán cao cấp trong **etcd, Google Spanner, CockroachDB, TiKV** hoặc **DynamoDB `ConsistentRead=true`**: Bắt buộc phải có khi làm khoá phân tán (*Distributed Lock*), bầu cử Leader, chống trùng tên tài khoản (`UNIQUE`), và giao dịch ngân hàng. |
+| **`Sequential Consistency`**<br/>*(Nhất quán tuần tự)* | Giống như xem truyền hình trực tiếp có độ trễ vài giây: Nhà ở Tokyo có thể xem chậm hơn nhà ở Hà Nội 3 giây, nhưng **thứ tự các bàn thắng trong trận đấu mà cả hai nhà nhìn thấy phải giống hệt nhau 100%** (và tôn trọng thứ tự hành động của từng cầu thủ). | Mô hình đọc từ các **Read Replicas** nhân bản theo một nhật ký chung (**PostgreSQL WAL Streaming, MySQL Binlog, ZooKeeper Async Read**): Người đọc trên Replica có thể thấy dữ liệu trễ vài mili-giây so với Primary, nhưng mọi thay đổi luôn diễn ra theo đúng một trình tự lịch sử duy nhất. |
+| **`Causal Consistency`**<br/>*(Nhất quán nhân quả)* | Trên mạng xã hội: Các bài đăng không liên quan (ảnh con mèo ở VN và ảnh bóng đá ở Brazil) hiện lên theo thứ tự nào cũng được; nhưng **Câu hỏi (`Nguyên nhân`) bắt buộc phải luôn hiện ra trước Câu trả lời (`Kết quả`)** ở mọi nơi trên thế giới! | Mức nhất quán mạnh tối đa mà vẫn sống sót khi đứt mạng (`AP`), được hỗ trợ trong **MongoDB Causal Consistency Sessions** và các hệ thống dùng **Vector Clocks / HLC**: Không bao giờ để người dùng nhìn thấy bình luận trả lời trước khi nhìn thấy bài viết gốc. |
+| **`Session Guarantees`**<br/>*(Read-Your-Writes, Monotonic Reads, Monotonic Writes, Writes-Follow-Reads)* | 4 quyền lợi tối thiểu của **một người dùng trong phiên đăng nhập của chính họ**:<br/>1. *Read-Your-Writes*: Tự sửa tên mình xong bấm F5 phải thấy ngay tên mới.<br/>2. *Monotonic Reads*: Đã nhìn thấy tin nhắn mới rồi thì bấm F5 không bao giờ được lùi về màn hình cũ lúc chưa có tin nhắn.<br/>3. *Monotonic Writes*: Gửi lệnh sửa nháp rồi lệnh chốt bài thì máy chủ phải chạy đúng thứ tự đó.<br/>4. *Writes-Follow-Reads*: Đọc câu hỏi xong bấm trả lời thì câu trả lời không được chạy trước câu hỏi. | Khi ứng dụng Web/Mobile đặt nhiều **PostgreSQL / MySQL / MongoDB Read Replicas** sau Load Balancer: Lập trình viên phải dùng **Sticky Session** (gắn cố định 1 user vào 1 Replica) hoặc truyền kèm vị trí log `last_seen_lsn / clusterTime` để tránh lỗi "F5 xong thấy mất dữ liệu vừa lưu". |
+| **`Eventual Consistency & Tunable Quorum`**<br/>*(`N, W, R` với `R + W > N` trong Cassandra / DynamoDB)* | Cất bản hợp đồng vào **`N = 3` tủ hồ sơ**. Lúc cất (`Write`), bắt buộc bỏ vào ít nhất **`W = 2` tủ**. Lúc đi tìm đọc (`Read`), bắt buộc mở kiểm tra ít nhất **`R = 2` tủ**. Vì $2 + 2 > 3$, kiểu gì trong 2 tủ mở ra cũng có **ít nhất 1 tủ chứa bản hợp đồng mới nhất**! | Cơ chế **Tunable Quorum** kinh điển của **Apache Cassandra, ScyllaDB, Riak**: Cho phép lập trình viên chọn `ONE` ($W=1, R=1$ — cực nhanh nhưng có thể đọc cũ) hoặc `QUORUM` ($W=2, R=2$ trên $N=3$ — giao nhau chắc chắn). Tuy nhiên muốn đạt *Linearizability* tuyệt đối thì phải bật thêm **Blocking Read Repair** hoặc **Lightweight Transactions (Paxos)**. |
+| **`CRDTs`**<br/>*(Conflict-Free Replicated Data Types: CvRDT vs CmRDT, PN-Counter, LWW-Element-Set)* | Các cấu trúc dữ liệu "tự biết giảng hoà bằng toán học": Dù 3 chi nhánh bị đứt cáp mạng suốt 1 tuần và mỗi nơi tự bấm cộng/trừ lượt Like hoặc thêm/xoá giỏ hàng độc lập, ngay khi nối mạng lại, hàm `merge()` sẽ gộp cả 3 bản về **cùng một kết quả chính xác 100%** mà không mất một thao tác nào! | Được tích hợp sẵn trong **Redis Enterprise (Active-Active Geo-Distribution), Riak DT (Data Types), Azure Cosmos DB, Akka Distributed Data**: Sử dụng `G-Counter / PN-Counter` (tách mảng Cộng và mảng Trừ riêng rồi lấy `max` từng ô) và `LWW-Element-Set / OR-Set` cho tập hợp. |
+
+---
+
 ### 1. Bài toán thực tế & Mental Model: Cái giá vật lý của việc nhân bản dữ liệu (Replication)
 
 Tại sao không lưu toàn bộ dữ liệu trên một máy chủ đơn lẻ cho đơn giản? Bởi vì một máy chủ đơn lẻ không thể chống chịu được hỏng hóc phần cứng (**Fault Tolerance**), không đủ sức phục vụ hàng trăm nghìn lượt đọc mỗi giây (**Read Scalability**), và không thể đặt dữ liệu gần người dùng ở nhiều châu lục để giảm độ trễ mạng (**Data Locality**).
@@ -35,6 +65,14 @@ Tại sao không lưu toàn bộ dữ liệu trên một máy chủ đơn lẻ c
 1. **Consistency (`C` — ở đây được định nghĩa chặt chẽ là `Linearizability` / Atomic Consistency)**: Mọi thao tác đọc trên bất kỳ node nào đều phải trả về giá trị của lần ghi thành công gần nhất theo thời gian thực (hoặc trả về lỗi nếu không thể đảm bảo).
 2. **Availability (`A` — Tính sẵn sàng `100%`)**: Mọi yêu cầu (đọc hoặc ghi) gửi tới một node **không bị sập (non-failing node)** đều bắt buộc phải nhận được một phản hồi hợp lệ (không trả về lỗi huỷ thao tác vì lý do mất liên lạc với các node khác).
 3. **Partition Tolerance (`P` — Khả năng chịu phân mảnh mạng)**: Hệ thống vẫn tiếp tục vận hành ngay cả khi mạng truyền thông giữa các node bị chia cắt thành các phân vùng cô lập làm rơi hoặc trễ toàn bộ gói tin đi qua ranh giới phân vùng.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào đỉnh `Partition Tolerance (P)` của tam giác**: Trong thế giới mạng vật lý thực tế, đứt cáp hay nghẽn Switch giữa các phòng máy là điều chắc chắn xảy ra, nên mọi hệ thống phân tán đều bắt buộc phải neo giữ đỉnh `P`.
+> 2. **Theo dõi hai cạnh nối từ `P` sang `Consistency (C)` và `Availability (A)`**: Khi sự cố đứt mạng (`P`) ập đến, kiến trúc sư chỉ được đi theo 1 trong 2 cạnh này:
+>    - **Cạnh `CP` (`Consistency + Partition Tolerance`)**: Chấp nhận trả lỗi từ chối phục vụ ở nhánh bị mất liên lạc để đảm bảo không ai đọc/ghi sai dữ liệu (ví dụ: CockroachDB, TiKV, etcd, Spanner).
+>    - **Cạnh `AP` (`Availability + Partition Tolerance`)**: Cho phép mọi máy còn sống tiếp tục nhận lệnh Đọc/Ghi độc lập dù đang đứt cáp, chấp nhận dữ liệu giữa hai nhánh tạm thời lệch nhau (ví dụ: Cassandra, Dynamo, Riak).
+> 3. **Kết quả ở cạnh đáy `CA` (Không có `P`)**: Chỉ tồn tại khi hoàn toàn không có mạng phân tán (tức cơ sở dữ liệu chạy trên `1` máy chủ đơn lẻ như PostgreSQL/MySQL Single-Node).
 
 ![Sơ đồ Định lý CAP](./images/cap-theorem.svg "Sự đánh đổi giữa Consistency, Availability và Partition Tolerance trong định lý CAP")
 *Hình 11.1: Ba đỉnh của Định lý CAP: khi xảy ra Network Partition (P), hệ thống buộc phải chọn giữa Consistency (CP) và Availability (AP)*
@@ -83,6 +121,12 @@ Rất nhiều kỹ sư nhầm lẫn hai khái niệm cùng viết tắt là ch�
 
 Các mô hình Consistency phân tán được xếp từ **Nghiêm ngặt nhất (dễ lập trình nhất cho ứng dụng, nhưng đắt đỏ nhất về độ trễ mạng)** xuống **Lỏng lẻo nhất (tốc độ cực nhanh, luôn sẵn sàng, nhưng đẩy gánh nặng xử lý dữ liệu cũ về phía ứng dụng)**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn theo chiều mũi tên từ đỉnh xuống đáy (`1 -> 2 -> 3 -> 4 -> 5`)**: Càng ở tầng trên cùng, dữ liệu càng "chuẩn tức thì" nhưng tốc độ ghi càng chậm (do các máy chủ phải chờ nhau qua mạng); càng xuống tầng dưới, tốc độ phản hồi càng nhanh và luôn sẵn sàng nhưng người đọc có thể nhìn thấy dữ liệu trễ vài giây.
+> 2. **Theo dõi bước chuyển từ tầng `1 (Linearizability)` xuống tầng `2 (Sequential)` và `3 (Causal)`**: Tầng `1` bắt buộc bám chặt đồng hồ thời gian thực toàn cầu; tầng `2` bỏ yêu cầu đồng hồ thực nhưng giữ chung một cuốn lịch sử toàn cục; tầng `3` chỉ giữ thứ tự cho những sự kiện có quan hệ Nguyên nhân — Kết quả (`A -> B`).
+> 3. **Kết quả ở tầng `4 (Session)` và tầng `5 (Eventual / CRDTs)`**: Tầng `4` đảm bảo từng người dùng đơn lẻ không gặp hiện tượng "ma ám" khi bấm F5, còn tầng `5` đảm bảo mọi máy chủ cuối cùng sẽ tự động hội tụ về cùng một kết quả.
+
 ```mermaid
 flowchart TD
     L["1. Linearizability (Strong / Atomic / External Consistency)<br/>Ảo giác 1 bản sao duy nhất + Bám chặt Đồng hồ Thời gian thực (Real-time)"] --> S["2. Sequential Consistency<br/>Thứ tự toàn cục chung (Global Order) + Tôn trọng Program Order<br/>(Không bắt buộc khớp đồng hồ thời gian thực giữa các Client độc lập)"]
@@ -109,6 +153,15 @@ Hệ thống phân tán dù có `100` bản sao (Replicas) ở bên dưới như
 #### Ví dụ chạy tay trên Biểu đồ Trục thời gian (Timeline Diagram)
 
 Giả sử giá trị ban đầu của biến `x` là **`0`**. Hãy quan sát hai biểu đồ thời gian thực dưới đây (trong đó mỗi đoạn thẳng `|--- Op ---|` biểu diễn khoảng thời gian từ lúc Client bắt đầu gọi hàm qua mạng cho tới lúc hàm trả kết quả về, và dấu `*` là điểm thực thi nguyên tử *Linearization Point*):
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Cách đọc biểu đồ thanh ghi Không gian — Thời gian):**
+> 1. **Hiểu ý nghĩa của đoạn thẳng `|----- Op -----|`**: Vạch đứng đầu tiên `|` là lúc ứng dụng **bắt đầu bấm nút gửi lệnh** qua mạng (*Invocation*); vạch đứng cuối cùng `|` là lúc ứng dụng **nhận được kết quả trả về** (*Completion*). Vì gói tin đi qua mạng mất vài mili-giây, mọi lệnh Đọc/Ghi đều là một **khoảng thời gian có độ dài** chứ không phải một chấm tức thời!
+> 2. **Tìm dấu hoa thị `*` (`Linearization Point`) bên trong mỗi thanh**: Linearizability quy định rằng trong khoảng từ lúc gửi đến lúc nhận của mỗi lệnh, phải chọn ra được đúng 1 khoảnh khắc nguyên tử `*` mà lệnh đó thực sự phát huy tác dụng.
+> 3. **Dóng thẳng hàng các dấu `*` từ trái sang phải theo trục thời gian**:
+>    - Dấu `*` của `Client D` nổ ra đầu tiên (khi `A` chưa kịp chạm tới dấu `*` của mình) $\implies$ `D` đọc được giá trị ban đầu `0` là hoàn toàn hợp lệ!
+>    - Tiếp theo, dấu `*` của `Client A` nổ ra, đổi biến `x` thành `1`.
+>    - Kể từ vạch của dấu `*` trên `Client A` trở về bên phải, dấu `*` của cả `Client B` và `Client C` đều nằm sau nên bắt buộc phải đọc ra `1`!
 
 ```text
 TRƯỜNG HỢP 1: HỢP LỆ — ĐẠT LINEARIZABILITY (Điểm nguyên tử * xếp thành 1 hàng thẳng tắp theo thời gian thực)
@@ -160,6 +213,12 @@ Hãy hình dung tất cả các thao tác của mọi Client vẫn được xế
 Hãy xét kịch bản: Ban đầu biến `x = 0`.
 - **`Client A`** thực hiện tuần tự 2 lệnh theo **Program Order**: ghi `Write(x = 1)` rồi sau đó ghi `Write(x = 2)`.
 - **`Client B`** và **`Client C`** là hai người đọc liên tục kiểm tra giá trị của `x`.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào dòng `Client A (Writer)` ở trên cùng**: `Client A` lần lượt viết `x = 1`, rồi một lúc sau viết tiếp `x = 2`. Thứ tự lịch sử do `A` tạo ra là: `0 -> 1 -> 2`.
+> 2. **Theo dõi lệnh `Read(x) -> 0` đầu tiên của `Client B`**: Nếu xét theo đồng hồ thời gian thực (dóng thẳng từ trên xuống), `Client B` bắt đầu đọc sau khi `Client A` đã ghi xong `x = 1`, nhưng `B` vẫn nhận được số cũ `0` (do Replica của `B` nhận bản sao chậm vài mili-giây) $\implies$ Không đạt Linearizability.
+> 3. **Kết quả kiểm tra Sequential Consistency trên cả `Client B` và `Client C`**: Hãy đọc dãy kết quả từ trái sang phải của `Client B` (`0 -> 1 -> 2`) và của `Client C` (`0 -> 1 -> 2`). Cả hai người đọc đều xem đúng một cuốn phim biến đổi theo thứ tự `0 ===> 1 ===> 2` mà không ai bị nhảy cóc hay đảo lộn thứ tự `2` trước `1` $\implies$ **Đạt chuẩn Sequential Consistency**!
 
 ```text
 TRƯỜNG HỢP 1: ĐẠT SEQUENTIAL CONSISTENCY (nhưng KHÔNG đạt Linearizability)
@@ -214,6 +273,12 @@ Xét 3 sự kiện:
 - **`R`**: Bình đọc thấy `Q`, rồi đăng câu trả lời (`Reply("Của tôi!")`). Do đó ta có quan hệ nhân quả bắt buộc: **`Q -> R`**.
 - **`C`**: Cường ở một nhóm khác đăng một thông báo độc lập (`Post("Trời mưa to quá!")`), không hề đọc `Q` hay `R`. Do đó **`C || Q`** và **`C || R`**.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào phần trên đường kẻ ngang**: Có một mũi tên nhân quả nối từ lúc `Client An` ghi câu hỏi **`Q`** sang lúc `Client Bình` đọc `Q` rồi ghi câu trả lời **`R`** (`Q -> R`). Trong khi đó, dòng `Client Cường` ghi **`C`** ("Trời mưa!") hoàn toàn đứng riêng, không có mũi tên nào nối với `Q` hay `R`.
+> 2. **Theo dõi 3 dòng `Replica 1, 2, 3` ở phần dưới**: Hãy kiểm tra vị trí của `[Q]` và `[R]` — dù thông báo độc lập `[C]` có chen vào cuối (`[Q] -> [R] -> [C]`), chen vào đầu (`[C] -> [Q] -> [R]`), hay chen vào giữa (`[Q] -> [C] -> [R]`), thì **câu hỏi `[Q]` luôn luôn xuất hiện trước câu trả lời `[R]`** nên cả 3 Replica đều hợp lệ (`✅`)!
+> 3. **Kết quả ở dòng cuối `Replica 4 (Lỗi!)`**: Do gói tin của `[R]` bay qua mạng tới `Replica 4` nhanh hơn gói tin của `[Q]`, `Replica 4` cho hiển thị câu trả lời **`[R]` trước câu hỏi `[Q]`** $\implies$ Đảo ngược nhân quả, **vi phạm Causal Consistency (`❌`)**!
+
 ```text
 Biểu đồ kiểm tra tính đúng đắn của Causal Consistency trên các Replica:
 
@@ -263,6 +328,12 @@ Nếu không cần tới chi phí đắt đỏ của Linearizability giữa nh�
 - **Kịch bản lỗi thực tế nếu vi phạm**:
   Người dùng vừa cập nhật mật khẩu mới hoặc sửa tên hiển thị trên trang Hồ sơ cá nhân rồi bấm *"Lưu"* (lệnh ghi đi vào `Primary DB`). Trình duyệt tự động tải lại trang để hiển thị thông tin mới, nhưng Load Balancer lại điều hướng lệnh `SELECT` đó sang `Replica 2` (nơi chưa nhận được bản cập nhật từ Primary). Màn hình vẫn hiện tên cũ! Người dùng hoang mang tưởng mình chưa bấm nút Lưu nên bấm lặp lại nhiều lần.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Theo dõi mũi tên `1. UPDATE bio = "Senior Engineer"`**: Người dùng gửi lệnh sửa hồ sơ vào máy chủ chính `Primary DB`.
+> 2. **Theo dõi mũi tên `2. F5 tải lại trang` và đường truyền dọc `(Đang đồng bộ chậm...)`**: Ngay khi người dùng tải lại trang để xem thành quả, lệnh đọc `SELECT bio` bị điều hướng sang máy phụ `Replica 2` trong lúc bản cập nhật từ `Primary DB` vẫn còn đang trên đường bay xuống `Replica 2`.
+> 3. **Kết quả ở mũi tên `3`**: `Replica 2` trả về chức danh cũ `"Intern"`, làm người dùng tưởng hệ thống bị hỏng không lưu được dữ liệu của chính mình!
+
 ```text
 Minh hoạ lỗi khi VI PHẠM Read-Own-Writes:
   [User Session A] --- 1. UPDATE bio = "Senior Engineer" ---> [Primary DB] (Đã lưu bio mới)
@@ -285,6 +356,12 @@ Minh hoạ lỗi khi VI PHẠM Read-Own-Writes:
 - **Định nghĩa**: Nếu trong một Session, người dùng tại thời điểm $t_1$ đã đọc và nhìn thấy giá trị $v_2$ của dữ liệu, thì tại mọi lần đọc tiếp theo $t_2 > t_1$, người dùng đó **không bao giờ được phép nhận lại giá trị cũ hơn $v_1$** (với $v_1$ là phiên bản trước của $v_2$).
 - **Kịch bản lỗi thực tế nếu vi phạm**:
   Người dùng mở hộp thư chat: lần đầu tải trang, truy vấn rơi vào **`Replica 1` (đã đồng bộ mới nhất)** nên nhìn thấy tin nhắn mới của sếp vừa gửi: *"Chiều nay họp lúc 14:00 nhé"*. Người dùng bấm F5 làm mới trang, lần này Load Balancer theo kiểu *Round-Robin* lại đẩy truy vấn sang **`Replica 2` (đang bị trễ Replication Lag `5` giây)** — tin nhắn của sếp đột nhiên **biến mất hoàn toàn khỏi màn hình** như chưa từng tồn tại!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào dòng đầu tiên (`Tại t = 1s`)**: Người dùng đọc trúng `Replica 1` đang ở mốc nhật ký mới `LSN = 500`, nên đã nhìn thấy tận mắt tin nhắn mới `v₂`.
+> 2. **Theo dõi dòng thứ hai (`Tại t = 2s`)**: Một giây sau, người dùng bấm làm mới trang nhưng bị chuyển sang `Replica 2` đang tụt hậu ở mốc nhật ký cũ `LSN = 480`.
+> 3. **Kết quả**: Màn hình của người dùng bị "quay ngược thời gian" về trạng thái cũ `v₁`, làm tin nhắn `v₂` vừa đọc được bỗng dưng biến mất!
 
 ```text
 Minh hoạ lỗi khi VI PHẠM Monotonic Reads:
@@ -376,6 +453,12 @@ Hãy chạy tay từng bước trên một cụm gồm **3 Replica: `Node A` (v�
 
 **Bảng chạy tay từng bước PN-Counter trên 3 Node (`A, B, C`)**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào trạng thái khởi tạo ở dòng trên cùng**: Mỗi máy chủ giữ 2 mảng 3 ô: mảng `P = [0, 0, 0]` chuyên ghi số lần Cộng, và mảng `N = [0, 0, 0]` chuyên ghi số lần Trừ.
+> 2. **Theo dõi mục `1` (Lúc đứt mạng)**: Mỗi node chỉ được sửa đúng vị trí cột của mình (`Node A` sửa cột 1, `Node B` sửa cột 2, `Node C` sửa cột 3). Ví dụ `Node B` cộng `2` rồi trừ `3` thì ghi `P_B = [0, 2, 0]` và `N_B = [0, 3, 0]` (lưu ý: số lần trừ được lưu thành số dương `+3` trong mảng `N`!).
+> 3. **Kết quả ở mục `2` và `3` (Khi nối mạng gọi `merge()`)**: Hệ thống gộp riêng mảng `P` bằng phép `max` từng cột ra `[5, 2, 4]` (tổng cộng = `11`), và gộp riêng mảng `N` bằng phép `max` từng cột ra `[1, 3, 0]` (tổng trừ = `4`). Lấy `11 - 4 = 7`, khớp tuyệt đối 100% với tổng thực tế của cả 3 máy!
+
 ```text
 Trạng thái khởi tạo trên cả 3 node:
   P = [0, 0, 0],  N = [0, 0, 0]   ===>  Giá trị = sum(P) - sum(N) = 0 - 0 = 0
@@ -446,6 +529,12 @@ Nếu có tất cả **$N$ chiếc ghế** (tương ứng $N$ Replica), trong l�
 $$R + W > N$$
 thì theo toán học tập hợp, **tập hợp $W$ node vừa được ghi và tập hợp $R$ node được đọc lên BẮT BUỘC phải đè lên nhau (giao nhau) tại ít nhất $1$ node!** Node giao nhau đó chính là "nhân chứng sống" giữ phiên bản dữ liệu mới nhất (mang nhãn `timestamp / version` cao nhất) giúp Coordinator nhận diện đâu là dữ liệu mới!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào `Write Client (W = 2)` ở bên trái**: Khi ghi bản mới `ts = 100`, Client gửi tới cả 3 máy nhưng chỉ cần `2` máy đầu tiên (`Replica 1` và `Replica 2`) xác nhận xong là báo thành công (gói tin sang `Replica 3` bị trễ nên `Replica 3` vẫn giữ bản cũ `ts = 50`).
+> 2. **Theo dõi `Read Coordinator (R = 2)` ở bên phải**: Khi có người vào đọc với `R = 2`, giả sử Coordinator hỏi trúng `Replica 2` và `Replica 3`. Nhờ $R + W = 2 + 2 = 4 > 3$, tập Đọc `{2, 3}` và tập Ghi `{1, 2}` **bắt buộc giao nhau tại `Replica 2` (ô ở giữa)**!
+> 3. **Kết quả ở hộp dưới cùng**: `Read Coordinator` nhận về cả bản mới (`ts = 100` từ `Replica 2`) lẫn bản cũ (`ts = 50` từ `Replica 3`). Nó chỉ việc so sánh `100 > 50` để trả `"Bản mới"` về cho khách, đồng thời tiện tay gửi lệnh **Read Repair** sang cập nhật lại cho `Replica 3`!
+
 ```mermaid
 flowchart LR
     subgraph Cluster["Replication Factor N = 3"]
@@ -492,6 +581,12 @@ Hãy chạy tay từng mili-giây kịch bản dưới đây trên 3 node **`Rep
 | **`t = 30 ms`** | **`Reader 1`** thực hiện lệnh `Read(x)` với **`R = 2`**, tình cờ hỏi trúng cặp **`{Replica A, Replica B}`**:<br/>• Nhận từ `A`: `(x = 1, ts = 2)`<br/>• Nhận từ `B`: `(x = 0, ts = 1)`<br/>So sánh `ts = 2 > ts = 1`, Coordinator trả kết quả **`x = 1`** về cho `Reader 1` hoàn tất tại `t = 40 ms`! *(Giả sử Read Repair chạy bất đồng bộ ở nền nên chưa kịp sửa `B`)*. | **`x = 1` (`ts=2`)** | `x = 0` (`ts=1`)<br/>*(Chưa được sửa đồng bộ!)* | `x = 0` (`ts=1`) | **Tại `t = 40 ms`: Thế giới bên ngoài (`Reader 1`) ĐÃ NHÌN THẤY giá trị mới `x = 1`!** Theo định nghĩa Linearizability, mọi lệnh đọc bắt đầu sau `t = 40 ms` bắt buộc phải thấy `x = 1`! |
 | **`t = 50 ms` (LỖI XẢY RA!)** | **`Reader 2`** bắt đầu gọi lệnh `Read(x)` lúc `t = 50 ms` (**SAU KHI `Reader 1` đã hoàn tất đọc ra `1`**), cũng với **`R = 2`**, nhưng tình cờ hỏi trúng cặp **`{Replica B, Replica C}`**:<br/>• Nhận từ `B`: `(x = 0, ts = 1)`<br/>• Nhận từ `C`: `(x = 0, ts = 1)`<br/>Cả hai đều trả về `0`, nên Coordinator trả kết quả **`x = 0`** về cho `Reader 2` lúc `t = 60 ms`! | **`x = 1` (`ts=2`)** | `x = 0` (`ts=1`) | `x = 0` (`ts=1`) | **💥 VI PHẠM LINEARIZABILITY!**<br/>`Reader 2` bắt đầu đọc sau khi `Reader 1` đã cầm trên tay kết quả `x = 1`, nhưng `Reader 2` lại đọc ra giá trị quá khứ `x = 0`! |
 | **`t = 90 ms`** | Gói tin ghi của `Writer` cuối cùng cũng bay tới `Replica B` (đủ `W = 2`, lệnh Write hoàn tất). | **`x = 1` (`ts=2`)** | **`x = 1` (`ts=2`)** | `x = 0` (`ts=1`) | Dù lúc này Write hoàn tất, sự cố đọc lùi thời gian ở `t = 50 ms` đã xảy ra! |
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào thanh `Writer` kéo dài từ `t = 10ms` đến `t = 90ms`**: Trong suốt khoảng thời gian này, lệnh ghi `x = 1` mới chỉ chạm tới `Replica A` (lúc `12ms`), còn gói tin đi tới `Replica B` và `C` vẫn đang bay lơ lửng trên mạng.
+> 2. **Theo dõi `Reader 1` (`t = 30ms -> 40ms`)**: Vì hỏi cặp `{A, B}`, `Reader 1` thấy `x = 1` trên `A` nên nhận kết quả **`1`** tại `t = 40ms`.
+> 3. **Phát hiện điểm gãy Linearizability ở `Reader 2` (`t = 50ms -> 60ms`)**: `Reader 2` bắt đầu đọc lúc `t = 50ms` (sau khi `Reader 1` đã cầm kết quả `1` trên tay từ lúc `40ms`), nhưng vì hỏi cặp `{B, C}` khi gói tin ghi chưa bay tới `B`, `Reader 2` lại nhận về kết quả cũ **`0`**! Để vá lỗ hổng này, `Reader 1` ở bước trước bắt buộc phải chờ chép `x = 1` sang `B` xong (**Blocking Read Repair**) rồi mới được trả kết quả ra ngoài.
 
 ```text
 Biểu đồ Trục thời gian minh hoạ sự vi phạm Linearizability của Quorum (N=3, W=2, R=2):

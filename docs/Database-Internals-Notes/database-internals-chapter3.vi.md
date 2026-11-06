@@ -7,6 +7,7 @@ tags: ["database-internals", "storage-engine", "file-formats", "slotted-page"]
 ---
 
 ## Table of Contents
+0. [Khởi động cho người mới: Hành trình từ câu lệnh INSERT đến mảng Byte trên đĩa](#beginner-warmup)
 1. [Binary Encoding (Mã hóa nhị phân: Endianness, Varint, String, Null Bitmap)](#binary-encoding)
 2. [Cấu trúc Page tổng quát và Slotted Pages](#slotted-pages)
 3. [Ví dụ chạy tay (Step-by-Step Dry Run): Vòng đời một Slotted Page 8192 bytes](#slotted-page-dry-run)
@@ -17,9 +18,48 @@ tags: ["database-internals", "storage-engine", "file-formats", "slotted-page"]
 
 ---
 
-Ở Chương 2, cây B+Tree đã được giới thiệu dưới góc nhìn logic gồm các Node và các con trỏ. Tuy nhiên, phần cứng ổ đĩa (HDD/SSD) không hề hiểu khái niệm "Node" hay "Con trỏ" — ổ đĩa chỉ biết đọc và ghi các mảng byte thô theo từng khối cố định gọi là **Page** (`4 KB`, `8 KB` hoặc `16 KB`).
+## Khởi động cho người mới: Hành trình từ câu lệnh INSERT đến mảng Byte trên đĩa {#beginner-warmup}
 
-Chương 3 giải đáp câu hỏi cốt lõi của kỹ thuật chế tạo Storage Engine: **Làm thế nào để đóng gói (serialize) các con số, chuỗi ký tự, giá trị `NULL` và các dòng dữ liệu có độ dài co giãn bất kỳ vào bên trong một mảng `8.192 bytes` của Page sao cho truy xuất nhanh nhất, không bị phân mảnh và không làm gãy các con trỏ chỉ mục?**
+### 1. Ẩn dụ đời thực: Khi câu lệnh `INSERT INTO users VALUES (101, 'Alice', 28)` chạm tới ổ cứng
+Ở Chương 2, cây B+Tree đã được giới thiệu dưới góc nhìn logic gồm các Node và các con trỏ. Tuy nhiên, phần cứng ổ đĩa (HDD/SSD) không hề hiểu khái niệm "Bảng", "Cột", "Node" hay "Con trỏ" — ổ đĩa chỉ biết đọc và ghi các mảng byte thô (`0` và `1`) theo từng khối cố định gọi là **Page** (`4 KB`, `8 KB` hoặc `16 KB`).
+
+Hãy tự hỏi: Khi lập trình viên gõ câu lệnh SQL quen thuộc:
+
+```sql
+INSERT INTO users (id, name, age, bio) VALUES (101, 'Alice', 28, NULL);
+```
+
+Làm thế nào **PostgreSQL** (dùng Page `8 KB = 8.192 bytes`) hay **MySQL InnoDB** (dùng Page `16 KB = 16.384 bytes`) biến 4 cột dữ liệu trừu tượng trên thành các byte nằm gọn trong file trên đĩa?
+
+- **Hãy tưởng tượng mỗi `Page` (`8 KB` / `16 KB`) giống như một Toa tàu chở hàng có đánh số ghế ở đầu toa và chất thùng hàng ở cuối toa (`Slotted Page`)**:
+  1. **Đóng gói từng món hàng vào một chiếc Hộp kín (`Cell / Tuple` — Mã hóa nhị phân)**:
+     - Trước khi đưa lên toa tàu, nhân viên đóng gói phải ép 4 giá trị `(101, 'Alice', 28, NULL)` thành một dãy byte liên tục gọn nhất có thể:
+     - Cột `bio` là `NULL`? Thay vì tốn chỗ ghi chữ `"NULL"`, nhân viên chỉ cần bật `1 bit` trên tờ phiếu kiểm kê ở nắp hộp (**`Null Bitmap`**) để báo *"Cột thứ 4 trống!"*, và không tốn thêm bất kỳ byte nào cho `bio`!
+     - Con số `id = 101` và `age = 28` được dịch sang mã nhị phân cố định (`4 bytes`), còn chữ `'Alice'` là chuỗi co giãn (**`Variable-Size Field`**) nên được ghi kèm con số báo độ dài `5 bytes` ở phía trước.
+  2. **Xếp hộp hàng vào cuối toa tàu và ghi sổ mục lục ở đầu toa (`Slotted Page`)**:
+     - Thay vì xếp các hộp hàng nối đuôi nhau từ đầu toa (vì nếu hành khách ở giữa hủy vé `DELETE` hoặc đổi sang hộp hàng to hơn `UPDATE`, cả đoàn tàu sẽ phải khuân vác dịch chuyển lại hàng trăm hộp hàng phía sau!), kỹ sư Database dùng một mẹo cực kỳ thông minh:
+     - **Ở đầu toa tàu (ngay sau buồng lái `Page Header`)**: Đặt một **Bảng danh sách số thứ tự ngăn (`Line Pointer / Slot Offset Array`)** mọc dần từ trái sang phải. Mỗi ô trong bảng này chỉ tốn `2 – 4 bytes` để ghi tọa độ: *"Hộp hàng số 1 đang đặt ở mét thứ `8050` dưới cuối toa"*.
+     - **Ở cuối toa tàu**: Các hộp hàng thực tế (`Cells / Tuples`) được **chất chồng từ đáy toa ngược lên phía đầu toa**.
+     - Nhờ vậy, khoảng trống ở chính giữa toa tàu luôn là một vùng trống liền mạch. Nếu hộp hàng số 1 bị xóa hoặc dời chỗ, nhân viên chỉ việc sửa lại con số tọa độ trong Bảng danh sách ở đầu toa mà không làm xáo trộn địa chỉ của các hộp hàng khác!
+  3. **Nếu gặp một kiện hàng siêu trường siêu trọng 40 KB (`Overflow Page / TOAST`)**:
+     - Toa tàu chỉ dài `8 KB`, không thể nhét vừa một bài báo dài `40 KB`. Hệ thống sẽ tự động nén bài báo đó lại, cắt thành các kiện nhỏ `2 KB` đem cất sang một **toa tàu phụ chuyên chở hàng quá khổ (`Overflow Page / TOAST Table`)**, rồi chỉ để lại trong toa chính một **tấm vé gửi đồ nhỏ xíu (`18 bytes` TOAST Pointer)** ghi địa chỉ các kiện hàng kia!
+
+---
+
+### 2. Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+Trước khi đi vào chi tiết từng bit và byte của Chương 3, người đọc hãy nắm nhanh 8 thuật ngữ nền tảng qua bảng đối chiếu dưới đây:
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database thực tế (PostgreSQL / MySQL InnoDB / SQLite) là gì? |
+| :--- | :--- | :--- |
+| **`Primitive Serialization & Endianness` (`Big-Endian` vs `Little-Endian`)** | Cách viết một con số nhiều chữ số ra giấy: viết từ hàng lớn nhất xuống hàng đơn vị (`Big-Endian`) hay viết ngược từ hàng đơn vị lên (`Little-Endian`). | CPU `x86_64`/`ARM64` lưu số trong RAM theo `Little-Endian`, nhưng khi lưu khóa Index xuống đĩa (InnoDB, RocksDB), hệ thống thường đổi sang **`Big-Endian`** để hàm `memcmp` so sánh từng byte từ trái sang phải đúng thứ tự lớn nhỏ ngay lập tức. |
+| **`Page / Slotted Page`** | "Toa tàu hai đầu": đầu trên chứa bảng danh sách chỉ mục nhỏ gọn mọc đi xuống, đầu dưới chứa các kiện hàng dữ liệu mọc đi lên, ở giữa là khoảng trống. | Cấu trúc trang chuẩn mực của hầu hết RDBMS: trang `8 KB` của PostgreSQL và trang `16 KB` của MySQL InnoDB đều là các biến thể của **Slotted Page**. |
+| **`Page Header`** | "Bảng thông tin buồng lái" ở ngay đầu mỗi trang, ghi số hiệu trang, loại trang, mã kiểm tra lỗi và vị trí ranh giới vùng trống. | Trong PostgreSQL là `PageHeaderData` (`24 bytes` đầu trang: `pd_lsn`, `pd_checksum`, `pd_lower`, `pd_upper`); trong InnoDB là `FIL Header` (`38 bytes`) + `INDEX Header` (`36 bytes`). |
+| **`Line Pointer / Offset Array` (Mảng con trỏ vị trí)** | "Bảng sơ đồ ngăn tủ" ở đầu trang: mỗi ô đánh số thứ tự `0, 1, 2...` và chỉ lưu số byte (`offset`) dẫn tới vị trí thực của dòng dữ liệu dưới đáy trang. | Trong PostgreSQL gọi là mảng **`ItemIdData` (`Line Pointers`, `4 bytes`/ô)**; trong SQLite gọi là **`Cell Pointer Array` (`2 bytes`/ô)**; trong InnoDB là **`Page Directory`**. |
+| **`Cell / Tuple` (Bản ghi nhị phân)** | "Chiếc hộp hàng đã đóng gói kín": một dòng dữ liệu sau khi đã ép tất cả các cột thành một dãy byte liên tiếp đặt ở đáy trang. | Sách *Database Internals* và SQLite gọi là **`Cell`**; PostgreSQL gọi là **`Heap Tuple` / `Index Tuple`**; MySQL InnoDB gọi là **`Record`** (`Compact` / `Dynamic` record format). |
+| **`Null Bitmap` (Mảng bit đánh dấu cột `NULL`)** | "Phiếu tích chọn `NULL`": một dãy công tắc mà mỗi cột chỉ tốn đúng `1 bit` (`1` = cột này bị `NULL`, `0` = có dữ liệu). Cột nào `NULL` thì khỏi cần đóng gói. | Nằm ngay phần đầu của mỗi `Tuple/Record` trong cả PostgreSQL (`t_bits`) và MySQL InnoDB (`Nullable field bitmap`), giúp các cột `NULL` tốn **`0 byte`** ở vùng dữ liệu. |
+| **`Variable-Size Fields` (Trường độ dài thay đổi)** | Các món hàng co giãn như tên người, địa chỉ, chuỗi JSON (`VARCHAR`, `TEXT`) — bắt buộc phải ghi kèm chiều dài thực tế ở đầu bản ghi. | PostgreSQL dùng cấu trúc `varlena` (ghi độ dài ở đầu trường); InnoDB gom danh sách độ dài các cột `VARCHAR` đặt ở đầu Record (`Variable field lengths` `1–2 bytes`/cột). |
+| **`Overflow Page / TOAST` (Trang tràn cho dữ liệu siêu lớn)** | "Kho gửi đồ quá khổ": khi một cột văn bản/ảnh quá to không nhét vừa trang chính, hệ thống cắt nhỏ đem cất sang trang phụ và chỉ giữ lại tấm vé hẹn `18–20 bytes`. | PostgreSQL gọi là **`TOAST`** (*The Oversized-Attribute Storage Technique* — kích hoạt khi dòng `> 2 KB`); MySQL InnoDB gọi là **`Off-Page / Overflow Pages`** (`20-byte BOB pointer`); SQLite gọi là **`Overflow Pages`**. |
 
 ---
 
@@ -36,6 +76,14 @@ Giả sử lưu dòng dữ liệu `{"id": 1000000, "active": true, "name": "Alic
 
 ### 1. Số nguyên kích thước cố định (Fixed-Width Integers) & Thứ tự Byte (`Endianness`)
 Các số nguyên có kích thước cố định (`INT8 = 1 byte`, `INT16 = 2 bytes`, `INT32 = 4 bytes`, `INT64 = 8 bytes`) khi trải ra mảng byte trong bộ nhớ hoặc trên đĩa có thể xếp theo hai thứ tự ngược nhau:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai thanh ngang `"one 32-bit integer"` ở phía trên**: Số nguyên 32-bit `0x0A0B0C0D` gồm 4 byte: byte lớn nhất (MSB) là `0A` (bên trái) và byte nhỏ nhất (LSB) là `0D` (bên phải).
+> 2. **Theo dõi các mũi tên đi vào cột bộ nhớ dọc (`a, a+1, a+2, a+3`) ở hai nửa hình**:
+>    - **Bên trái (`Little-endian`)**: Các mũi tên bắt chéo ngược — byte nhỏ nhất `0D` được xếp vào ô địa chỉ đầu tiên `a`, còn byte lớn nhất `0A` bị đẩy xuống cuối ở `a+3` (`0D -> 0C -> 0B -> 0A`).
+>    - **Bên phải (`Big-endian`)**: Các mũi tên đi thẳng theo đúng thứ tự tự nhiên — byte lớn nhất `0A` nằm ngay ở ô đầu tiên `a`, tiếp theo là `0B`, `0C`, `0D`.
+> 3. **Kết quả**: Khi so sánh hai khóa từ địa chỉ đầu tiên `a` trở đi bằng hàm `memcmp`, chỉ có **`Big-endian`** mới so sánh byte hàng triệu (`0A`) trước byte hàng đơn vị (`0D`), đảm bảo kết quả so sánh byte trùng khớp 100% với thứ tự lớn nhỏ của con số!
 
 ![So sánh thứ tự lưu trữ byte 32-bit giữa Big-Endian và Little-Endian](./images/endianness-32bit.svg)
 
@@ -156,6 +204,25 @@ Giả sử có một Page `8 KB` (`8.192 bytes`). Nếu thiết kế theo cách 
    - **Các `Data Cells (Tuples)`** chứa dữ liệu thật được xếp từ đáy trang và **mọc từ dưới đáy đi lên trên** (con trỏ ranh giới **`upper`** giảm dần).
    - Khoảng không gian nằm giữa `lower` và `upper` chính là **Vùng trống liên tục (`Contiguous Free Space`)**!
 
+Trước khi đi vào chi tiết bên trong phần ruột trang, hãy quan sát bộ khung vật lý tổng quát của một **Page `16 KB` (`16.384 bytes`)** thực tế trong **MySQL InnoDB**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào cột mốc tọa độ byte ở mép trái (`0`, `38`, `16376`, `16384`)**: Toàn bộ một Page của InnoDB là một mảng byte dài đúng `16.384 bytes` (`16 KB`), được bọc giữa hai lớp vỏ bảo vệ ở đầu và cuối.
+> 2. **Theo dõi 3 phân vùng từ trên xuống dưới**:
+>    - **Đầu trang (`Byte 0 .. 38` — `FIL Header` dài `38 bytes`)**: Ghi số hiệu trang (`Page Number`), con trỏ nối trang trước/sau, loại trang và mã kiểm tra lỗi `Checksum`.
+>    - **Thân trang ở giữa (`Byte 38 .. 16376` — `Total usable space: 16,338 bytes`)**: Toàn bộ không gian `16.338 bytes` ở giữa dành cho tiêu đề chỉ mục, dữ liệu bản ghi (`Cells/Records`) và mảng con trỏ (`Page Directory`).
+>    - **Đáy trang (`Byte 16376 .. 16384` — `FIL Trailer` dài `8 bytes`)**: Lưu mã `Checksum` và `LSN` ở 8 byte cuối cùng để đối chiếu với `FIL Header` ở đầu trang — nếu đầu trang và cuối trang không khớp nhau, InnoDB phát hiện ngay trang này bị ghi dở dang do mất điện (**Torn Page**)!
+> 3. **Kết quả**: Bất kỳ loại trang nào trên đĩa cũng luôn có phần Header ở đỉnh và phần kiểm tra toàn vẹn, còn vùng `Payload` ở giữa mới được tổ chức theo cấu trúc **Slotted Page** như sơ đồ ngay bên dưới.
+
+![Cấu trúc tổng quan một Page 16 KB trong MySQL InnoDB](./images/innodb-basic-page.png "Cấu trúc vật lý một Page 16 KB trong MySQL InnoDB với FIL Header (38 bytes), Payload ở giữa và FIL Trailer (8 bytes) chứa Checksum ở cuối trang — Nguồn: Jeremy Cole")
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khối `1. Page Header` và `2. Slot Array` ở đỉnh trang**: Mảng các ô mục lục `Slot 0, Slot 1, Slot 2` xuất phát từ byte `24` và **mọc dài xuống dưới** theo mũi tên `lower ↓` mỗi khi có thêm dòng dữ liệu mới.
+> 2. **Nhìn vào khối `4. Variable-Size Data Cells` ở đáy trang (`8192`)**: Các hộp dữ liệu thực tế `Cell 0, Cell 1, Cell 2` được xếp từ đáy trang `8192` và **chất cao dần lên trên** theo mũi tên `upper ↑`.
+> 3. **Kết quả ở khối `3. Free Space` chính giữa**: Nhờ hai đầu mọc ngược chiều nhau, toàn bộ khoảng trống chưa sử dụng được gom lại thành một khối liên tục duy nhất có kích thước đúng bằng `upper - lower`. Khi `upper` chạm vào `lower` nghĩa là trang đã đầy!
+
 ```mermaid
 flowchart TD
     subgraph SlottedPage["Cấu trúc Slotted Page (Kích thước 8 KB = 8192 bytes, đánh địa chỉ 0 .. 8192)"]
@@ -198,6 +265,12 @@ Giả sử chèn 3 bản ghi có kích thước lần lượt là:
 
 **Trạng thái Page sau Bước 1**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hàng trên (`Byte 0 .. 36` — Đầu trang)**: Sau `Page Header (0..24)`, ba ô mục lục `Slot[0]`, `Slot[1]`, `Slot[2]` mọc từ trái sang phải, đẩy ranh giới `lower` từ `24` lên **`36`**.
+> 2. **Nhìn vào hàng dưới (`Byte 7500 .. 8192` — Đáy trang)**: Ba bản ghi thực tế `Cell 0 (192B)`, `Cell 1 (200B)`, `Cell 2 (300B)` lại được xếp **từ phải sang trái (từ đáy `8192` lùi về `7500`)**, kéo ranh giới `upper` tụt xuống **`7500`**.
+> 3. **Kết quả**: Khoảng giữa từ byte `36` đến `7500` hoàn toàn trống (`7.464 bytes`), và mỗi `Slot[i]` ở hàng trên đều ghi chính xác tọa độ `off` nơi `Cell i` bắt đầu ở hàng dưới.
+
 ```text
 [Bước 1: Sau khi INSERT 3 bản ghi — lower = 36, upper = 7500, Free Space = 7464 bytes]
 Byte 0        24               28               32               36
@@ -226,6 +299,12 @@ Khi người dùng chạy lệnh xóa bản ghi thứ hai (`TID = (Page, Slot 1)
 - Hệ thống chỉ cần đánh dấu **`Slot[1] = DEAD (offset = 0, len = 0)`**!
 - Con trỏ `upper` vẫn đứng ở `7500`, còn vùng byte từ `7800..8000` (`200 bytes`) trở thành một **lỗ hổng phân mảnh (Fragmented Hole)** nằm kẹp giữa `Cell 2` và `Cell 0`:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào ô `Slot[1]` ở hàng trên (`Byte 28..32`)**: Khi xóa dòng thứ hai, hệ thống chỉ đổi trạng thái `Slot[1]` thành `** DEAD ** (off=0, len=0)`.
+> 2. **Nhìn xuống đoạn `7800 .. 8000` ở hàng dưới**: Chỗ cũ của `Cell 1` trở thành `[LỖ HỔNG 200B]`, nhưng `Cell 2 (7500..7800)` và `Cell 0 (8000..8192)` ở hai bên vẫn đứng yên tại chỗ.
+> 3. **Kết quả**: Thao tác `DELETE` diễn ra tức thời với chi phí gần như bằng 0, không phải dịch chuyển bất kỳ byte dữ liệu nào của các dòng còn lại.
+
 ```text
 [Bước 2: Sau khi DELETE Slot 1 — Slot[1] đánh dấu DEAD, tạo lỗ hổng 200 bytes ở 7800..8000]
 Byte 0        24               28               32               36
@@ -252,6 +331,12 @@ Giả sử người dùng cập nhật thêm nội dung vào `Record 0` khiến 
   3. **Chỉ cần sửa lại con trỏ bên trong `Slot[0]` thành `(offset = 7200, len = 300)`!**
   4. **Định danh bên ngoài `TID = (Page, Slot 0)` hoàn toàn KHÔNG THAY ĐỔI!** Không một Secondary Index nào bị ảnh hưởng!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn xuống hàng dưới tại đoạn `7200 .. 7500`**: Vì `Cell 0` phình từ `192B` lên `300B` không vừa chỗ cũ `8000..8192`, hệ thống cấp phát vùng mới `7200..7500` cho `Cell 0 Mới` và bỏ lại `[RÁC CŨ 192B]` ở cuối trang.
+> 2. **Nhìn lên ô `Slot[0]` ở hàng trên**: Hệ thống chỉ việc sửa con số tọa độ trong `Slot[0]` từ `off=8000` thành **`off=7200 (MỚI!), len=300`**.
+> 3. **Kết quả**: Mọi cây chỉ mục bên ngoài đang trỏ vào `Slot[0]` vẫn tìm thấy `Cell 0 Mới` chính xác tuyệt đối mà không cần biết nó vừa chuyển nhà từ byte `8000` sang byte `7200`!
+
 ```text
 [Bước 3: Sau khi UPDATE Slot 0 (192B -> 300B) — Ghi vào 7200..7500 và chỉ sửa Slot[0].off = 7200!]
 Byte 0        24               28               32               36
@@ -277,6 +362,12 @@ Sau Bước 3, đáy trang đang có hai vùng rác bị bỏ trống là `7800.
    - Dời **`Cell 0` (`300 bytes`)** nằm ngay sát trên `Cell 2`: từ `7892 - 300 = 7592` đến `7892` $\implies$ cập nhật **`Slot[0].offset = 7592`**.
 3. Cập nhật con trỏ **`upper = 7592`** (thu hồi trọn vẹn `392 bytes` rác vào lại vùng trống liên tục `Free Space`!).
 4. Trong suốt quá trình dồn trang này, `Slot 0` vẫn là `Slot 0`, `Slot 2` vẫn là `Slot 2` (và `Slot 1` đang `DEAD` có thể được tái sử dụng cho lần `INSERT` tiếp theo). **Mọi Secondary Index bên ngoài hoàn toàn không hề hay biết các byte bên dưới đáy Page vừa được sắp xếp lại!**
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn xuống hàng dưới (`Byte 7592 .. 8192`)**: Hai vùng rác `200B` và `192B` đã bị ép sạch; `Cell 2 (300B)` và `Cell 0 (300B)` được dồn sát khít về đáy trang `8192`, giúp ranh giới `upper` rút từ `7200` lên lại **`7592`**.
+> 2. **Nhìn lên `Slot[0]` và `Slot[2]` ở hàng trên**: Tọa độ bên trong hai ô này được cập nhật tương ứng thành `off=7592` và `off=7892`.
+> 3. **Kết quả**: Trang thu hồi lại được toàn bộ `392 bytes` vào vùng trống liên tục ở giữa (`36..7592`) mà không làm đứt gãy bất kỳ con trỏ `TID` nào từ bên ngoài.
 
 ```text
 [Bước 4: Sau khi Page Defragmentation — Thu hồi sạch 392B rác, upper tăng từ 7200 lên lại 7592!]
@@ -316,6 +407,22 @@ Bên trong vùng `Data Cells` ở đáy một Slotted Page của B+Tree, mỗi p
 
 - **Key Cell (Internal Node Cell)**: Chỉ lưu khóa phân tách (`Separator Key`) và địa chỉ trang con (`Child Page ID`). Vì không chứa dữ liệu dòng, một Key Cell chỉ tốn khoảng `12 – 20 bytes`, giúp nhét được hàng ngàn Key Cells vào một Internal Page.
 - **Key-Value Data Cell (Leaf Node Cell / Heap Tuple)**: Lưu trữ khóa chính cùng toàn bộ giá trị các cột của bản ghi (kèm thông tin giao dịch MVCC như `xmin/xmax` hoặc `trx_id/roll_pointer`).
+
+Để thấy rõ cấu trúc một **Data Cell (Record)** trong thực tế, hãy nhìn vào sơ đồ giải phẫu định dạng bản ghi (**`COMPACT` / `DYNAMIC` Record Format**) bên trong **MySQL InnoDB**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Tìm điểm mốc `N` ở mép dưới bên trái (giữa `Next Record Offset (2)` và `(Record Data)`)**: Trong InnoDB, con trỏ bản ghi luôn trỏ thẳng vào điểm mốc `N` này — từ `N` đi xuống dưới là phần nội dung các cột **`(Record Data)`**, còn từ `N` đi ngược lên trên (`N-2`, `N-4`, `N-5`...) là phần **`"Header"`** của bản ghi!
+> 2. **Đọc 2 thanh trên cùng của phần Header**:
+>    - **`Variable field lengths (1-2 bytes per var. field)`**: Danh sách độ dài thực tế của các cột co giãn (`VARCHAR`, `VARBINARY`).
+>    - **`Nullable field bitmap (1 bit per nullable field)`**: Mảng `Null Bitmap` — mỗi cột được phép `NULL` chỉ chiếm đúng `1 bit`. Nếu bit này bật lên `1`, cột đó không tồn tại trong `(Record Data)` ở dưới.
+> 3. **Đọc 5 trường điều khiển từ `N-5` đến `N` (`5 bytes` cố định)**:
+>    - `Info Flags (4 bits)`: Cờ đánh dấu bản ghi đã bị xóa (`deleted flag`) hoặc là bản ghi nhỏ nhất tầng (`min_rec`).
+>    - `Number of Records Owned (4 bits)`: Số bản ghi mà ô này đại diện trong `Page Directory` (sẽ học ở Chương 4).
+>    - `Order (13 bits)` & `Record Type (3 bits)`: Thứ tự chèn trong heap của trang và loại bản ghi (`0=Leaf`, `1=Non-Leaf`, `2=Infimum`, `3=Supremum`).
+>    - `Next Record Offset (2 bytes)`: Độ lệch byte trỏ sang điểm mốc `N` của bản ghi kế tiếp trong trang!
+
+![Định dạng nhị phân của một Record (Cell) trong MySQL InnoDB](./images/innodb-record-format.png "Giải phẫu chi tiết các trường Variable-Length Field Lengths, NULL Bitmap, Record Header và dữ liệu cột bên trong một Record của InnoDB — Nguồn: Jeremy Cole")
 
 ### 2. Tại sao cách sắp xếp trường trong Data Cell cho phép đọc bất kỳ cột nào với $\mathcal{O}(1)$?
 Giả sử một bảng có 5 cột: `(c1 INT32, c2 VARCHAR, c3 BIGINT, c4 VARCHAR, c5 INT16)`.
@@ -365,6 +472,12 @@ Quá trình xử lý bên dưới tầng Storage Engine diễn ra theo **4 bư�
      - `va_valueid = 9901` (`chunk_id` định danh chuỗi mảnh trong bảng TOAST)
      - `va_toastrelid = <OID của bảng TOAST>`
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khối bên trái (`1. Main Table Page (8 KB)`)**: Dòng dữ liệu `Row id = 501` trong trang chính giờ đây chỉ tốn vỏn vẹn `~60 bytes` vì cột `description` khổng lồ đã được thay bằng chiếc vé hẹn `[TOAST Pointer: 18 bytes]` mang mã số `chunk_id = 9901`.
+> 2. **Theo dõi mũi tên `Lazy Loading` sang khối bên phải (`2. Out-of-Line TOAST Storage`)**: Chỉ khi nào câu lệnh `SELECT` của ứng dụng thực sự yêu cầu cột `description`, hệ thống mới cầm mã `chunk_id = 9901` sang tra cây `TOAST B+Tree Index`.
+> 3. **Kết quả tại `TOAST Page #1` và `TOAST Page #2`**: Hệ thống gom đủ 5 mảnh `seq = 0..4` (mỗi mảnh `2 KB`), ghép lại thành `10 KB` rồi giải nén `LZ4` trả về chuỗi văn bản `40 KB` nguyên vẹn.
+
 ```mermaid
 flowchart LR
     subgraph MainPage["1. Main Table Page (8 KB) — Chứa hàng trăm dòng gọn nhẹ!"]
@@ -379,6 +492,18 @@ flowchart LR
     end
     Row501 -->|"Lazy Loading:<br/>Tra cứu chunk_id = 9901"| Idx
 ```
+
+Hãy quan sát thêm sơ đồ thực tế từ tài liệu kiến trúc của **PostgreSQL** minh họa cách các trang trong `[1] Main Table (Oid=16406)` trỏ sang nhiều trang của `[2] Toast table (Oid=16411)`:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào trang bên trái (`[1] Main Table (Oid=16406)`)**: Ở đáy trang có 3 bản ghi: bản ghi `(1, 'abc')` ngắn gọn nên nằm trực tiếp trong trang; nhưng bản ghi số `2` và số `3` có cột quá lớn nên chỉ lưu con trỏ TOAST `[rowsize, extinfo, 16415, 16411]` và `[rowsize, extinfo, 16416, 16411]`.
+> 2. **Theo dõi hai cặp mũi tên màu xám và màu xanh dương bắn sang cột bên phải (`[2] Toast table (Oid=16411)`)**:
+>    - Hai mũi tên màu xám xuất phát từ bản ghi số `2` (`chunk_id = 16415`) trỏ sang 6 mảnh dữ liệu được đánh số thứ tự từ `(16415, 0, ...)` đến `(16415, 5, ...)` trải trên 2 trang của bảng TOAST.
+>    - Hai mũi tên màu xanh dương xuất phát từ bản ghi số `3` (`chunk_id = 16416`) trỏ sang 6 mảnh từ `(16416, 0, ...)` đến `(16416, 5, ...)`.
+> 3. **Kết quả**: Dù bản ghi số `2` và số `3` chứa hàng chục kilobyte dữ liệu, cả 3 bản ghi vẫn nằm gọn gàng trong duy nhất 1 trang `8 KB` của bảng chính `Main Table`!
+
+![Cơ chế TOAST (Overflow Pages) trong PostgreSQL](./images/pg-toast-overflow.png "Một TOAST Pointer nhỏ gọn trong trang chính trỏ sang nhiều mảnh dữ liệu (chunk_seq 0..5) lưu trong bảng TOAST phụ — Nguồn: The Internals of PostgreSQL")
 
 4. **Bước 4 — Lợi ích kép khi Truy vấn (`Lazy Loading`) và khi Cập nhật (`UPDATE`)**:
    - **Khi chạy `SELECT id, title, views FROM articles WHERE views > 1000`**:

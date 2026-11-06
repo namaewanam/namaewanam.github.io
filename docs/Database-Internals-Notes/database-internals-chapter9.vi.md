@@ -17,6 +17,31 @@ tags: ["database-internals", "failure-detection", "heartbeat", "phi-accrual", "s
 
 ## Bài toán nan giải cốt lõi của Failure Detection {#fundamental-dilemma-of-failure-detection}
 
+### 0. Khởi động cho người mới: Làm sao biết đồng nghiệp làm việc từ xa "đã nghỉ việc" hay chỉ "đang đi vệ sinh hơi lâu"?
+
+Hãy tưởng tượng một trưởng nhóm quản lý các lập trình viên làm việc từ xa (Remote Work) qua ứng dụng chat:
+- Theo quy định, cứ mỗi `1 phút`, máy tính của nhân viên sẽ tự động gửi một chấm xanh báo hiệu *"Tôi vẫn đang ngồi làm việc"* (**Heartbeat**).
+- Đột nhiên, chấm xanh của đồng nghiệp **B** tắt ngấm suốt `3 phút` liền! Lúc này trưởng nhóm đứng trước một bài toán hóc búa:
+  - **Nếu quá nóng vội (Đặt ngưỡng chờ cực ngắn, ví dụ 2 phút)**: Thấy B im lặng 2 phút là trưởng nhóm lập tức kết luận *"B đã bỏ việc!"*, vội vàng thu hồi toàn bộ vé việc (tickets) của B chia cho 4 người còn lại làm gập mặt. Ai ngờ 30 giây sau B quay lại bàn làm việc và nói: *"Tôi chỉ đi pha cốc cà phê / mạng Wi-Fi nhà tôi vừa bị lag 30 giây thôi mà!"*. Việc báo tử nhầm này gọi là **Báo động giả (`False Positive` — vi phạm tính `Accuracy`)**, làm cả nhóm rối loạn và kiệt sức oan!
+  - **Nếu quá cả nể (Đặt ngưỡng chờ cực dài, ví dụ 2 tiếng)**: Dù máy tính của B đã cháy nguồn thật sự từ lúc 9 giờ sáng, trưởng nhóm vẫn kiên nhẫn ngồi đợi tới 11 giờ trưa mới dám giao việc của B cho người khác. Suốt 2 tiếng đó, khách hàng gọi vào phần việc của B đều bị treo cứng! Việc chậm phát hiện lỗi thật này làm suy giảm **Tính đầy đủ (`Completeness` — gây `False Negative`)**.
+
+Trong cơ sở dữ liệu phân tán (như **Apache Cassandra, CockroachDB, TiKV, etcd, MongoDB**), việc "đi vệ sinh hơi lâu" của một máy chủ chính là lúc nó bận **dọn rác bộ nhớ (`Stop-The-World GC Pause`)**, bận nén file trên ổ đĩa (**LSM Compaction spike**), hoặc cáp mạng qua Switch bị nghẽn vài giây (**Network Jitter**). Chương 9 giải quyết câu hỏi: **Làm thế nào để các máy chủ tự động phân biệt được một nút thực sự đã chết với một nút chỉ đang bị khựng tạm thời trên quy mô hàng nghìn máy?**
+
+Trước khi đi vào chi tiết toán học, hãy nắm vững bảng từ điển các thuật ngữ cốt lõi của Chương 9:
+
+#### Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (CockroachDB / TiKV / Cassandra / etcd / DynamoDB) là gì? |
+| :--- | :--- | :--- |
+| **`Heartbeat` & `Ping/Ack`** | • **Heartbeat**: Nhân viên bảo vệ tự động bấm chuông báo bình an về phòng trực mỗi 1 phút (gửi 1 chiều).<br/>• **Ping/Ack**: Trưởng phòng chủ động gọi bộ đàm *"Còn đó không?"* và chờ bảo vệ đáp *"Có mặt!"* (2 chiều khứ hồi). | Trong **etcd / CockroachDB / TiKV (Raft)**, Leader định kỳ bắn gói `Heartbeat` một chiều xuống các Follower (khoảng `100ms - 500ms`/lần). Còn trong **Consul / Redis Cluster**, các node dùng cặp `PING -> PONG/ACK` hai chiều để kiểm tra lẫn nhau. |
+| **`Completeness`**<br/>*(Tính đầy đủ — Nút chết thật thì chắc chắn phải phát hiện ra)* | Nếu một nhân viên thực sự đã nghỉ việc hoặc ngất xỉu, sớm hay muộn phòng nhân sự bắt buộc phải phát hiện ra chứ không được để tên họ nhận việc mãi mãi (**Tránh bỏ lọt lỗi / False Negative**). | Nếu một Storage Node của **DynamoDB** hoặc **TiKV** bị cháy nguồn, bộ điều phối truy vấn bắt buộc phải phát hiện ra để ngắt luồng request vào node chết đó và bầu Leader mới cho phân vùng dữ liệu (*Shard/Range*). |
+| **`Accuracy`**<br/>*(Tính chính xác — Không báo tử nhầm nút đang sống)* | Không bao giờ được đuổi việc nhầm một nhân viên vẫn đang làm việc bình thường chỉ vì họ đi vệ sinh hoặc kẹt thang máy vài phút (**Tránh báo động giả / False Positive**). | Nếu một node **Cassandra** chỉ bị *JVM GC Pause* `2 giây` mà bị các node khác kết luận nhầm là `Dead` (*False Positive*), cả cụm sẽ đổ xô đi sao chép lại hàng Terabyte dữ liệu của node đó, gây nghẽn mạng và làm **sập dây chuyền (`Cascading Failure`)** toàn bộ Database! |
+| **`Fixed-Timeout Detector`**<br/>*(Bộ phát hiện lỗi ngưỡng cố định)* | Đồng hồ hẹn giờ cứng nhắc: Cứ đúng `2.0 giây` không thấy trả lời là lập tức bấm còi báo tử, bất kể hôm đó trời nắng đẹp hay đang bão lũ kẹt xe toàn thành phố. | Cơ chế đơn giản dùng ngưỡng hằng số `election-timeout = 1000ms` (như trong cấu hình tĩnh của **etcd / ZooKeeper**): dễ cài đặt trong mạng LAN ổn định, nhưng rất dễ gây bão bầu cử giả khi triển khai qua mạng diện rộng (WAN / Cross-Region) có độ trễ trồi sụt thất thường. |
+| **`Phi-Accrual Failure Detector` ($\varphi$)**<br/>*(Đánh giá mức độ nghi ngờ liên tục theo phân phối xác suất — Akka / Cassandra)* | Thay vì phán ngay *"Còn sống"* hay *"Đã chết"*, người quản lý nhìn vào lịch sử đi làm 1.000 ngày qua để chấm **điểm nghi ngờ $\varphi$ từ `0` đến `10+`**: Nếu mọi ngày đi rất đúng giờ mà hôm nay trễ 3 phút thì $\varphi$ vọt lên `9` (báo động ngay); nếu cả tuần nay đường đang đào cống ai cũng trễ 10 phút thì trễ 3 phút chỉ có $\varphi = 0.8$ (bình tĩnh chờ tiếp!). | Trái tim phát hiện lỗi của **Apache Cassandra, ScyllaDB, Akka Cluster**: Liên tục đo trung bình ($\mu$) và độ lệch chuẩn ($\sigma$) của 1.000 nhịp Heartbeat gần nhất theo đường cong hình chuông (hoặc phân phối mũ). Chỉ khi điểm nghi ngờ $\varphi \ge 8$ (`phi_convict_threshold: 8`, tức xác suất nhầm chỉ còn $10^{-8}$) thì Cassandra mới chính thức đánh dấu node là `DOWN`. |
+| **`Gossip-style Failure Detection & SWIM Protocol`**<br/>*(Ping -> Ping-Req gián tiếp -> Suspect -> Confirm)* | Trong công ty 1.000 người, thay vì ai cũng gọi điện hỏi thăm cả 999 người mỗi phút làm cháy tổng đài, mỗi người chỉ hỏi thăm ngẫu nhiên 1 người. Nếu A gọi B không được, A nhờ 2 người hàng xóm C, D gọi thử cho B (**Ping-Req**). Nếu vẫn im lặng, cả công ty đồn rằng *"Hình như B đang ngất (`Suspect`)"*; nếu B tỉnh dậy kịp thì B la lên *"Tôi còn sống!"* để tự minh oan, còn hết giờ vẫn im thì mới chốt sổ nghỉ việc (**Confirm Dead**). | Được sử dụng trong **HashiCorp Consul, Serf, Uber Ringpop** và tầng Gossip của **Cassandra / Dynamo**: Giảm số gói tin kiểm tra sức khoẻ từ bậc hai $O(N^2)$ xuống hằng số $O(1)$ mỗi node, đồng thời miễn nhiễm hoàn toàn với lỗi đứt cáp cục bộ giữa 2 máy lẻ tẻ nhờ bước hỏi thăm gián tiếp `PING-REQ`. |
+
+---
+
 ### 1. Bài toán thực tế & Mental Model: Tại sao phát hiện một máy chủ "đã chết" lại khó đến vậy?
 
 Trong một cơ sở dữ liệu phân tán, hầu như mọi quyết định sống còn đều phải chờ tín hiệu khởi phát từ một mô-đun nền tảng: **Failure Detector (Bộ phát hiện lỗi)**.
@@ -40,6 +65,12 @@ Trên một máy đơn lẻ, hệ điều hành biết ngay lập tức một ti
 | :--- | :--- | :--- | :--- |
 | **Completeness<br/>(Tính đầy đủ)** | Mọi node **thực sự đã chết (Crashed)** cuối cùng bắt buộc phải bị các node sống phát hiện ra. | • **Strong Completeness**: Mọi node chết cuối cùng đều bị **tất cả** các node khoẻ mạnh đánh dấu là `Dead`.<br/>• **Weak Completeness**: Mọi node chết cuối cùng bị **ít nhất 1** node khoẻ mạnh đánh dấu là `Dead`. | **False Negative (Bỏ lọt lỗi)**: Node B đã chết từ lâu nhưng Node A vẫn tưởng B còn sống và tiếp tục gửi truy vấn vào "hố đen", gây lỗi cho người dùng. |
 | **Accuracy<br/>(Tính chính xác)** | Không có node **đang còn sống khoẻ mạnh (Alive)** nào bị kết luận oan là đã chết. | • **Strong Accuracy**: Không một node sống nào từng bị đánh dấu nhầm là `Dead` tại bất kỳ thời điểm nào.<br/>• **Eventual Accuracy**: Có thể nghi ngờ nhầm lúc mạng nhiễu, nhưng sau một thời điểm ổn định, không còn node sống nào bị kết luận oan nữa. | **False Positive (Báo động giả)**: Node B chỉ bị GC Pause `2` giây nhưng bị cả cụm khai tử oan, kích hoạt bầu cử lại và di chuyển dữ liệu hỗn loạn. |
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào điểm tựa tam giác `▲` ở chính giữa**: Đây là trục bập bênh thể hiện giới hạn vật lý của mạng — khi kéo đầu này lên thì đầu kia buộc phải hạ xuống.
+> 2. **Theo dõi đĩa cân bên trái (`Ưu tiên COMPLETENESS`)**: Khi vặn `Timeout` thật ngắn (ví dụ `200 ms`), hễ máy nào chết là phát hiện ra ngay lập tức, nhưng đổi lại mỗi khi mạng hơi giật nhẹ là báo tử nhầm (*False Positive*).
+> 3. **Theo dõi đĩa cân bên phải (`Ưu tiên ACCURACY`)**: Khi vặn `Timeout` thật dài (ví dụ `60 giây`), hầu như không bao giờ báo tử nhầm máy đang GC Pause, nhưng đổi lại khi máy cháy nguồn thật thì khách hàng phải chờ mốc meo cả phút hệ thống mới biết!
 
 ```text
 Chiếc bập bênh đánh đổi của Failure Detector:
@@ -76,6 +107,13 @@ Chiếc bập bênh đánh đổi của Failure Detector:
 ### 2. Bài toán thực tế: Tại sao Fixed Timeout gây ra Thảm hoạ sập dây chuyền (Cascading Failure)?
 
 Trong các hệ thống thế hệ cũ, Failure Detector được cài đặt bằng một ngưỡng thời gian chờ cố định (**Fixed Timeout $\tau$**):
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào phép trừ `monotonic_now() - last_heartbeat_from_B`**: Đây là khoảng thời gian im lặng kể từ lần cuối cùng `Node A` nghe thấy tiếng của `Node B`.
+> 2. **Theo dõi phép so sánh `> FIXED_TIMEOUT_TAU`**: Hệ thống so sánh khoảng im lặng đó với một hằng số cứng nhắc (ví dụ `2000 ms`).
+> 3. **Kết quả ở 2 dòng lệnh bên trong `if`**: Ngay khoảnh khắc vượt quá ngưỡng cứng đó dù chỉ `1 ms`, `Node A` lập tức kết án tử hình `Node B` (`mark_node_as_DEAD`) và kích hoạt di chuyển dữ liệu (`trigger_failover_and_rebalance`) mà không cần biết mạng đang êm hay đang bão.
+
 ```text
 // Logic Fixed Timeout cổ điển tại Node A:
 if (monotonic_now() - last_heartbeat_from_B > FIXED_TIMEOUT_TAU) {
@@ -85,6 +123,12 @@ if (monotonic_now() - last_heartbeat_from_B > FIXED_TIMEOUT_TAU) {
 ```
 
 Giả sử người vận hành cấu hình chu kỳ gửi Heartbeat là `1000 ms` và đặt ngưỡng cố định $\tau = 2000\text{ ms}$ với mong muốn phát hiện sự cố chỉ trong `2` giây. Hãy theo dõi **Kịch bản sập dây chuyền (Cascading Failure & Flapping)** xảy ra trong giờ cao điểm (Flash Sale) trên một cụm gồm 5 node (`Node 1` đến `Node 5`, mỗi node đang chạy ở mức tải `70%` CPU):
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào cột ngoài cùng bên phải (`Node 5`) tại mốc `t = 0.0s`**: `Node 5` không hề hỏng phần cứng mà chỉ tạm ngưng `2.5 giây` để dọn rác bộ nhớ (*GC Pause*), nhưng vì ngưỡng chờ cố định chỉ có `2.0 giây`, tại `t = 2.0s` các `Node 1..4` đã vội vàng kết luận nhầm `"Node 5 ĐÃ CHẾT!"`.
+> 2. **Theo dõi hiệu ứng Domino ở giữa sơ đồ (`t = 2.0s -> t = 4.3s`)**: Vì tưởng `Node 5` đã chết, toàn bộ tải và tác vụ sao chép lại dữ liệu của `Node 5` bị dồn ập sang `Node 1..4`, đẩy `Node 1` từ `70%` vọt lên `100%` CPU và tự rơi vào *GC Pause* `3.0 giây`! Ngay cả khi `Node 5` tỉnh dậy ở `t = 2.5s` đòi vào lại cụm (*Flapping*), thảm hoạ đã không thể phanh lại.
+> 3. **Kết quả ở đáy sơ đồ**: Đến lượt `Node 1` bị báo chết ở `t = 4.3s`, tải của 5 máy dồn hết lên 3 máy còn lại và làm nổ tung toàn bộ cụm Database!
 
 ```mermaid
 sequenceDiagram
@@ -119,6 +163,12 @@ Hãy phân tích hai cực của cái bẫy **Fixed Timeout $\tau$**:
 
 Được đề xuất bởi Naohiro Hayashibara và cộng sự vào năm `2004`, **$\Phi$-Accrual Failure Detector (Phi-Accrual)** là một bước ngoặt trong thiết kế hệ thống phân tán và hiện là trái tim phát hiện lỗi của **Apache Cassandra**, **ScyllaDB**, **Akka Cluster**.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào đỉnh chuông ở chính giữa (`Mốc số 0` trên trục ngang)**: Đây là khoảng cách trung bình $\mu$ giữa các nhịp Heartbeat (ví dụ cứ đúng `1000 ms` là có 1 nhịp tim tới). Vùng màu xanh đậm quanh mốc `0` (từ `-1σ` đến `+1σ`) chiếm tới `34.1% + 34.1% = 68.2%` tổng số nhịp tim hàng ngày.
+> 2. **Theo dõi trục ngang đi dần về phía đuôi bên phải (`1σ -> 2σ -> 3σ -> ...`)**: Càng đi xa về bên phải nghĩa là thời gian chờ nhịp tim tiếp theo ($\Delta t$) càng kéo dài bất thường. Hãy nhìn con số phần trăm diện tích thu hẹp cực nhanh: từ `13.6%` (ở `1σ..2σ`) xuống `2.1%` (ở `2σ..3σ`) và chỉ còn `0.1%` khi vượt quá `3σ`!
+> 3. **Kết quả liên hệ với chỉ số nghi ngờ $\varphi$ trong Cassandra / Akka**: Phần diện tích nhỏ xíu còn sót lại ở đuôi bên phải chính là xác suất $P_{\text{later}}$ (*"Xác suất node kia vẫn sống nhưng gói tin vô tình đến muộn"*). Khi thời gian chờ trôi xa tới mức diện tích đuôi phải chỉ còn $10^{-8}$ (`0.000001%` — tương ứng khoảng `5.7σ` đến `6σ`), công thức $\varphi = -\log_{10}(10^{-8})$ sẽ cho ra **$\varphi = 8$** — lúc này Cassandra mới chính thức kết luận node đó đã `DEAD`!
+
 ![Phân phối chuẩn với độ lệch chuẩn sigma dùng để ước lượng xác suất trễ nhịp tim trong Phi-Accrual Detector](./images/normal-distribution-sigma.svg)
 
 ### 1. Tư tưởng cốt lõi & Mental Model: Đổi từ câu trả lời Nhị phân (`Alive`/`Dead`) sang Thang đo nghi ngờ liên tục ($\varphi$)
@@ -133,6 +183,12 @@ Về mặt kiến trúc phần mềm, $\Phi$-Accrual tách rời hoàn toàn **t
 - Khi $\varphi < 3$: Mạng bình thường, tiếp tục gửi truy vấn như cũ.
 - Khi $3 \le \varphi < 8$: Node B đang có dấu hiệu chậm bất thường $\rightarrow$ Tạm thời ưu tiên gửi truy vấn đọc sang Replica khác (*Dynamic Snitch / Speculative Retry*), nhưng **chưa khai tử B**.
 - Khi $\varphi \ge 8$ (ngưỡng mặc định `phi_convict_threshold: 8` trong Cassandra): Xác suất B chỉ bị trễ mạng đã nhỏ hơn $10^{-8}$ $\rightarrow$ Chính thức đánh dấu B là **`Dead`** và kích hoạt Hinted Handoff!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn từ trái sang phải qua 5 hộp xử lý nối tiếp (`1 -> 2 -> 3 -> 4 -> 5`)**: Đây là dây chuyền biến đổi từ những gói tin mạng thô thành quyết định vận hành Database.
+> 2. **Theo dõi Hộp 1 & Hộp 2 (Giai đoạn học lịch sử mạng)**: Mỗi khi có nhịp tim mới đến, Hộp 1 lưu khoảng cách $\Delta t_i$ vào cửa sổ trượt `1,000` mẫu gần nhất để Hộp 2 tính ra nhịp trung bình ($\mu$) và độ trồi sụt của mạng ($\sigma$).
+> 3. **Theo dõi Hộp 3, 4 & 5 (Giai đoạn chấm điểm nghi ngờ thời gian thực)**: Hộp 3 lấy thời gian đang chờ hiện tại $\Delta t_{\text{now}}$ tra vào đường cong hình chuông để ra xác suất trễ $P_{\text{later}}$; Hộp 4 đổi xác suất đó ra thang điểm $\varphi = -\log_{10}(P_{\text{later}})$ (đếm số chữ số 0 sau dấu phẩy); và Hộp 5 so sánh nếu $\varphi \ge 8$ thì báo tử!
 
 ```mermaid
 flowchart LR
@@ -260,6 +316,12 @@ Mental Model của SWIM dựa trên 3 trụ cột thông minh:
    - Thay vì phát tán thông tin thành viên bằng các gói tin Broadcast riêng lẻ tốn băng thông, SWIM **đính kèm (Piggyback)** các mẩu tin đồn (`Alive`, `Suspect`, `Dead`) trực tiếp vào phần đuôi của chính các gói `PING`, `PING-REQ` và `ACK` hàng ngày!
    - Khi cả `A` lẫn $k$ người hàng xóm đều không gọi được cho `B`, `B` vẫn chưa bị khai tử thành `Dead` ngay, mà chỉ bị gắn nhãn **`Suspect(B, incarnation = i)`** trong một khoảng thời gian ân hạn. Nếu `B` vừa tỉnh dậy sau GC Pause và nghe được tin đồn mình đang bị nghi ngờ, `B` chỉ cần tự tăng số thế hệ lên **`incarnation = i + 1`** và tung tin **`Alive(B, incarnation = i + 1)`** để đập tan mọi lời đồn!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào bước `1. Direct PING` giữa `Node A` và `Node B`**: Đường cáp nối thẳng từ `A` sang `B` bị đứt cục bộ (dấu sét `⚡`), nên `A` gọi trực tiếp cho `B` không thấy trả lời.
+> 2. **Theo dõi bước `2` và `3` (Nhờ hàng xóm hỏi hộ qua `PING-REQ`)**: Thay vì vội vàng báo `B` đã chết, `Node A` gửi lời nhờ vả `PING-REQ(target = B)` sang hai người hàng xóm `Node C` và `Node D`. Cả `C` và `D` dùng đường cáp riêng của họ gọi sang `B` (`3. Indirect PING`).
+> 3. **Kết quả ở bước `4`**: Vì `Node B` vẫn sống khoẻ, `B` trả lời `ACK` cho `C`, và `C` chuyển tiếp tờ giấy xác nhận đó về cho `A` — giúp `Node A` biết `B` vẫn bình an vô sự bất chấp sợi cáp `A <-> B` bị đứt!
+
 ```mermaid
 sequenceDiagram
     participant A as Node A (Prober)
@@ -323,6 +385,12 @@ Bây giờ, tại đúng mốc **`t = 1000 ms`**, tiến trình trên **`Node B`
 ### 4. Quy tắc thứ tự ưu tiên trạng thái (State Precedence Rules) trong SWIM
 
 Tại sao khi `Node B` phát tin `Alive(B, inc=1)` thì nó lại thắng được `Suspect(B, inc=0)` đang lan truyền trên mạng? Bởi vì mọi node trong giao thức SWIM đều áp dụng quy tắc so sánh tất định (tương tự một State-based CRDT) cho mỗi thành viên $M$:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào Quy tắc 1 (`DEAD` là cấp cao nhất)**: Một khi node đã hết sạch thời gian ân hạn và bị đóng dấu `Dead(M)`, trạng thái này là chung cuộc và đè lên mọi bản tin `Alive` hay `Suspect` cũ.
+> 2. **Theo dõi Quy tắc 2 (Đấu số thế hệ `incarnation` giữa `Alive` và `Suspect`)**: Hãy nhìn vào hai chỉ số `inc = j` và `inc = i`: Nếu ở cùng một thế hệ (`j == i`), lời nghi ngờ `Suspect` sẽ thắng `Alive`. Nhưng nếu `Alive` có số thế hệ cao hơn hẳn (`j > i`), lời minh oan `Alive` sẽ lật ngược thế cờ và thắng `Suspect`!
+> 3. **Kết quả ở dòng Lưu ý dưới đáy**: Vì chỉ có **chính chủ `Node M`** mới có quyền cộng thêm `+1` vào số `incarnation` của mình, việc xuất hiện gói tin `Alive(M, inc = i + 1)` là bằng chứng sống không thể chối cãi rằng `Node M` vừa tỉnh dậy và tự bác bỏ tin đồn thất thiệt về nó.
 
 ```text
 Quy tắc ghi đè trạng thái của Node M giữa bản tin cũ và bản tin mới:

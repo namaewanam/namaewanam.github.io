@@ -7,6 +7,7 @@ tags: ["database-internals", "consensus", "paxos", "multi-paxos", "raft", "zab",
 ---
 
 ## Table of Contents
+0. [Khởi động cho người mới: "Đồng thuận" thực chất là gì?](#beginner-warmup)
 1. [Bài toán Consensus và 4 Thuộc tính Cốt lõi](#what-is-consensus)
 2. [Hệ thống phân cấp Broadcast và Atomic Broadcast](#broadcast-hierarchy)
 3. [Paxos và Multi-Paxos](#paxos-and-multi-paxos)
@@ -18,6 +19,37 @@ tags: ["database-internals", "consensus", "paxos", "multi-paxos", "raft", "zab",
 ---
 
 Đồng thuận phân tán (**Consensus**) là nền tảng cốt lõi của hầu hết các hệ thống dữ liệu hiện đại: từ bầu chọn Leader, quản lý cấu hình cụm (etcd, ZooKeeper, Consul), khoá phân tán (Distributed Locks) cho tới sao chép máy trạng thái (**Replicated State Machines**) trong Google Spanner, CockroachDB, TiKV và Apache Kafka (KRaft). Chương 14 giải phẫu từ gốc rễ toán học đến từng bước chạy tay của **Broadcast Hierarchy**, **Paxos**, **Multi-Paxos**, **Fast/EPaxos**, **Raft**, **ZAB** và **PBFT**.
+
+---
+
+## Khởi động cho người mới: "Đồng thuận" thực chất là gì? {#beginner-warmup}
+
+### 1. Ẩn dụ đời thực: 5 thư ký cùng giữ một cuốn sổ biên bản
+Hãy hình dung 5 thư ký ngồi ở 5 văn phòng khác nhau, mỗi người giữ **một bản sao của cùng một cuốn sổ biên bản**. Họ chỉ liên lạc với nhau qua điện thoại, và điện thoại đôi khi mất sóng hoặc đến chậm. Yêu cầu đặt ra:
+- Cả 5 cuốn sổ phải ghi **cùng các dòng, theo cùng một thứ tự** (dòng 1: "Mở tài khoản A", dòng 2: "Nạp 100 USD vào A"...).
+- Dù **2 thư ký bất ngờ nghỉ ốm** (2 máy chủ sập), 3 người còn lại vẫn phải tiếp tục ghi sổ được.
+- Không bao giờ được xảy ra chuyện văn phòng 1 ghi dòng 5 là "Rút 50 USD" còn văn phòng 4 ghi dòng 5 là "Nạp 70 USD".
+
+Quy tắc đơn giản nhất để làm được điều này: **một dòng chỉ được coi là "chốt" khi đa số (ít nhất 3/5) thư ký đã ghi nó vào sổ**. Vì hai nhóm đa số bất kỳ luôn có ít nhất 1 người chung, người chung đó sẽ "nhớ" quyết định cũ và ngăn hai nhóm chốt hai nội dung khác nhau. Đây là ý tưởng cốt lõi của **Paxos**, **Raft** và **ZAB**.
+
+### 2. Liên hệ với hệ thống thực tế
+- **Kubernetes**: Mọi trạng thái của cụm (Pod nào chạy ở đâu, Secret nào tồn tại) được lưu trong **etcd** — một cụm 3 hoặc 5 node chạy **Raft**. Khi chạy `kubectl apply`, lệnh chỉ trả về thành công sau khi đa số node etcd đã ghi bản ghi vào log.
+- **TiDB / TiKV, CockroachDB, YugabyteDB**: Dữ liệu được chia thành nhiều vùng nhỏ (Region / Range), mỗi vùng có 3 bản sao tạo thành một nhóm Raft riêng. Một câu `UPDATE` chỉ `COMMIT` được khi 2/3 bản sao của vùng đó đã ghi nhận.
+- **Kafka (KRaft)** và **ZooKeeper (ZAB)**: Dùng đồng thuận để quản lý siêu dữ liệu, bầu Controller / Leader và giữ thứ tự các thay đổi cấu hình.
+
+### 3. Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (etcd / TiKV / CockroachDB / ZooKeeper) là gì? |
+| :--- | :--- | :--- |
+| **Broadcast Hierarchy** | Các mức độ "phát loa thông báo" từ lỏng tới chặt: gửi đại khái (có thể sót người), đảm bảo ai còn sống cũng nghe, cho tới mức **mọi người nghe cùng các thông báo theo đúng cùng một thứ tự**. | Mức cao nhất (**Total Order / Atomic Broadcast**) tương đương với bài toán Consensus — chính là thứ Raft và ZAB cung cấp. |
+| **State Machine Replication (SMR)** | 5 thư ký cùng làm theo một danh sách lệnh giống hệt nhau, theo cùng thứ tự, thì cuối cùng 5 cuốn sổ sẽ giống hệt nhau. | Mỗi node áp dụng các mục trong Raft Log theo thứ tự vào storage (ví dụ RocksDB trong TiKV), nên mọi bản sao có cùng dữ liệu. |
+| **Quorum Intersection** ($\lfloor N/2 \rfloor + 1$) | Hai nhóm đa số luôn có ít nhất 1 người chung. Với 5 node, đa số là 3; hai nhóm 3 người bất kỳ luôn trùng ít nhất 1 người. | Lý do cụm etcd 5 node chịu được 2 node sập, còn cụm 3 node chỉ chịu được 1 node sập. |
+| **Basic Paxos** (Proposer, Acceptor, Learner) | Người đề xuất phải xin "phiếu hứa" của đa số trước (Phase 1: `Prepare/Promise`), rồi mới gửi nội dung để đa số chấp nhận (Phase 2: `Accept/Accepted`). | Nền tảng lý thuyết của Google Chubby, Spanner; tốn 2 vòng mạng (RTT) cho mỗi giá trị. |
+| **Multi-Paxos** | Bầu ra một "chủ tọa" cố định; sau khi xin phiếu hứa một lần, chủ tọa chỉ cần 1 vòng cho mỗi lệnh tiếp theo. | Cách mọi hệ thống Paxos thực tế chạy để giảm độ trễ. |
+| **Fast Paxos / EPaxos** | Cho phép khách gửi thẳng tới các thư ký mà không cần qua chủ tọa, đổi lại cần nhóm đa số lớn hơn hoặc phải xử lý va chạm. | Tối ưu độ trễ cho cụm trải rộng nhiều vùng địa lý. |
+| **Raft** (Term, Leader Election, Log Replication) | Chia thời gian thành các "nhiệm kỳ" (`Term`). Mỗi nhiệm kỳ có tối đa 1 Leader; Leader nhận lệnh, ghi vào log và sao chép cho Follower. Leader im lặng quá lâu thì một Follower tự ứng cử. | etcd, Consul, TiKV, CockroachDB, Kafka KRaft, RethinkDB. |
+| **ZAB** (`zxid = epoch + counter`) | Mỗi thay đổi được đóng dấu 2 con số: "khóa chủ tọa thứ mấy" và "lệnh thứ mấy trong khóa đó". | Giao thức đồng thuận của Apache ZooKeeper. |
+| **Byzantine Fault Tolerance / PBFT** ($3f + 1$) | Không chỉ có người nghỉ ốm, mà còn có **kẻ nói dối** gửi thông tin trái ngược cho từng người. Muốn chịu được $f$ kẻ nói dối cần ít nhất $3f + 1$ người. | Dùng trong blockchain có cấp phép (Hyperledger Fabric BFT, Tendermint/CometBFT); các database thông thường giả định không có node nói dối nên chỉ cần Raft/Paxos. |
 
 ---
 
@@ -47,6 +79,12 @@ Một thuật toán **Consensus** đúng đắn bắt buộc phải đảm bảo
 ### Tại sao nghiên cứu Consensus lại phải bắt đầu từ Broadcast?
 
 Trong cơ sở dữ liệu thực tế, các node không chỉ đồng thuận 1 giá trị đơn lẻ rồi nghỉ, mà phải liên tục phát tán một luồng các lệnh cập nhật (`Write X=1`, `Write Y=2`, `Delete Z`...) sao cho mọi bản sao nhận được cùng một tập bản tin theo cùng một thứ tự. Các cơ chế phát tán thông điệp (**Broadcast**) được phân cấp từ yếu đến mạnh theo **4 cấp độ**, và cấp độ thứ 4 chính là mảnh ghép tương đương hoàn toàn với **Consensus**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Tháp Broadcast bên dưới):**
+> 1. **Đọc từ dưới lên**: Mỗi tầng giữ mọi đảm bảo của tầng bên dưới và thêm một đảm bảo mới.
+> 2. **Tầng 2 và 3 khác nhau ở node vừa sập**: Tầng 3 bắt buộc cả node vừa nhận xong rồi sập cũng không được lệch với phần còn lại.
+> 3. **Tầng 4 trên cùng**: Thêm yêu cầu "cùng thứ tự". Mũi tên `◄══►` cho biết tầng này **tương đương** với Consensus — giải được một bài thì giải được bài kia.
 
 ```text
 ================================================================================
@@ -131,6 +169,12 @@ Nếu một Proposer chỉ đơn giản gửi `Accept("X")` cho các Acceptor (1
   1. **Quy tắc kế thừa bắt buộc (Safety Rule)**: Nếu ở Phase 1 có bất kỳ Acceptor nào báo về rằng nó đã từng giữ một giá trị `accepted_v`, Proposer hiện tại **BẮT BUỘC phải vứt bỏ giá trị dự kiến của riêng mình, và phải chọn giá trị `accepted_v` nào có số phiếu `accepted_n` lớn nhất** để đem đi đề xuất ở Phase 2! Chỉ khi tất cả các Acceptor trong Quorum đều báo về `(null, null)` thì Proposer mới được phép đề xuất giá trị mới của mình.
   2. **Chốt giá trị xuống đĩa**: Gửi lệnh `Accept(n, v)` để đa số Acceptor ghi bền vững xuống đĩa (với điều kiện trong lúc chờ đợi chưa có Proposer nào khác mang số phiếu lớn hơn $n$ nhảy vào chặn).
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Lưu đồ Basic Paxos bên dưới):**
+> 1. **Các cột dọc**: Mỗi cột là một vai trò (Proposer, các Acceptor, Learner). Thời gian chạy từ trên xuống dưới.
+> 2. **Cặp mũi tên đầu (`Prepare` → `Promise`)**: Phase 1 — Proposer xin đa số Acceptor hứa không nhận đề xuất nào có số phiếu nhỏ hơn.
+> 3. **Cặp mũi tên sau (`Accept` → `Accepted`)**: Phase 2 — Proposer gửi giá trị; khi đa số chấp nhận, giá trị được chốt và Learner được thông báo.
+
 ![Lưu đồ thông điệp của Basic Paxos khi không có lỗi](./images/basic-paxos-flow.svg)
 
 ---
@@ -148,6 +192,12 @@ Hãy chạy tay từng bước kịch bản quan trọng nhất của Paxos đ�
 - Có **2 Proposer**:
   - **`P1`** (Node ID = `1`): Muốn đề xuất giá trị **`"X"`**.
   - **`P2`** (Node ID = `2`): Muốn đề xuất giá trị **`"Y"`**.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Kịch bản tranh chấp Paxos bên dưới):**
+> 1. **Chú ý cột `A2` (Node giao nhau)**: Đây là node nằm trong cả nhóm đa số của P1 lẫn của P2. Toàn bộ sự an toàn của Paxos dựa vào node này.
+> 2. **Bước 1–2**: P1 đã khiến giá trị `"X"` được 2/3 Acceptor chấp nhận rồi sập — nhưng chưa ai kịp biết `"X"` đã chốt.
+> 3. **Các bước sau**: Khi P2 xin phiếu hứa, `A2` báo lại "tôi đã chấp nhận `X`". P2 **buộc phải đề xuất lại `"X"`** thay vì `"Y"`. Kết quả: không bao giờ có hai giá trị khác nhau được chốt.
 
 ```mermaid
 sequenceDiagram
@@ -254,6 +304,12 @@ Basic Paxos chỉ giải quyết đồng thuận cho **1 giá trị đơn lẻ**
 - Khi Leader mới lên nắm quyền, nó chạy **Phase 1 (`Prepare(n)`) ĐÚNG 1 LẦN ĐƠN LẺ cho toàn bộ các Log Slots từ hiện tại đến vô cực** (`Slot k, k+1, k+2...`).
 - Sau khi các Acceptor đã hứa (`Promise`) với Leader này cho mọi Slot tương lai, ở trạng thái vận hành bình thường (**Steady State**), mỗi khi Client gửi lệnh ghi mới, Leader **bỏ qua hoàn toàn Phase 1** và chỉ gửi trực tiếp **Phase 2 (`Accept(n, slot_i, value)`)** tới các Acceptor $\rightarrow$ **rút ngắn độ trễ ghi xuống chỉ còn đúng 1 RTT**!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (So sánh Basic Paxos và Multi-Paxos bên dưới):**
+> 1. **Khối trên (Basic Paxos)**: Mỗi lệnh ghi đi qua cả 2 phase — tốn 2 vòng mạng.
+> 2. **Khối dưới (Multi-Paxos)**: Phase 1 chỉ chạy **một lần** lúc bầu Leader. Từ đó, mỗi lệnh ghi (`#1`, `#2`...) chỉ cần Phase 2 — tức 1 vòng mạng.
+> 3. **Ý nghĩa thực tế**: Đây là lý do mọi hệ thống thực tế đều có một Leader ổn định.
+
 ```text
 BASIC PAXOS (Cho mỗi lệnh ghi đều tốn 2 RTT):
   Client ──► Leader ──[Phase 1: Prepare/Promise (1 RTT)]──► Acceptors
@@ -282,6 +338,12 @@ Mặc dù Basic Paxos rất ngắn gọn, việc mở rộng từ Basic Paxos l�
 Năm 2014, Diego Ongaro và John Ousterhout (Đại học Stanford) thiết kế thuật toán **Raft** với triết lý đặt **Tính dễ hiểu (Understandability)** làm mục tiêu cốt lõi, thông qua hai nguyên tắc thiết kế cốt lõi:
 1. **Decomposition (Phân rã bài toán)**: Tách bạch hoàn toàn thành 3 mô-đun: *Leader Election*, *Log Replication*, và *Safety*.
 2. **Strong Leader (Luồng dữ liệu một chiều tuyệt đối)**: Trong Multi-Paxos, node nào thắng số phiếu cao hơn cũng có thể làm Leader rồi phải thu thập các mảnh Log từ các Acceptor khác về ghép lại cho mình. Ngược lại, trong **Raft**: **Log chỉ bao giờ chảy theo đúng 1 chiều đơn lẻ từ Leader xuống các Follower** (Leader không bao giờ ghi đè hay xoá bản ghi trong Log của chính mình; và một ứng viên thiếu bản ghi đã Commit thì ngay từ đầu đã không thể thắng cử làm Leader!).
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Ba trạng thái của một node Raft bên dưới):**
+> 1. **Bắt đầu từ `Follower`**: Mọi node khởi động đều là Follower, chờ nhịp tim (Heartbeat) từ Leader.
+> 2. **Mũi tên `Follower → Candidate`**: Không nghe thấy Leader trong `150–300 ms` (thời gian ngẫu nhiên khác nhau ở mỗi node), node tự tăng `Term` và đi xin phiếu.
+> 3. **Mũi tên `Candidate → Leader`**: Được đa số bầu thì lên làm Leader. Bất kỳ ai (kể cả Leader) thấy một `Term` lớn hơn mình đều lùi về làm Follower — nhờ vậy cụm không bao giờ có 2 Leader trong cùng một Term.
 
 ```mermaid
 stateDiagram-v2
@@ -313,6 +375,12 @@ $$\text{Log}_A \ge \text{Log}_B \iff \big(\text{lastLogTerm}_A > \text{lastLogTe
 Giả sử trong cuộc bầu cử ở `Term 4`, có hai node so sánh Log với nhau:
 - **`Node A`**: Có phần tử cuối cùng nằm ở **`(Term = 3, Index = 5)`** (Log dài 5 phần tử).
 - **`Node B`**: Có phần tử cuối cùng nằm ở **`(Term = 2, Index = 9)`** (Log dài tới 9 phần tử!).
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (So sánh độ mới của Log bên dưới):**
+> 1. **Mỗi ô `[T=x]`**: Là một mục log, ghi lại mục đó được tạo ở nhiệm kỳ (`Term`) nào.
+> 2. **So sánh ô cuối cùng trước, không so độ dài**: Node A có ô cuối ở `Term 3`, Node B có ô cuối ở `Term 2`.
+> 3. **Kết luận**: Term lớn hơn thắng, dù log của B dài hơn. Chỉ khi Term bằng nhau mới so tiếp `Index`. Một node chỉ bỏ phiếu cho ứng viên có log mới bằng hoặc hơn mình.
 
 ```text
 ================================================================================
@@ -366,6 +434,12 @@ Giả sử `Node A` vừa đắc cử Leader ở `Term 4` và nhận thêm 1 l�
 Đây là tình huống tinh vi nhất của Raft (được minh hoạ tại **Figure 8** trong bài báo gốc của Ongaro & Ousterhout). Nhiều kỹ sư lầm tưởng rằng: *"Cứ hễ một bản ghi trong Log được sao chép lên đa số node (ví dụ 3/5 node) thì Leader được quyền đánh dấu nó là Committed ngay"*. **Điều này hoàn toàn SAI đối với các bản ghi thuộc nhiệm kỳ cũ (`logTerm < currentTerm`)!**
 
 Hãy chạy tay từng bước qua 5 mốc thời gian `(a) -> (b) -> (c) -> (d)` trên một cụm gồm **5 máy chủ (`S1, S2, S3, S4, S5`, đa số Quorum = 3)** để thấy tận mắt tại sao nếu commit sớm bản ghi của Term cũ thì bản ghi đó sẽ bị xoá mất:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Bài toán Hình 8 bên dưới):**
+> 1. **Mỗi hàng `S1..S5`**: Là log của một máy chủ; mỗi cột là một `Index`.
+> 2. **Đọc lần lượt từng khung `(a) → (b) → (c) → (d)`**: Theo dõi ô ở `Index 2` thay đổi thế nào qua các nhiệm kỳ.
+> 3. **Điểm mấu chốt**: Một mục cũ (`T=2`) dù đã nằm trên đa số node vẫn có thể bị ghi đè. Vì vậy Leader chỉ được coi một mục là đã chốt khi chính nó đã sao chép thành công một mục của **nhiệm kỳ hiện tại**.
 
 ```text
 ==========================================================================================
@@ -440,6 +514,12 @@ Hãy chạy tay từng bước qua 5 mốc thời gian `(a) -> (b) -> (c) -> (d)
 #### a. Cấu trúc định danh giao dịch 64-bit `zxid` (`[epoch | counter]`)
 Trong ZAB, mỗi thay đổi trạng thái (Proposal) không được đánh số rời rạc mà được gắn một định danh đơn lẻ `64-bit` gọi là **`zxid` (ZooKeeper Transaction ID)** chia làm hai nửa `32-bit`:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Cấu trúc `zxid` bên dưới):**
+> 1. **Nửa trái (32 bit cao — `EPOCH`)**: Tăng lên mỗi lần bầu Primary mới, giống `Term` trong Raft.
+> 2. **Nửa phải (32 bit thấp — `COUNTER`)**: Số thứ tự giao dịch trong epoch đó.
+> 3. **Cách so sánh**: Ghép lại thành một số 64 bit, nên chỉ cần so sánh 2 số nguyên là biết thay đổi nào mới hơn.
+
 ```text
 ┌────────────────────────────────────────┬────────────────────────────────────────┐
 │         32-bit cao: EPOCH (e)          │        32-bit thấp: COUNTER (c)        │
@@ -481,6 +561,20 @@ Tuy nhiên, trong các hệ thống đa tổ chức không tin cậy lẫn nhau 
 
 ##### Bước 1: Tại sao $N = 3$ node (với $f = 1$ kẻ phản bội) là BẤT KHẢ THI?
 Hãy xét 3 vị tướng: **Tướng Chỉ Huy `C` (Primary)**, **Trung uý `A`** và **Trung uý `B`**. Trong số 3 người này có **1 kẻ phản bội ($f = 1$)**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (*Bài toán các vị tướng Byzantine*):**
+> 1. **Các vị tướng bao quanh thành**: Mỗi tướng là một node. Họ phải cùng "Tấn công" hoặc cùng "Rút lui" thì mới thắng.
+> 2. **Kẻ phản bội**: Gửi lời nhắn trái ngược cho từng người (bảo người này tấn công, người kia rút lui).
+> 3. **Ý nghĩa**: Các tướng trung thực phải đối chiếu lời nhắn với nhau. Chỉ khi số người trung thực đủ lớn ($N \ge 3f + 1$) thì họ mới chắc chắn ra cùng một quyết định.
+
+![Bài toán các vị tướng Byzantine (Byzantine Generals Problem)](./images/byzantine-generals.png "Minh họa bài toán Byzantine Generals: Khi có kẻ phản bội gửi thông điệp trái ngược nhau ('Tấn công' cho người này nhưng 'Rút lui' cho người kia), hệ thống cần tối thiểu 3f + 1 nút và giao thức PBFT để đạt đồng thuận an toàn — Nguồn: Wikimedia Commons")
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Ví dụ 3 vị tướng bên dưới):**
+> 1. **Trường hợp 1**: Chỉ huy `C` nói dối, nên `A` nghe "Tấn công" còn `B` nghe "Rút lui".
+> 2. **Trường hợp 2**: Chỉ huy trung thực, nhưng `B` nói dối khi chuyển lời cho `A`.
+> 3. **So sánh góc nhìn của `A`**: Trong cả hai trường hợp, `A` nhận được **đúng cùng các thông tin**, nên không thể biết ai đang nói dối. Vì vậy 3 node không đủ để chịu 1 kẻ nói dối.
 
 ```text
 ==========================================================================================
@@ -529,6 +623,12 @@ Giả sử tổng số node trong cụm là $N$, trong đó có tối đa $f$ no
 #### Quy trình 3 pha của PBFT (`Pre-Prepare -> Prepare -> Commit`)
 
 Được Miguel Castro và Barbara Liskov công bố năm 1999, **PBFT (Practical Byzantine Fault Tolerance)** đưa bài toán Byzantine vào thực tế (với $N = 3f + 1$ node, Quorum $Q = 2f + 1$, và thời gian chia theo nhiệm kỳ gọi là **View $v$**) thông qua **3 pha trao đổi bản tin**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Ba pha của PBFT bên dưới):**
+> 1. **Pha 1 (`PRE-PREPARE`)**: Primary gán số thứ tự cho yêu cầu và gửi cho mọi Replica.
+> 2. **Pha 2 (`PREPARE`)**: Mọi Replica gửi lại cho **tất cả** các Replica khác (mũi tên chéo nhiều chiều) để kiểm tra Primary có nói hai lời không.
+> 3. **Pha 3 (`COMMIT`)**: Khi nhận đủ $2f + 1$ xác nhận khớp nhau, Replica thực thi và trả kết quả. `R3` có nói dối cũng không đủ phiếu để làm sai lệch kết quả.
 
 ```mermaid
 sequenceDiagram

@@ -48,6 +48,20 @@ Một **Database Management System (DBMS)** ra đời để giải quyết tri�
 - **Kiểm soát truy cập đồng thời (Concurrency Control)**: Cho phép hàng ngàn kết nối cùng đọc và ghi vào cùng một bảng dữ liệu mà vẫn cô lập an toàn (nhờ sự kết hợp giữa `Lock`, `Latch` và `MVCC - Multi-Version Concurrency Control`).
 - **Tối ưu hóa truy vấn tự động (Query Optimization)**: Chuyển câu lệnh khai báo (Declarative SQL — chỉ mô tả *cần lấy dữ liệu gì*) thành kế hoạch thực thi vật lý (Execution Plan — quyết định *cách lấy dữ liệu như thế nào*) có chi phí Disk I/O và CPU thấp nhất.
 
+### Từ điển thuật ngữ nhanh cho người mới (Beginner's Visual Glossary)
+Trước khi đi vào chi tiết kiến trúc bên dưới, người mới bắt đầu có thể tra cứu nhanh bảng đối chiếu các thuật ngữ cốt lõi của **Part 1 — Storage Engines**:
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database thực tế (PostgreSQL / MySQL InnoDB / RocksDB) là gì? |
+| :--- | :--- | :--- |
+| **`Page` / `Block`** | Một "thùng carton tiêu chuẩn" có kích thước cố định (`8 KB` hoặc `16 KB`). Database không bao giờ bê từng món đồ lẻ từ kho (Disk) lên bàn làm việc (RAM) mà luôn bê nguyên từng thùng carton. | Đơn vị đọc/ghi nhỏ nhất giữa Disk và RAM (`8 KB` trong PostgreSQL, `16 KB` trong MySQL InnoDB). Một Page chứa khoảng vài chục đến vài trăm dòng dữ liệu. |
+| **`Buffer Pool`** | Chiếc "bàn làm việc rộng rãi trên RAM" nơi đặt tạm các thùng carton (`Page`) vừa lấy từ dưới kho lên để nhân viên đọc/sửa thật nhanh. | Vùng bộ nhớ RAM được cấp phát riêng cho Database (`shared_buffers` trong PostgreSQL, `innodb_buffer_pool_size` trong MySQL). |
+| **`Dirty Page`** | Một tờ hồ sơ nằm trên bàn làm việc (RAM) vừa được lấy bút sửa lại số liệu mới, nhưng **chưa kịp mang xuống kho (Disk) cất vào tủ chính**. | Trang dữ liệu trong `Buffer Pool` đã bị sửa bởi lệnh `INSERT/UPDATE/DELETE` trên RAM nhưng chưa được luồng chạy ngầm ghi đè xuống file dữ liệu trên đĩa. |
+| **`WAL` (*Write-Ahead Log*)** | Cuốn "sổ nhật ký trực ban" đặt ngay cạnh tay. Trước khi sửa bất kỳ tờ hồ sơ nào trên bàn, nhân viên bắt buộc ghi 1 dòng nối đuôi vào cuốn sổ này để lỡ mất điện làm bay mất giấy trên bàn thì mở sổ ra làm lại được. | File nhật ký ghi tuần tự trên đĩa (`pg_wal` trong PostgreSQL, `ib_logfile / Redo Log` trong InnoDB) giúp đảm bảo tính bền vững (**Durability**) mà không cần chờ ghi file dữ liệu chính. |
+| **`B+Tree Engine`** | Cuốn từ điển/tủ hồ sơ phân tầng: mỗi bản ghi có một ngăn cố định; khi sửa dữ liệu thì mở đúng ngăn đó ra tẩy xóa và viết đè lên (**Update-in-place**). | Trường phái lưu trữ tối ưu cho **Đọc (Read-heavy)**: MySQL InnoDB, PostgreSQL, SQLite, Oracle, SQL Server. |
+| **`LSM-Tree Engine`** | Ghi chép nhanh vào "sổ nháp trên bàn" (**`Memtable`**), khi đầy cuốn nháp thì đem in thành một "cuốn tập nhỏ chỉ đọc" (**`SSTable`**) xếp chồng dưới kho, định kỳ nhờ trợ lý gom nhiều cuốn nhỏ gộp thành cuốn lớn (**`Compaction`**). | Trường phái lưu trữ tối ưu cho **Ghi tốc độ cao (Write-heavy)**: RocksDB, LevelDB, Apache Cassandra, ScyllaDB, HBase. |
+| **`Tombstone`** | Vì các cuốn tập `SSTable` đã in ra không được phép lấy bút xóa, khi muốn xóa một dòng, hệ thống dán một "tờ giấy báo tử" (`Tombstone`) đè lên trên để báo rằng khóa đó đã bị xóa. | Bản ghi đánh dấu xóa logic `(key, TOMBSTONE, timestamp)` trong LSM-Tree; dữ liệu chỉ thực sự biến mất khỏi ổ cứng khi chạy `Compaction`. |
+| **`Bloom Filter`** | Tờ "danh sách điểm danh nhanh bằng bit" dán ngoài bìa mỗi cuốn `SSTable`, giúp biết ngay cuốn đó **chắc chắn 100% không chứa từ khóa đang tìm** để khỏi mất công mở sách ra đọc. | Mảng bit kết hợp $k$ hàm băm nằm trên RAM, giúp LSM-Tree tránh đọc đĩa oan uổng khi tìm các khóa không tồn tại. |
+
 ---
 
 ## Kiến trúc phân tầng của một DBMS {#database-architecture}
@@ -81,6 +95,12 @@ flowchart TB
    - Thành phần cốt lõi nằm ở đáy kiến trúc, trực tiếp quản lý cách biểu diễn từng byte trên ổ đĩa (Disk) và bộ nhớ khả biến (RAM). Sự tách biệt rõ ràng giữa Execution Engine và Storage Engine giải thích tại sao cùng một hệ thống MySQL có thể cắm (plug-in) nhiều Storage Engine khác nhau như **InnoDB** (B+Tree) hay **MyRocks** (LSM-Tree).
    - Toàn bộ **Part 1 (Chương 1 – Chương 7)** của cuốn sách *Database Internals* tập trung giải phẫu chi tiết tầng Storage Engine này.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (*Hình 1.1* bên dưới):**
+> 1. **Nửa bên trái (In-Memory Structures — Vùng nằm trên RAM)**: Hãy nhìn vào khối lớn nhất tên là **Buffer Pool**. Khi ứng dụng đọc/sửa dữ liệu, MySQL InnoDB nạp các trang `16 KB` từ đĩa lên `Buffer Pool` này để thao tác ở tốc độ nano-giây. Phía dưới là **Log Buffer** — bộ đệm gom các dòng nhật ký trước khi đẩy xuống file log trên đĩa.
+> 2. **Nửa bên phải (On-Disk Structures — Vùng nằm trên ổ cứng)**: Gồm các file dữ liệu bảng thực tế (**System Tablespace `ibdata1`**, **File-Per-Table Tablespaces `.ibd`**) và đặc biệt là khối **Redo Log (`ib_logfile0`, `ib_logfile1`)** ở góc dưới bên phải — chính là cuốn sổ nhật ký `WAL` giúp cứu dữ liệu khi mất điện.
+> 3. **Các mũi tên nối từ Trái sang Phải**: Cho thấy dữ liệu luôn được xử lý trên RAM trước, sau đó mới được các luồng chạy ngầm xả xuống các file trên đĩa.
+
 ![Kiến trúc của database](./images/DatabaseArchitecture.png "Kiến trúc tổng quan của MySQL InnoDB Storage Engine")
 *Hình 1.1: Kiến trúc tổng quan của MySQL InnoDB Storage Engine — phân tách rõ rệt giữa cấu trúc trong bộ nhớ (In-Memory Structures: Buffer Pool, Change Buffer, Log Buffer) và cấu trúc trên đĩa (On-Disk Structures: Tablespaces, Redo Logs)*
 
@@ -98,6 +118,12 @@ Mọi thiết kế trong Storage Engine đều xoay quanh việc giải quyết 
 
 ### 1. Quá trình Ghi (Write Path)
 Khi ứng dụng gửi lệnh thay đổi dữ liệu (`INSERT`, `UPDATE`, `DELETE`):
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Sơ đồ tuần tự Write Path bên dưới):**
+> 1. **Theo dõi mũi tên số `1` và `2`**: Khi người dùng bấm nút Thanh toán (`COMMIT`), Storage Engine chỉ làm đúng 2 việc cực nhanh: ghi nối tiếp 1 dòng vào sổ nhật ký **WAL** trên đĩa (`Bước 1`) và sửa dữ liệu trên **RAM** (`Bước 2`).
+> 2. **Mũi tên nét đứt số `3`**: Ngay sau Bước 2, hệ thống lập tức báo "Thành công" về cho người dùng mà **chưa hề ghi vào file dữ liệu chính (`Data Files`)**!
+> 3. **Mũi tên số `4` ở đáy**: Việc ghi xuống file dữ liệu chính nặng nề được đẩy ra chạy ngầm (`Background Flush`), giúp người dùng không phải chờ đợi.
 
 ```mermaid
 sequenceDiagram
@@ -304,6 +330,12 @@ Chương 5 của cuốn sách đi sâu vào cách Storage Engine bảo vệ tín
 
 Hầu hết các DBMS thương mại và mã nguồn mở hiện đại đều chọn tổ hợp **STEAL + NO-FORCE** vì nó mang lại hiệu năng runtime cao nhất. Khi khởi động lại sau sự cố mất điện, thuật toán **ARIES (*Algorithms for Recovery and Isolation Exploiting Semantics*)** khôi phục cơ sở dữ liệu qua đúng **3 pha tuần tự**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Ba pha phục hồi ARIES bên dưới):**
+> 1. **Pha 1 (`Analysis` — Kiểm kê hiện trường)**: Đọc nhật ký từ điểm lưu an toàn gần nhất (`Checkpoint`) về cuối để lập 2 danh sách: những giao dịch nào đang chạy dở lúc mất điện (**Losers** — cần hủy bỏ) và những trang nào trên đĩa đang bị cũ (**Dirty Pages**).
+> 2. **Pha 2 (`Redo` — Dựng lại toàn bộ hiện trường)**: Làm lại **tất cả** mọi thay đổi có trong nhật ký WAL để đưa ổ cứng về đúng trạng thái ngay tích tắc trước khi mất điện.
+> 3. **Pha 3 (`Undo` — Hoàn tác các giao dịch dở dang)**: Đi ngược từ cuối nhật ký về đầu để trả lại giá trị cũ cho các giao dịch **Losers** chưa kịp `COMMIT`.
+
 ```mermaid
 flowchart LR
     Crash["Sự cố mất điện<br/>(Khởi động lại DBMS)"] --> P1["<b>1. Analysis Phase</b><br/>Quét xuôi từ Checkpoint gần nhất:<br/>- Xác định các Transaction đang chạy dở (Losers)<br/>- Xác định các Dirty Pages chưa kịp ghi xuống đĩa"]
@@ -358,6 +390,15 @@ Chương 6 phân tích các biến thể B-Tree được thiết kế để kh�
 ## Log-Structured Storage (LSM-Tree, SSTable, Compaction, Bloom Filter) {#log-structured-storage}
 
 Chương 7 giải phẫu chi tiết cách họ **LSM-Tree** biến mọi thao tác ghi ngẫu nhiên thành ghi tuần tự tốc độ cao:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Kiến trúc LSM-Tree và Luồng chảy dữ liệu bên dưới):**
+> 1. **Tầng trên cùng (`C0 / Memtable` trên RAM)**: Mọi lệnh thêm/sửa/xóa mới đều rơi vào cái phễu nhỏ trên RAM trước (đồng thời ghi nối tiếp vào `WAL`).
+> 2. **Tầng đĩa đầu tiên (`Level 0 SSTables`)**: Khi phễu RAM đầy (`64 MB`), nó được đổ nguyên khối xuống đĩa tạo thành các file `SSTable` ở `Level 0`.
+> 3. **Các tầng sâu hơn (`Level 1`, `Level 2`...)**: Tiến trình chạy ngầm **Compaction** liên tục trộn các file ở tầng trên xuống tầng dưới rộng gấp 10 lần, vừa sắp xếp lại khóa vừa vứt bỏ các bản ghi cũ đã lỗi thời.
+
+![Kiến trúc tổng quan của Log-Structured Merge-Tree (LSM-Tree)](./images/lsm-tree-overview.png "Luồng dữ liệu trong LSM-Tree: Ghi nhanh vào cây C0 (Memtable) trên RAM rồi xả và trộn dần (Compaction) xuống các tầng C1, C2 (SSTables) trên đĩa — Nguồn: Wikimedia Commons")
+*Hình 1.2: Mô hình thác nước của LSM-Tree — dữ liệu mới được gom trên bộ nhớ đệm `C0` (`Memtable`) và định kỳ hợp nhất tuần tự (`Rolling Merge / Compaction`) xuống các tầng `C1` (`SSTable`) trên ổ đĩa*
 
 ```mermaid
 flowchart TB

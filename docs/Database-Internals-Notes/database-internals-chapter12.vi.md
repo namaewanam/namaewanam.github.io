@@ -7,6 +7,7 @@ tags: ["database-internals", "anti-entropy", "merkle-tree", "gossip", "read-repa
 ---
 
 ## Table of Contents
+0. [Khởi động cho người mới & Bảng Từ Điển Thuật Ngữ Nhanh](#beginner-guide-and-glossary)
 1. [Vì sao các Replica bị lệch dữ liệu (Replica Divergence)?](#why-replicas-diverge)
 2. [Sửa lỗi trực tiếp & Cơ hội: Read Repair và Hinted Handoff](#foreground-repair)
 3. [Đồng bộ nền Anti-Entropy với Merkle Trees (Hash Trees)](#merkle-trees)
@@ -21,6 +22,36 @@ Trong các hệ thống lưu trữ phân tán phi tập trung (**Leaderless / Dy
 
 ---
 
+## Khởi động cho người mới & Bảng Từ Điển Thuật Ngữ Nhanh {#beginner-guide-and-glossary}
+
+### 1. Khởi động cho người mới: Tại sao các bản sao dữ liệu luôn tự lệch nhau và tự chữa lành bằng cách nào?
+
+Trước khi đi vào các công thức xác suất hay cấu trúc cây băm, hãy bắt đầu bằng một ẩn dụ đời thực cực kỳ gần gũi:
+
+- **Hãy tưởng tượng một nhóm 3 kế toán viên (`Replica R1, R2, R3`) cùng ghi chép chung một cuốn sổ đơn hàng**, nhưng để phục vụ khách hàng thật nhanh (kiến trúc **Leaderless** của Apache Cassandra hay Amazon DynamoDB), cửa hàng đặt ra quy tắc: *"Chỉ cần 2 trong 3 kế toán viên ghi xong đơn hàng mới vào sổ là báo thành công cho khách hàng ngay lập tức ($N = 3, W = 2$), không cần chờ người thứ 3!"*
+- **Chuyện gì xảy ra khi có sự cố?**
+  - Hôm nay kế toán viên `R3` bị đau bụng chạy ra ngoài 5 phút (máy chủ bị khởi động lại hoặc nghẽn mạng tạm thời), nên `R1` và `R2` ghi đơn hàng `#99 = ĐÃ THANH TOÁN`, còn cuốn sổ của `R3` vẫn dừng ở `#99 = CHỜ THANH TOÁN`.
+  - Ngày mai đến lượt `R1` bị mất mạng vài giây khi có đơn hàng `#100`... Cứ thế theo thời gian, 3 cuốn sổ trên 3 máy chủ ngày càng xuất hiện nhiều dòng lệch pha nhau — hiện tượng độ hỗn loạn tăng dần này được gọi là **Entropy (Sự lệch pha dữ liệu)**.
+- **Làm thế nào để 3 máy chủ tự động chữa lành (Anti-Entropy) mà không phải photo lại toàn bộ cuốn sổ hàng chục Terabyte gửi qua mạng mỗi ngày?**
+  Các hệ quản trị cơ sở dữ liệu phân tán kết hợp **3 cơ chế tự chữa lành thông minh**:
+  1. **Cách 1 — Sửa lỗi tiện tay ngay lúc khách đọc (`Read Repair` + `Digest Read`)**: Khi khách hàng hỏi xem đơn hàng `#99`, lễ tân (`Coordinator`) hỏi `R1` lấy nội dung đầy đủ, nhưng chỉ hỏi `R2, R3` mã băm tóm tắt (`Digest Read` dài vài byte). Thấy mã băm của `R3` bị lệch, lễ tân tiện tay gửi bản ghi mới nhất sang cập nhật lại cho `R3` ngay lập tức!
+  2. **Cách 2 — Gửi nhờ mảnh giấy ghi chú khi hàng xóm vắng mặt (`Hinted Handoff`)**: Lúc ghi đơn hàng `#99` mà thấy `R3` không trả lời, lễ tân viết tạm một mảnh giấy ghi chú (**Hint**) cất vào ngăn kéo của mình; ngay khi thấy `R3` quay lại làm việc (báo tin qua giao thức **Gossip**), lễ tân lập tức mang mảnh giấy đó sang giao tận tay cho `R3`.
+  3. **Cách 3 — So sánh mục lục phân cấp định kỳ cho dữ liệu ngủ đông (`Merkle Tree / Hash Tree`)**: Với những đơn hàng cũ từ 2 năm trước không ai đọc tới và đã quá hạn giữ giấy ghi chú, định kỳ hàng tuần hai máy chủ sẽ dựng một **Cây băm phân cấp (`Merkle Tree`)** để tìm ra chính xác 1 dòng bị lệch giữa 1 tỷ dòng chỉ bằng vài bước chia đôi nhị phân ($\mathcal{O}(\log N)$) mà không cần truyền cả kho dữ liệu qua mạng!
+
+### 2. Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (Cassandra / DynamoDB / Spanner / TiKV / CockroachDB / etcd) là gì? |
+| :--- | :--- | :--- |
+| **`Entropy` vs `Anti-Entropy`** *(Sự lệch pha dữ liệu giữa các bản sao & Cơ chế tự chữa lành)* | **Entropy**: Ba cuốn sổ kế toán ghi chép độc lập lâu ngày ắt sẽ có chỗ lệch nhau.<br/>**Anti-Entropy**: Quy trình đối chiếu và chép bù những dòng bị thiếu để cả 3 cuốn sổ khớp nhau 100%. | Trong **Apache Cassandra / ScyllaDB / DynamoDB**, khi ghi với Quorum $W < N$, các Replica bị rớt gói tin sẽ giữ dữ liệu cũ (Entropy). Các tiến trình nền như `nodetool repair` trong Cassandra hay Active Anti-Entropy trong Riak/DynamoDB chạy liên tục để đồng bộ lại các SSTable giữa các node. |
+| **`Read Repair`** *(Sửa lỗi tiện tay ngay trong lúc khách hàng đọc dữ liệu — Blocking vs Async)* | Khi khách hỏi thông tin, lễ tân mở cả 3 cuốn sổ ra xem; thấy sổ của `R3` còn ghi số liệu cũ, lễ tân lấy bút sửa luôn cuốn sổ của `R3` cho khớp với `R1, R2` (**Blocking**: sửa xong mới trả lời khách; **Async**: trả lời khách ngay rồi sửa ngầm). | Trong **Cassandra / ScyllaDB**, khi Client chạy lệnh `SELECT` với `ConsistencyLevel.QUORUM`, node Coordinator phát hiện bản sao có `timestamp` cũ hơn sẽ tự động phát lệnh `Mutation` ghi đè bản mới nhất xuống Replica lạc hậu (cấu hình qua `read_repair` trong Cassandra 4.0+). |
+| **`Digest Read`** *(Chỉ đọc mã băm Hash từ các bản sao phụ để tiết kiệm băng thông)* | Thay vì bắt cả 3 nhân viên đọc to toàn bộ hợp đồng dài 50 trang qua điện thoại, lễ tân chỉ bảo nhân viên 1 đọc toàn văn, còn nhân viên 2 và 3 chỉ cần đọc **mã kiểm tra 4 chữ số cuối**; nếu khớp nhau nghĩa là hợp đồng giống hệt nhau! | Khi đọc với $R = 3$ trên **Cassandra / DynamoDB**, Coordinator gửi 1 lệnh `Full Data Request` tới Replica gần nhất (nhờ *Dynamic Snitch*) và gửi 2 lệnh `Digest Request` tới 2 Replica còn lại. Nếu mã băm Murmur3/MD5 khớp nhau, mạng nội bộ tiết kiệm được `66%` băng thông truyền payload. |
+| **`Sloppy Quorum` & `Hinted Handoff`** *(Gửi nhờ mảnh giấy ghi chú "Hint" ở nút hàng xóm khi nút chính tạm sập)* | Người đưa thư thấy chủ nhà `R3` đi vắng tạm thời liền dán tờ giấy nhớ (**Hint**) gửi nhờ ở bác tổ trưởng (`Coordinator`) hoặc nhà hàng xóm (`Sloppy Quorum`). Khi chủ nhà `R3` về, bức thư được mang sang trả lại. | Trong **Cassandra**, khi một Replica sập ngắn hạn, Coordinator lưu bản ghi mutation vào thư mục đĩa cục bộ (`system.hints`, mặc định giữ tối đa `max_hint_window_in_ms = 3 giờ`) và tự động phát lại (replay) khi Gossip báo node đó đã `UP`. Trong **Amazon Dynamo / Riak**, chế độ `Sloppy Quorum` cho phép ghi tạm sang một node khoẻ mạnh khác trên vòng băm để ưu tiên độ sẵn sàng ghi tối đa. |
+| **`Merkle Tree / Hash Tree`** *(Cây băm phân cấp giúp so sánh 1 tỷ dòng giữa 2 server chỉ bằng vài gói tin)* | Muốn tìm 1 trang bị in sai trong cuốn bách khoa toàn thư 1.000 trang giữa 2 thư viện, hai thủ thư chỉ cần so mã tổng của cả cuốn $\to$ khác thì chia đôi so nửa đầu (1–500) và nửa sau (501–1.000)... Chia đôi vài lần là bắt trúng trang bị sai! | Khi chạy lệnh `nodetool repair` trên **Apache Cassandra / ScyllaDB** hoặc đồng bộ nền trên **Amazon DynamoDB / Riak**, mỗi node quét các SSTable thuộc một Token Range để dựng cây nhị phân Merkle Tree (độ sâu $d = 15 \dots 20$), trao đổi từ `Root Hash` xuống lá qua mạng và chỉ stream đúng dải khoá nhỏ bị lệch. |
+| **`Gossip Protocol / Epidemic Dissemination`** *(Lan truyền tin đồn kiểu dịch bệnh: Infected, Susceptible, Removed)* | Giống như tin đồn trong công ty: mỗi giây, mỗi người chỉ kể cho 1–3 đồng nghiệp ngẫu nhiên. Người chưa biết là **Susceptible**, người đang đi kể là **Infected**, người thấy ai cũng biết rồi nên ngừng kể là **Removed**. | **Cassandra, ScyllaDB, CockroachDB, Consul** dùng Gossip mỗi `1 giây` (`Gossiper.java` trong Cassandra) theo chế độ **Push-Pull** (`SYN -> ACK -> ACK2`) để phát tán danh sách thành viên cụm, trạng thái nhịp tim (`Phi Accrual Failure Detector`), phiên bản Schema và tải ổ cứng mà không cần máy chủ trung tâm. |
+| **`Plumtree`** *(Hybrid Broadcast Tree kết hợp Eager Push trên cây khung và Lazy Pull qua Gossip)* | Khi ban giám đốc thông báo khẩn: tin chính thức được truyền thẳng theo **Sơ đồ cây tổ chức (`Eager Push`)** cho nhanh và không bị lặp; đồng thời nhân viên các phòng ban vẫn nhắn tin hỏi thăm chéo (**`Lazy Push: I-Have`**). Nếu một trưởng phòng nghỉ ốm làm đứt nhánh cây, nhân viên bên dưới lập tức nối nhánh sang phòng bên cạnh (**`Graft`**)! | Được sử dụng trong **Riak Core** (`riak_core_broadcast`) và các hệ thống phân tán Erlang/Elixir quy mô lớn để phát tán metadata/sự kiện toàn cụm với độ trễ thấp của Spanning Tree ($\mathcal{O}(\log N)$) nhưng vẫn tự chữa lành tức thì nhờ mạng lưới Gossip dự phòng. |
+
+---
+
 ## Vì sao các Replica bị lệch dữ liệu (Replica Divergence)? {#why-replicas-diverge}
 
 ### Bài toán thực tế & Mental Model
@@ -28,6 +59,12 @@ Trong các hệ thống lưu trữ phân tán phi tập trung (**Leaderless / Dy
 Trong vật lý thống kê, **Entropy** là thước đo mức độ hỗn loạn của một hệ thống cô lập. Theo định luật thứ hai của nhiệt động lực học, entropy luôn có xu hướng tăng dần theo thời gian trừ khi có năng lượng bên ngoài tác động vào để lập lại trật tự.
 
 Trong cơ sở dữ liệu phân tán, các bản sao dữ liệu trên nhiều server cũng chịu quy luật tương tự: nếu chỉ gửi lệnh ghi qua mạng mà không có cơ chế đối chiếu và sửa lỗi, các bản sao sẽ ngày càng sai khác nhau (**Replica Divergence**). Quá trình chủ động so sánh, tìm điểm lệch và đồng bộ các bản sao để giảm mức độ hỗn loạn về `0` được gọi là **Anti-Entropy**.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào dòng đầu tiên (`Thời điểm t = 0`)**: Cả 3 máy chủ bản sao `R1`, `R2`, `R3` đều đang giữ cùng phiên bản dữ liệu `[v1]` $\rightarrow$ mức độ lệch pha `Entropy = 0`.
+> 2. **Theo dõi xuống dòng thứ hai và thứ ba (`t = 1` và `t = 2`)**: Ở `t = 1`, lệnh ghi mới `[v2]` chỉ cần ghi thành công vào 2 máy (`W = 2`) là `R1, R2`, còn `R3` bị rớt gói tin nên vẫn kẹt ở `[v1]`. Sang `t = 2`, lệnh ghi `[v3]` lại rơi vào `R2, R3` trong khi `R1` bị khựng bộ nhớ (`GC pause`).
+> 3. **Kết quả ở mũi tên cuối cùng**: Sau vài lượt ghi, 3 máy chủ giữ các phiên bản lệch chéo nhau (`[v2]`, `[v3]`, `[v3]`), bắt buộc hệ thống phải kích hoạt cơ chế **Anti-Entropy** để kéo tất cả hội tụ về `[v3]`.
 
 ```text
 Thời điểm t = 0 (Đồng bộ):       R1: [v1]    R2: [v1]    R3: [v1]   (Entropy = 0)
@@ -66,6 +103,14 @@ Tuy nhiên, nếu mỗi lượt đọc Coordinator đều yêu cầu cả $R$ no
 2. Đồng thời, Coordinator chỉ yêu cầu **`R - 1` Replica còn lại** tính và gửi về **mã băm của dữ liệu (Digest / Hash)** (chỉ nặng vài chục byte, ví dụ `16 bytes` MD5/Murmur3).
 3. Nếu tất cả các mã băm khớp với mã băm của bản dữ liệu đầy đủ, Coordinator kết luận các bản sao hoàn toàn đồng bộ và lập tức trả dữ liệu về cho Client.
 4. Nếu phát hiện bất kỳ mã băm nào bị lệch, Coordinator mới yêu cầu các node gửi toàn bộ dữ liệu để so sánh nhãn thời gian (`timestamp` hoặc `Vector Clock`), chọn ra giá trị mới nhất trả cho Client và phát lệnh **Read Repair** ghi đè lên các node mang dữ liệu cũ.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hàng ngang trên cùng**: Có 5 thực thể tham gia gồm khách hàng (`Client`), nút điều phối (`Coordinator`) và 3 máy chủ lưu bản sao (`R1, R2` đang giữ bản mới `"PAID", ts=200`, còn `R3` đang giữ bản cũ `"PENDING", ts=100`).
+> 2. **Theo dõi các mũi tên từ trên xuống dưới theo số thứ tự `1 -> 7`**:
+>    - Ở bước `2a, 2b, 2c`: `Coordinator` chỉ xin dữ liệu đầy đủ (`Full Read`) từ `R1`, nhưng chỉ xin mã băm (`Digest Read`) từ `R2` và `R3`.
+>    - Ở bước `3a, 3b, 3c`: Mã băm của `R1` và `R2` đều là `0x8F2A` (khớp nhau), riêng `R3` trả về `0x19C4` (**LỆCH HASH!**).
+> 3. **Kết quả ở bước `4 -> 7`**: `Coordinator` lập tức đọc bản đầy đủ từ `R3` để kiểm tra `timestamp`, phát lệnh `6. Read Repair Write` ghi đè `"PAID", ts=200` xuống `R3`, rồi trả kết quả đúng cho `Client` ở bước `7`.
 
 ```mermaid
 sequenceDiagram
@@ -140,15 +185,22 @@ Hãy hình dung một nhân viên bưu tá (**Coordinator**) cần phát 3 bức
    - Tuy nhiên, `R3` đang bị reboot nên kết nối tới `R3` bị timeout.
 2. **Ghi Hint cục bộ (`t = 201`)**:
    - Phát hiện `R3` không phản hồi, `Coordinator` tạo một bản ghi **Hint** lưu xuống thư mục đĩa cục bộ của chính `Coordinator` (ví dụ bảng `system.hints`):
-     ```text
-     Hint Record = {
-       target_node_id: "R3_UUID",
-       key:            "order:99",
-       mutation:       { val: "SHIPPED", ts: 300 },
-       created_at:     201,
-       ttl:            10800s (3 giờ)
-     }
-     ```
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào trường `target_node_id`**: Ghi rõ địa chỉ người nhận thực sự đang tạm vắng mặt (`"R3_UUID"`).
+> 2. **Theo dõi trường `key` và `mutation`**: Chứa chính xác nội dung thay đổi (`"order:99" -> val: "SHIPPED", ts: 300`) mà `R3` vừa bỏ lỡ.
+> 3. **Kết quả ở trường `ttl`**: Bản ghi giấy nhớ này chỉ được giữ tối đa `10800s` (3 giờ); nếu `R3` sống lại trong vòng 3 giờ thì `Coordinator` giao lại ngay, còn quá 3 giờ thì xoá đi để tránh đầy ổ cứng và nhường việc đồng bộ cho Merkle Tree.
+
+```text
+Hint Record = {
+  target_node_id: "R3_UUID",
+  key:            "order:99",
+  mutation:       { val: "SHIPPED", ts: 300 },
+  created_at:     201,
+  ttl:            10800s (3 giờ)
+}
+```
 3. **Phát hiện phục hồi & Bàn giao (`Handoff` tại `t = 500`)**:
    - Tại thời điểm `t = 500`, `R3` khởi động xong và gửi bản tin nhịp tim qua giao thức **Gossip** báo rằng `R3` đã `UP`.
    - Tiến trình chạy nền trên `Coordinator` nhận tín hiệu `R3 UP`, lập tức đọc các bản ghi Hint có `target_node_id == "R3_UUID"` từ đĩa và phát lại (**Replay**) lệnh `Write(K="order:99", val="SHIPPED", ts=300)` sang `R3`.
@@ -186,6 +238,12 @@ Khi một node nghỉ quá thời gian lưu Hint hoặc trong đợt bảo dư�
    $$\text{Hash}(\text{Parent}) = H\big(\text{Hash}(\text{Left Child}) \;\Vert\; \text{Hash}(\text{Right Child})\big)$$
 3. **Tính chất lan truyền ngược (Bottom-Up Propagation)**: Nhờ tính chất kháng va chạm của hàm băm, chỉ cần **1 byte của 1 khoá bất kỳ** ở tầng lá thay đổi, mã băm của lá đó sẽ thay đổi, kéo theo toàn bộ các node cha trên đường đi từ lá đó lên tới **Root Hash** đều thay đổi theo; trong khi tất cả các nhánh không chứa khoá đó giữ nguyên mã băm!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào khi xây dựng cây (từ dưới đáy lên đỉnh)**: Dưới cùng là 4 khối dữ liệu gốc (`Data Blocks: L1, L2, L3, L4`). Mỗi khối được băm thành một nút lá ở tầng trên (`Hash 0-0 = hash(L1)`, `Hash 0-1 = hash(L2)`, `Hash 1-0 = hash(L3)`, `Hash 1-1 = hash(L4)`). Tiếp tục ghép đôi 2 nút con để băm thành nút cha ở tầng giữa (`Hash 0 = hash(Hash 0-0 + Hash 0-1)` và `Hash 1 = hash(Hash 1-0 + Hash 1-1)`), rồi gộp lên đỉnh duy nhất là **`Top Hash = hash(Hash 0 + Hash 1)`**.
+> 2. **Theo dõi mũi tên khi so sánh tìm lỗi giữa 2 máy chủ (từ đỉnh `Top Hash` đi xuống)**: Hai máy chủ so sánh `Top Hash` trước tiên. Nếu `Top Hash` giống nhau $\rightarrow$ cả 4 khối `L1..L4` giống nhau 100%, dừng ngay! Nếu `Top Hash` khác nhau, hai máy mới nhìn xuống `Hash 0` và `Hash 1`: giả sử `Hash 1` khớp nhau còn `Hash 0` bị lệch $\rightarrow$ bỏ qua toàn bộ nửa bên phải (`L3, L4`), chỉ đi xuống kiểm tra `[0-0]` và `[0-1]`.
+> 3. **Kết quả**: Nếu thấy `Hash 0-0` bị lệch còn `Hash 0-1` khớp nhau, hệ thống chỉ đích danh khối dữ liệu **`L1`** bị hỏng để đồng bộ lại đúng khối `L1` với chi phí chỉ $\mathcal{O}(\log N)$ bước kiểm tra!
+
 ![Cấu trúc cây băm Merkle Tree](./images/merkle-hash-tree.svg "Cấu trúc phân cấp của một cây băm nhị phân Merkle Tree")
 *Hình 12.1: Cấu trúc Merkle Tree (Hash Tree): các khối dữ liệu ở tầng lá được băm đệ quy từ dưới lên tới đỉnh Top Hash (Root Hash)*
 
@@ -208,6 +266,12 @@ Giả sử `Node A` và `Node B` cùng quản lý dải khoá nguyên từ `1` �
 - Trên `Node B`: `k = 550` vẫn giữ giá trị cũ `"v1"` $\rightarrow$ mã băm của `Leaf 6` trên `Node B` là `0x6B` (khác `0x6A`!).
 
 Hãy quan sát toàn bộ cây Merkle được dựng trên `Node A` và `Node B`:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào `TẦNG 0 (ROOT)` trên cùng**: Mã băm tổng trên `Node A` (`0x991F`) khác với `Node B` (`0x774C`), báo hiệu có ít nhất 1 khoá bị lệch trong dải `1..800`.
+> 2. **Theo dõi nhánh rẽ xuống `TẦNG 1` và `TẦNG 2`**: Tại `TẦNG 1`, nhánh trái `H_1..4` khớp hoàn toàn (`0xAA00 == 0xAA00`) nên toàn bộ 400 khoá đầu được **cắt tỉa ngay lập tức**. Mắt người đọc chỉ cần đi tiếp theo nhánh phải bị lệch (`H_5..8` $\rightarrow$ `H_5..6`).
+> 3. **Kết quả ở `TẦNG 3 (LÁ)`**: Nhánh `Leaf 5` (`401..500`) khớp nhau (`0x50 == 0x50`), chỉ có duy nhất thùng **`Leaf 6` (`501..600`)** bị lệch (`0x6A != 0x6B`), khoanh vùng chính xác nơi chứa khoá `k = 550`!
 
 ```text
 =====================================================================================
@@ -233,6 +297,12 @@ TẦNG 3 (LÁ):                                          [Leaf 5: 401..500]  [Le
                                                        A: 0x50 == B: 0x50  A: 0x6A != B: 0x6B
                                                        (KHỚP -> Bỏ qua)    (LỆCH! Chứa k = 550)
 ```
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào ô trên cùng (`Bước 1 - Tầng 0`)**: Đây là điểm xuất phát của thuật toán tìm kiếm nhị phân trên cây Merkle cho toàn bộ 800 khoá `[1..800]`.
+> 2. **Theo dõi các mũi tên có dấu `✅ KHỚP!` và `❌ LỆCH`**: Bất kỳ nhánh nào có dấu `✅ KHỚP!` (`Bước 2a` cắt 400 khoá, `Bước 3b` cắt 200 khoá, `Bước 4a` cắt 100 khoá) đều dừng lại ngay lập tức mà không mở rộng thêm nút con.
+> 3. **Kết quả ở ô `Bước 4b` dưới đáy**: Chỉ sau 4 bước đi theo các nhánh `❌ LỆCH`, thuật toán bắt trúng đích danh thùng `Leaf 6` chứa `k = 550`.
 
 ```mermaid
 flowchart TD
@@ -375,6 +445,12 @@ Plumtree kết hợp hoàn hảo cả hai thế giới bằng cách chia các k�
 Xét một cụm gồm 6 node: `N1` (Nguồn phát tin), `N2`, `N3`, `N4`, `N5`, `N6`.
 Giả sử ban đầu cây khung chính (**Tree Links — nét liền `===`**) và các liên kết Gossip dự phòng (**Lazy Links — nét đứt `---`**) được thiết lập như sau:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào đỉnh `[ N1 (Root) ]`**: Đây là máy chủ gốc phát bản tin mới.
+> 2. **Theo dõi các mũi tên nét đôi `//` và `\\` (`Eager Push`)**: Dữ liệu đầy đủ (`Full Payload`) chảy thẳng từ `N1` xuống `N2, N3`, rồi từ `N2` xuống `N4` và từ `N3` xuống `N5, N6` mà không bị trùng lặp.
+> 3. **Kết quả ở đường nét đứt `◄ - - - -` (`Lazy Link`) giữa `N5` và `N4`**: Bình thường `N5` chỉ gửi mã thông báo siêu nhẹ `I-Have(MsgID)` sang `N4` để làm phao cứu sinh dự phòng nếu nhánh `N2` bị đứt.
+
 ```text
 ================================================================================
 TRẠNG THÁI CÂY PLUMTREE BAN ĐẦU (TRƯỚC KHI CÓ SỰ CỐ)
@@ -418,6 +494,12 @@ Bây giờ, hãy trace từng bước qua 3 tình huống vận hành cốt lõi
 ##### Tình huống 2: Node trung gian `N2` bị sập! Quá trình tự chữa lành cây bằng `I-Have` và `Graft`
 Giả sử ngay trước khi `N1` phát bản tin mới **`Msg #102`**, server **`N2` bị sập nguồn đột ngột (Crash)**! Lúc này nhánh cây từ `N2` xuống `N4` bị đứt gãy hoàn toàn. Hãy xem `N4` tự động cứu lấy mình và nối lại vào cây như thế nào:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào bước `1a` và `1b`**: `N1` gửi bản tin `#102` xuống `N2` và `N3`, nhưng `N2` đã sập (`❌`) nên `N4` ở bên phải ngoài cùng không nhận được gì từ nhánh chính.
+> 2. **Theo dõi mũi tên `2 -> 3` (`Lazy Push`)**: Nhánh lành lặn `N1 -> N3 -> N5` vẫn nhận được `#102`, và `N5` gửi thông báo nhẹ `3. Lazy Push: I-Have(#102)` sang cho `N4`.
+> 3. **Kết quả ở bước `4 -> 5` (`GRAFT`)**: `N4` biết mình bị thiếu `#102` nên gửi lệnh `4. GRAFT(#102)` sang `N5` để vừa kéo dữ liệu `#102` về (bước `5`), vừa nâng cấp liên kết `N5 -> N4` thành nhánh cây chính thức!
+
 ```mermaid
 sequenceDiagram
     participant N1 as Node N1 (Root)
@@ -451,6 +533,12 @@ Trace từng bước khôi phục:
 5. **Bước 5 (`N5` nối nhánh và bù dữ liệu)**:
    - Khi nhận được `GRAFT(#102)` từ `N4`, `N5` cũng lập tức chuyển `N4` từ `lazyPushPeers` lên **`eagerPushPeers`** của mình, và gửi trả toàn bộ nội dung **`FullMsg(#102)`** sang cho `N4`.
    - **Kết quả sau khi tự chữa lành**: Không chỉ bản tin `Msg #102` được cứu thành công, mà từ bản tin `Msg #103` trở đi, dữ liệu từ `N1 -> N3 -> N5` sẽ chảy thẳng sang `N4` qua đường `Eager Push` mới nối mà không cần chờ timeout nữa!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào nhánh trái `[ N2 (DEAD) ]`**: Nút `N2` đã chết nên đường truyền cũ từ `N2` xuống `N4` hoàn toàn biến mất.
+> 2. **Theo dõi nhánh phải `N1 -> N3 -> N5`**: Nhánh `Eager Push` bên phải vẫn hoạt động bình thường.
+> 3. **Kết quả ở đường nét đôi mới `◄════════` giữa `N5` và `N4`**: Nhờ lệnh `GRAFT`, đường nét đứt dự phòng cũ giữa `N5` và `N4` nay đã biến thành đường `Tree Link` nét liền (`Eager Push`), giúp cây khung tự động lành lại mà không cần quản trị viên can thiệp!
 
 ```text
 ================================================================================

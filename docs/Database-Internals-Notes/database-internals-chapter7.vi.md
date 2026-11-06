@@ -19,6 +19,41 @@ tags: ["database-internals", "lsm-tree", "sstable", "rocksdb", "bloom-filter", "
 
 Trong khi các cấu trúc chỉ mục họ B-Tree thực hiện cập nhật tại chỗ (**In-place Update**) thông qua các thao tác đọc-sửa-ghi trang (`Random I/O`), **LSM-Tree (*Log-Structured Merge-Tree*, do Patrick O'Neil và cộng sự đề xuất năm 1996)** được thiết kế dựa trên một triết lý hoàn toàn đối lập: **Dữ liệu trên đĩa là bất biến (`Immutable`) và mọi thao tác sửa đổi đều được biến thành ghi tuần tự (`Sequential Append`)**. Nhờ loại bỏ hoàn toàn việc tìm kiếm và ghi đè ngẫu nhiên trên đĩa trong luồng ghi trực tuyến, LSM-Tree đã trở thành trái tim của hàng loạt hệ cơ sở dữ liệu chịu tải ghi khổng lồ hiện đại như **RocksDB**, **LevelDB**, **Apache Cassandra**, **ScyllaDB**, **HBase**, và **CockroachDB (Pebble)**.
 
+### 0. Khởi động cho người mới: "Sổ nháp trên bàn" thay vì "chạy xuống kho tẩy xóa"
+Hãy hình dung một nhân viên tổng đài phải cập nhật số điện thoại của hàng triệu khách hàng:
+- **Cách của B+Tree (Chương 2–4)**: Mỗi lần khách đổi số, nhân viên chạy xuống phòng lưu trữ, tìm đúng cuốn bách khoa, mở đúng trang, tẩy số cũ và viết số mới. Mỗi lần sửa là một chuyến đi xuống kho (`Random I/O`).
+- **Cách của LSM-Tree (Chương này)**:
+  1. Nhân viên ghi ngay một dòng vào **cuốn sổ nhật ký hằng ngày (`WAL`)** — chỉ viết nối tiếp, không bao giờ lật lại trang cũ.
+  2. Đồng thời ghi số mới lên **tờ nháp đặt trên bàn (`Memtable`)**, được giữ sẵn theo thứ tự tên A–Z.
+  3. Khi tờ nháp kín chỗ, nhân viên đem nó đi **in thành một cuốn sổ nhỏ chỉ đọc (`SSTable`)** rồi cất vào kho. Không ai được sửa cuốn sổ này nữa.
+  4. Định kỳ, một trợ lý ngồi ở phòng sau **gộp nhiều cuốn sổ nhỏ thành một cuốn lớn**, chỉ giữ số điện thoại mới nhất của mỗi khách và vứt các số cũ (`Compaction`).
+
+**Liên hệ với câu lệnh thực tế**: Khi ứng dụng chạy `INSERT INTO messages ...` trên **Apache Cassandra** hoặc **ScyllaDB**, hay `db.Put(key, value)` trên **RocksDB**, câu lệnh trả về thành công ngay sau bước 1 và 2. Không có chuyến đi xuống kho nào trong lúc người dùng chờ.
+
+### Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database thực tế (RocksDB / Cassandra / LevelDB) là gì? |
+| :--- | :--- | :--- |
+| **`Append-Only` / `Immutability`** | Chỉ được viết thêm vào cuối sổ, không bao giờ tẩy xóa trang cũ. | Mọi thao tác ghi (kể cả `UPDATE`, `DELETE`) đều tạo bản ghi mới; tệp đã ghi xuống đĩa không bao giờ bị sửa. |
+| **`Memtable`** | Tờ nháp trên bàn, luôn giữ theo thứ tự A–Z để tra nhanh. | Cấu trúc sắp xếp trên RAM (`write_buffer_size = 64 MB` trong RocksDB, `memtable_heap_space` trong Cassandra). |
+| **`Immutable Memtable`** | Tờ nháp đã kín, được kẹp lại chờ đem đi in; một tờ nháp mới được lấy ra dùng tiếp. | Memtable chỉ đọc đang chờ luồng `Flush` ghi xuống đĩa. |
+| **`Skiplist`** | Một danh sách có thêm các "làn cao tốc" ở trên để nhảy qua nhiều phần tử một lúc khi tìm kiếm. | Cấu trúc mặc định của Memtable trong RocksDB, LevelDB; chèn đồng thời bằng `CAS` mà không cần khóa toàn cục. |
+| **`SSTable` (*Sorted String Table*)** | Cuốn sổ nhỏ đã in, các tên được xếp A–Z, có mục lục ở cuối sổ. | Tệp bất biến trên đĩa (`*.sst` trong RocksDB, `*-Data.db` trong Cassandra). |
+| **`Tombstone`** | Một tờ giấy ghi "khách này đã hủy hợp đồng", dán lên trên thay vì xé trang cũ. | Bản ghi đánh dấu xóa `(key, TOMBSTONE, seq)`; dữ liệu cũ chỉ thật sự biến mất khi `Compaction` chạy. |
+| **`Compaction` (STCS / LCS / TWCS)** | Trợ lý gộp nhiều sổ nhỏ thành sổ lớn và vứt số cũ. Có 3 cách gộp: theo cỡ sổ, theo tầng, hoặc theo khoảng thời gian. | Tiến trình nền trộn các SSTable bằng Merge-Sort nhiều chiều. Cassandra mặc định dùng STCS, RocksDB dùng LCS. |
+| **`Bloom Filter`** | Tờ danh sách điểm danh nhanh dán ở bìa sổ: nói được chắc chắn "sổ này **không có** tên đó", nhưng đôi khi báo nhầm "có thể có". | Mảng bit + $k$ hàm băm trên RAM (thường `10 bits/key`, tỷ lệ báo nhầm khoảng `1%`). |
+| **`WiscKey` / `BlobDB`** | Chỉ ghi tên và số tủ vào sổ; còn tài liệu dày cộp thì cất riêng vào một kho khác. | Tách Value lớn ra tệp `Value Log` riêng, cây LSM chỉ giữ `(key, con trỏ)` để giảm Write Amplification. |
+| **`RUM Conjecture`** | Không thể cùng lúc đọc nhanh nhất, ghi nhanh nhất và tốn ít chỗ nhất — tối ưu 2 thứ thì phải hy sinh thứ còn lại. | Khung lý thuyết để so sánh B+Tree (tối ưu Đọc) với LSM-Tree (tối ưu Ghi). |
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (*Kiến trúc LSM-Tree* bên dưới):**
+> 1. **Nhìn khối nhỏ `C0` ở trên (nằm trong RAM)**: Đây là tờ nháp `Memtable`. Mọi dữ liệu mới đều vào đây trước.
+> 2. **Nhìn khối lớn `C1` ở dưới (nằm trên đĩa)**: Đây là các SSTable. Khối này lớn hơn `C0` rất nhiều.
+> 3. **Theo dõi mũi tên từ `C0` xuống `C1`**: Dữ liệu chỉ chảy **một chiều từ trên xuống dưới** qua các lượt trộn (`Merge`). Không có mũi tên nào đi ngược lên để sửa dữ liệu cũ — đó là bản chất "bất biến" của LSM-Tree.
+
+![Kiến trúc tổng quan của Log-Structured Merge-Tree (LSM-Tree)](./images/lsm-tree-overview.png "Luồng dữ liệu trong LSM-Tree: Ghi nhanh vào Memtable trên RAM (C0) rồi xả và trộn dần (Compaction) xuống các tầng SSTable trên đĩa (C1, C2...) — Nguồn: Wikimedia Commons")
+*Hình 7.0: Mô hình gốc của LSM-Tree — cây `C0` trên RAM và cây `C1` trên đĩa, dữ liệu được trộn dần từ `C0` xuống `C1`*
+
 ---
 
 ## Kiến trúc cốt lõi của LSM-Tree (Memtable, WAL, SSTable) {#lsm-tree-core-architecture}
@@ -34,6 +69,12 @@ Hãy hình dung cách một văn phòng lưu trữ hàng triệu hồ sơ:
 1. Khi hồ sơ mới tới, nhân viên ghi nhanh một dòng vào cuốn sổ nhật ký chống cháy (**Write-Ahead Log — WAL**) trên đĩa để lỡ cúp điện không bị mất.
 2. Tiếp theo, nhân viên xếp ngay hồ sơ đó vào đúng thứ tự bảng chữ cái trên chiếc kệ xoay đặt ngay trên bàn làm việc trong RAM (**Active Memtable**). Vì thao tác trong RAM cực nhanh, việc chèn vào đúng thứ tự chỉ mất vài trăm nano-giây.
 3. Khi chiếc kệ trên bàn đã đầy (ví dụ đạt `64 MB`), nhân viên khóa chiếc kệ đó lại không cho nhét thêm nữa (**Immutable Memtable**), lấy một chiếc kệ trống mới ra bàn để tiếp tục nhận hồ sơ, đồng thời giao chiếc kệ đã đầy cho nhân viên hậu cần ở phòng sau in ra thành một cuốn danh bạ đóng bìa cứng (**SSTable — Sorted String Table**) cất xuống kho đĩa cứng!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Luồng ghi bên dưới):**
+> 1. **Nhìn ô `Write Request` bên trái**: Một lệnh ghi tách thành **2 mũi tên cùng lúc** — một tới `WAL` (để chống mất điện), một tới `Active Memtable` (để tra cứu nhanh).
+> 2. **Đi tiếp theo mũi tên `Đạt ngưỡng 64 MB`**: Memtable đầy thì bị "đóng băng" thành `Immutable Memtable`.
+> 3. **Hai mũi tên cuối (`Flush`, `Compaction`)**: Đều chạy ngầm. Người dùng không phải chờ chúng.
 
 ```mermaid
 flowchart LR
@@ -61,6 +102,12 @@ Mặc dù các cây tìm kiếm nhị phân tự cân bằng (như `Red-Black Tr
 - **Tối ưu hóa tuyệt đối cho thao tác Flush tuần tự**:
   - Tầng đáy (`Level 0`) của Skiplist bản chất là một danh sách liên kết đơn chứa `100%` các phần tử đã sắp xếp tăng dần. Khi `Flush Thread` ghi `Immutable Memtable` ra tệp SSTable, nó chỉ cần đi thẳng theo con trỏ `next` ở tầng `Level 0` với độ phức tạp $O(N)$ tuần tự mà không cần duy trì ngăn xếp đệ quy để duyệt cây.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (*Hình 7.1* và *Hình 7.2*):**
+> 1. **Tầng dưới cùng (`Level 0`)**: Một danh sách liên kết bình thường, chứa **tất cả** phần tử đã sắp xếp tăng dần.
+> 2. **Các tầng phía trên**: Chỉ chứa một phần phần tử, giống "làn cao tốc" bỏ qua nhiều trạm. Tầng càng cao càng ít phần tử.
+> 3. **Cách tìm (theo dõi trong ảnh động)**: Bắt đầu ở tầng cao nhất bên trái, đi sang phải cho tới khi phần tử kế tiếp lớn hơn khóa cần tìm, rồi **bước xuống một tầng** và lặp lại. Khi tới `Level 0`, chèn phần tử mới vào đúng chỗ và nối lại vài con trỏ `next` bên cạnh.
+
 ![Cấu trúc dữ liệu Skiplist](./images/skiplist-structure.svg "Cấu trúc danh sách liên kết nhiều tầng của Skiplist")
 *Hình 7.1: Cấu trúc Skiplist nhiều tầng dùng làm Memtable trong RocksDB, LevelDB và Apache Cassandra*
 
@@ -78,6 +125,13 @@ Khi hàng chục `Immutable Memtable` lần lượt được xả xuống đĩa 
 2. Khi chạy câu lệnh quét khoảng (`Range Scan`: `SELECT * FROM items WHERE key BETWEEN 'k1' AND 'k9'`), làm sao hệ thống hợp nhất dữ liệu từ Memtable và hàng chục tệp SSTable đang mở cùng lúc mà vẫn trả về đúng thứ tự từ điển và chỉ lấy phiên bản mới nhất của mỗi khóa?
 
 ### 1. Giải phẫu cấu trúc bên trong một tệp SSTable
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Cấu trúc SSTable bên dưới):**
+> 1. **Đọc từ đáy lên (đúng thứ tự máy tính đọc)**: Khi mở tệp, hệ thống đọc **`Footer`** ở cuối cùng trước tiên để biết `Index Block` nằm ở đâu.
+> 2. **Đi lên `Index Block`**: Đây là "mục lục" — mỗi dòng cho biết một `Data Block` bắt đầu ở byte nào. Mục lục này đủ nhỏ để giữ luôn trong RAM.
+> 3. **Đi lên `Filter Block`**: Là Bloom Filter, giúp hỏi nhanh "khóa này có trong tệp không?".
+> 4. **Cuối cùng mới tới `Data Blocks` ở trên cùng**: Chỉ đọc đúng **1 block** (vài KB) chứa khóa cần tìm, thay vì đọc cả tệp `64 MB`.
 
 ```text
 +-------------------------------------------------------------------------+
@@ -106,7 +160,7 @@ Khi hàng chục `Immutable Memtable` lần lượt được xả xuống đĩa 
 
 - **Data Blocks (`4 KB` – `64 KB`)**: Chứa các cặp `Key-Value` được sắp xếp tuần tự, áp dụng nén tiền tố (**Prefix Compression**) và nén khối (**LZ4 / Zstd**). Đây là đơn vị I/O nhỏ nhất khi nạp dữ liệu từ đĩa vào **Block Cache** trong RAM.
 - **Filter Block (`Bloom Filter`)**: Chứa mảng bit xác suất cho phép kiểm tra tức thì trong RAM xem một khóa có mặt trong tệp SSTable này hay không trước khi chạm vào Data Block.
-- **Index Block (`Sparse Index` — Chỉ mục thưa)**: Vì các Data Block đã được sắp xếp hoàn toàn, hệ thống không cần lưu vị trí của mọi khóa. `Index Block` chỉ lưu ** đúng `1` mục cho mỗi Data Block** (khóa phân tách cùng `offset` và `size` của Data Block đó). Ví dụ một SSTable `64 MB` chia thành các khối `16 KB` chỉ có `4,096` mục trong `Index Block` — cực kỳ nhỏ gọn để giữ cố định trong RAM!
+- **Index Block (`Sparse Index` — Chỉ mục thưa)**: Vì các Data Block đã được sắp xếp hoàn toàn, hệ thống không cần lưu vị trí của mọi khóa. `Index Block` chỉ lưu **đúng `1` mục cho mỗi Data Block** (khóa phân tách cùng `offset` và `size` của Data Block đó). Ví dụ một SSTable `64 MB` chia thành các khối `16 KB` chỉ có `4,096` mục trong `Index Block` — cực kỳ nhỏ gọn để giữ cố định trong RAM!
 - **Footer**: Nằm ở những byte cuối cùng của tệp với kích thước cố định. Khi mở tệp SSTable, Storage Engine luôn đọc `Footer` đầu tiên để lấy tọa độ của `Index Block` và `Filter Block`.
 
 ### 2. Luồng đọc dữ liệu (`Point Lookup` vs `Range Scan` với `Merge Iterator`)
@@ -158,6 +212,12 @@ Hãy theo dõi trọn vẹn vòng đời của `3` khóa **`"k1"`**, **`"k2"`**,
    - Trạng thái hiện tại trong **`Active Memtable`**:
      $$\text{Memtable} = [\ (\text{"k1"}, \text{seq}=6, \mathbf{TOMBSTONE}),\ (\text{"k2"}, \text{seq}=5, \text{PUT}, \text{"v2\_latest"})\ ]$$
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Merge Iterator bên dưới):**
+> 1. **Ba khối ở trên**: Ba nguồn dữ liệu (Memtable mới nhất, SSTable_2, SSTable_1 cũ nhất). Mỗi nguồn đã tự sắp xếp theo khóa.
+> 2. **Khối `Min-Heap` ở giữa**: Như một người trọng tài luôn chọn ra phần tử có khóa nhỏ nhất; nếu trùng khóa thì chọn bản có `seq` lớn nhất (mới nhất).
+> 3. **Khối kết quả ở đáy**: `k1` biến mất vì có Tombstone mới hơn, `k2` chỉ trả về bản mới nhất, `k3` trả về bình thường.
+
 ```mermaid
 flowchart TD
     subgraph Streams["3 Luồng dữ liệu đầu vào (Đã sắp xếp theo Key)"]
@@ -201,6 +261,12 @@ Nếu chỉ liên tục Flush các Memtable xuống đĩa mà không bao giờ d
 2. Các phiên bản cũ bị ghi đè và các Tombstone nằm mãi trên đĩa $\implies$ Tốn gấp nhiều lần dung lượng ổ cứng (**Space Amplification bùng nổ**).
 
 Tiến trình chạy ngầm **Compaction** sử dụng chính thuật toán **Merge Iterator (`Multi-way Merge-Sort`)** ở mục trên để đọc nhiều tệp SSTable cũ, loại bỏ hoàn toàn các phiên bản bị che khuất cùng các Tombstone đã hết hạn, rồi ghi ra các tệp SSTable mới tinh gọn hơn. Ba chiến lược Compaction phổ biến nhất trong công nghiệp đại diện cho ba điểm đánh đổi khác nhau:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (3 chiến lược Compaction bên dưới):**
+> 1. **Khối 1 (STCS)**: Đọc từ trái sang phải — cứ đủ 4 tệp cùng cỡ thì gộp thành 1 tệp lớn hơn (`100 MB -> 400 MB -> 1.6 GB`). Ít ghi lại, nhưng lúc gộp tệp khổng lồ cần nhiều đĩa trống.
+> 2. **Khối 2 (LCS)**: Đọc từ trên xuống — dữ liệu đi qua các tầng `L0 -> L1 -> L2`, mỗi tầng lớn gấp 10 lần. Từ `L1` trở đi, các tệp trong cùng tầng **không trùng khoảng khóa**, nên một khóa chỉ nằm ở tối đa 1 tệp mỗi tầng → đọc nhanh hơn.
+> 3. **Khối 3 (TWCS)**: Dữ liệu được chia theo khung giờ. Khung giờ đã quá hạn TTL thì **xóa nguyên tệp** — rất hợp với dữ liệu log hoặc IoT.
 
 ```mermaid
 flowchart TD
@@ -288,6 +354,12 @@ Sau đó, khi có người hỏi *"Anh `user_3` có ở trong phòng không?"*, 
 - **Trường hợp 1**: Nếu nhìn thấy **dù chỉ `1` bóng đèn trong số đó đang TẮT (`0`)** $\implies$ **Chắc chắn `100%` anh `user_3` chưa từng bước vào phòng!** (Vì nếu đã vào thì cả $k$ bóng đèn bắt buộc phải sáng!). Hệ thống bỏ qua căn phòng ngay lập tức mà không cần mở cửa vào tìm (**Zero False Negatives**).
 - **Trường hợp 2**: Nếu thấy cả $k$ bóng đèn đều đang SÁNG (`1`) $\implies$ Có hai khả năng: hoặc `user_4` thực sự có trong phòng, hoặc do hai người khác (`user_1` và `user_2`) mỗi người vô tình bật một vài bóng đèn ghép lại làm sáng đủ các bóng của `user_4` (**False Positive — Dương tính giả**). Lúc này mới cần mở cửa phòng (`Đọc SSTable`) để kiểm tra thực tế!
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Bloom Filter bên dưới):**
+> 1. **Hàng ô vuông ở giữa**: Là mảng bit, ban đầu toàn `0` ("bóng đèn tắt").
+> 2. **Các mũi tên từ mỗi phần tử (`x`, `y`, `z`) xuống mảng bit**: Mỗi phần tử được băm bằng $k$ hàm, bật $k$ ô tương ứng thành `1`.
+> 3. **Phần tử `w` ở dưới (đang được hỏi)**: Chỉ cần một trong các ô của nó là `0` thì kết luận ngay "**chắc chắn không có**" — không phải đọc đĩa.
+
 ![Cấu trúc bộ lọc Bloom Filter](./images/bloom-filter.svg "Cơ chế băm k hàm của Bloom Filter vào mảng m bit")
 *Hình 7.3: Minh họa Bloom Filter với mảng bit và $k$ hàm băm: phần tử `w` chắc chắn không nằm trong tập hợp vì có 1 vị trí bit mang giá trị `0`*
 
@@ -352,6 +424,12 @@ $$
 k_{\text{opt}} = \frac{m}{n} \ln 2 \approx 0.693 \times \frac{m}{n} \qquad \text{và} \qquad \frac{m}{n} = -\frac{\ln p}{(\ln 2)^2} \approx -1.44 \log_2(p)
 $$
 
+> [!NOTE]
+> **Cách đọc đồ thị cho người mới (*Hình 7.4*):**
+> 1. **Trục ngang**: Số bit dành cho mỗi khóa ($m/n$). Càng sang phải, bộ lọc càng tốn RAM.
+> 2. **Trục dọc**: Xác suất báo nhầm (False Positive). Càng thấp càng tốt.
+> 3. **Đọc một điểm cụ thể**: Ở khoảng `10 bits/key`, đường cong rơi xuống quanh `1%` — đây là giá trị mặc định phổ biến trong RocksDB. Thêm vài bit nữa thì tỷ lệ báo nhầm giảm rất nhanh.
+
 ![Đồ thị xác suất False Positive của Bloom Filter](./images/bloom-filter-fp.svg "Tương quan giữa số bit và xác suất dương tính giả của Bloom Filter")
 *Hình 7.4: Xác suất False Positive $p$ giảm theo cấp số nhân khi tăng tỷ lệ số bit trên mỗi phần tử ($m/n$)*
 
@@ -376,6 +454,12 @@ Hãy xét một nghịch lý lớn trong LSM-Tree khi lưu trữ các bản ghi 
 Kiến trúc **WiscKey** (*Lu et al., USENIX FAST 2016* — được hiện thực hóa thành **BlobDB** trong RocksDB và **BadgerDB** trong Go) giải quyết triệt để bài toán này bằng cách **tách rời hoàn toàn `Value` ra khỏi cây LSM-Tree**:
 1. Khi có lệnh `PUT(Key, Value)`: phần `Value` lớn (`4 KB`) được ghi nối tiếp đúng **`1` lần duy nhất** vào cuối tệp nhật ký giá trị gọi là **`vLog` (`Value Log` / `Blob File`)**, nhận về một địa chỉ con trỏ `(vLog_file_id, offset, size)` chỉ dài vỏn vẹn **`12 bytes`**!
 2. Cây **LSM-Tree (`Memtable -> SSTables`)** lúc này **chỉ lưu cặp `(Key [16B], vLog_Pointer [12B])`** tổng cộng chỉ **`28 bytes`**!
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (WiscKey bên dưới):**
+> 1. **Nhìn ô `PUT` bên trái**: Một lệnh ghi bị tách đôi — phần `Value` nặng `4 KB` đi sang `vLog`, phần `Key` nhẹ đi vào cây LSM.
+> 2. **Nhìn khối LSM-Tree**: Mỗi bản ghi chỉ còn `28 bytes` (khóa + con trỏ). Compaction giờ chỉ phải bê những "tấm thẻ" nhỏ này, nhẹ hơn khoảng 150 lần.
+> 3. **Theo dõi mũi tên từ con trỏ sang `vLog`**: Khi đọc, hệ thống tìm khóa trong cây LSM trước, rồi nhảy theo con trỏ đúng 1 lần sang `vLog` để lấy giá trị.
 
 ```mermaid
 flowchart LR
@@ -423,6 +507,12 @@ Mọi cấu trúc lưu trữ từ Chương 3 đến Chương 7 đều quy tụ v
 > 3. **Memory / Storage Overhead (Space Amplification — `SA`)**: Tỷ lệ giữa tổng dung lượng đĩa/RAM bị chiếm dụng thực tế (do phân mảnh trang, các phiên bản cũ chưa dọn dẹp và siêu dữ liệu chỉ mục) so với kích thước dữ liệu thuần túy.
 >
 > **Việc giảm thiểu tối đa bất kỳ `2` trong `3` yếu tố trên bắt buộc phải trả giá bằng sự gia tăng của yếu tố thứ `3`!**
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới (Tam giác RUM bên dưới):**
+> 1. **Ba đỉnh tam giác**: Mỗi đỉnh là một mục tiêu tối ưu — Đọc (`R`), Ghi (`U`), Dung lượng (`M`).
+> 2. **Vị trí của mỗi cấu trúc**: Cấu trúc nằm gần cạnh nào thì tối ưu 2 đỉnh của cạnh đó và hy sinh đỉnh đối diện. Ví dụ B+Tree nằm ở cạnh `R–M`, nên hy sinh tốc độ Ghi.
+> 3. **Áp dụng thực tế**: Hệ thống đọc nhiều (thương mại điện tử, ngân hàng) thường chọn PostgreSQL / InnoDB; hệ thống ghi liên tục (log, IoT, tin nhắn) thường chọn Cassandra / RocksDB.
 
 ```text
                      Read Optimization (R)

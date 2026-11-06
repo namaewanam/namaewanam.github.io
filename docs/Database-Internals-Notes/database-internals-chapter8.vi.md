@@ -18,6 +18,37 @@ tags: ["database-internals", "distributed-systems", "flp", "network-partition", 
 
 ## Bước chuyển từ Single-Node Storage sang Hệ thống phân tán {#single-node-to-distributed}
 
+### 0. Khởi động cho người mới: Tại sao gọi hàm sang máy chủ khác qua dây mạng lại "nguy hiểm" gấp vạn lần gọi hàm trong cùng một máy?
+
+Khi mới học lập trình, chúng ta quen với việc viết một hàm tính thuế `calculateTax(order)` chạy ngay bên trong RAM của cùng một máy chủ. Gọi hàm `calculateTax()` giống như **với tay lấy cốc nước ngay trên bàn làm việc**:
+- Tốc độ gần như tức thì (vài chục nano-giây).
+- Không bao giờ có chuyện cánh tay đi nửa đường thì "rớt mất gói tin".
+- Nếu toà nhà mất điện (máy chủ sập nguồn), cả người gọi lẫn cốc nước đều dừng lại cùng một lúc — không có chuyện tay đã cầm cốc uống xong mà não không biết!
+
+Thế nhưng, khi dữ liệu phình to vượt quá sức chứa của một ổ cứng hoặc doanh nghiệp đòi hỏi cơ sở dữ liệu không được phép ngừng hoạt động dù cháy cả một phòng máy, chúng ta buộc phải bước sang **Hệ thống phân tán (Distributed Systems)** — nơi dữ liệu được chia nhỏ và sao chép qua **nhiều máy chủ (`Nodes`) nối với nhau bằng dây cáp mạng**. Lúc này, một câu lệnh `INSERT` hay `SELECT` của lập trình viên thực chất phải biến thành một **lời gọi hàm qua mạng (`RPC - Remote Procedure Call`)**.
+
+Nhiều lập trình viên mới thường bị "bỏng tay" nặng nề vì viết code gọi sang Database Node khác qua mạng giống hệt như gọi hàm `calculateTax()` trong RAM. Hãy hình dung: gọi `RPC` qua cáp mạng giống như **cử một người đưa thư đi xe máy sang thành phố bên cạnh giữa trời mưa bão**:
+1. Người đưa thư có thể bị kẹt xe hoặc ngã xe dọc đường (**Mất gói tin chiều đi** — máy chủ bên kia chưa hề nhận được lệnh).
+2. Người đưa thư đã tới nơi, kho hàng bên kia đã xuất hàng xong xuôi, nhưng trên đường cầm biên lai chạy về thì người đưa thư bị ngã xuống sông (**Thực thi xong nhưng mất gói tin `ACK` chiều về**).
+3. Đứng ở trụ sở chính, khi thấy hết `2 giây` (`Timeout`) mà người đưa thư chưa về, hệ thống rơi vào trạng thái **mù thông tin hoàn toàn**: Không ai biết kho bên kia đã trừ tiền khách hàng hay chưa! Nếu vội vàng cử người đưa thư thứ hai đi giao lại đúng tờ lệnh đó, khách hàng sẽ bị trừ tiền hai lần!
+
+Trước khi đi sâu vào toán học và giao thức nội bộ của Chương 8, hãy trang bị nhanh bảng từ điển đối chiếu dưới đây để nắm trọn mọi khái niệm nền tảng:
+
+#### Bảng Từ Điển Thuật Ngữ Nhanh Cho Người Mới (Beginner's Visual Glossary)
+
+| Thuật ngữ trong sách | Hiểu nôm na cho người mới (Ẩn dụ đời thực) | Trong Database phân tán thực tế (CockroachDB / TiKV / Cassandra / etcd / DynamoDB) là gì? |
+| :--- | :--- | :--- |
+| **`Partial Failure`**<br/>*(Lỗi cục bộ một phần)* | Trong một đội bóng 11 người, 1 cầu thủ bị chuột rút nằm sân nhưng 10 người kia vẫn đang chạy và không biết đồng đội mình vừa ngã. Hệ thống không chết hẳn mà "nửa sống nửa chết". | Khi chạy câu lệnh giao dịch trên **CockroachDB** hoặc **TiDB**, 1 trong 3 Storage Node (`TiKV`) bị đứt cáp mạng hoặc treo đĩa. Lời gọi RPC tới node đó bị hết giờ chờ (`Timeout`), và Coordinator không biết node đó đã ghi WAL xong chưa hay gói tin bị rớt trên Switch. |
+| **`Indistinguishability of Slow vs Dead`**<br/>*(Không thể phân biệt nút chết với mạng chậm)* | Nhắn tin cho đồng nghiệp làm việc từ xa mà 5 phút chưa thấy trả lời: Không thể biết họ đã sập nguồn máy tính ("chết") hay chỉ đang đi vệ sinh / mạng Wi-Fi bị lag ("chậm"). | Một node **Cassandra** (chạy trên JVM) bước vào đợt dọn rác bộ nhớ *Stop-The-World GC Pause* mất `3 giây` không phản hồi mạng. Từ góc nhìn của các node khác, trạng thái im lặng 3 giây này giống hệt 100% với việc máy chủ đó vừa bị rút phích cắm điện. |
+| **`Idempotency & Idempotency Key`**<br/>*(Tính lũy đẳng — Gửi lại nhiều lần kết quả vẫn như 1 lần)* | Bấm nút gọi thang máy tầng 5: Dù người đứng chờ sốt ruột bấm nút "Lên" 1 lần hay bấm liên tục 20 lần, thang máy cũng chỉ nhận đúng 1 lệnh đi lên tầng 5 chứ không chạy lên 20 lần. | Khi **DynamoDB** hoặc cổng thanh toán bị `Timeout`, Client gửi lại lệnh kèm cùng một mã `ClientRequestToken` (`Idempotency Key`). Storage Engine kiểm tra bảng lịch sử: thấy mã này đã làm rồi thì trả lại kết quả cũ chứ tuyệt đối không trừ tiền hay chèn dòng mới lần thứ hai. |
+| **`Two Generals' Problem`**<br/>*(Bài toán Hai vị tướng)* | Hai vị tướng ở hai đỉnh đồi hẹn nhau cùng tấn công qua người đưa thư đi xuyên thung lũng địch. Vì người đưa thư xác nhận ("Tôi đã nhận được thư của anh!") luôn có thể bị bắt giữa đường, không bên nào dám chắc 100% bên kia đã yên tâm xuất quân. | Giải thích tại sao không thể thiết kế một giao thức chốt giao dịch (`2PC / Consensus`) đảm bảo chắc chắn 100% chỉ bằng số lượt gói tin cố định nếu đường mạng đứt hoàn toàn, buộc **TCP (`TIME_WAIT`)** và các bộ điều phối giao dịch phải có hàng đợi **Retry bền vững (Persistent Retry Queue)**. |
+| **`FLP Impossibility Theorem`**<br/>*(Định lý bất khả thi FLP)* | Một hội đồng muốn biểu quyết chốt phương án `0` hoặc `1` qua đường bưu điện không giới hạn thời gian trễ. Nếu cho phép dù chỉ 1 thành viên có thể ngất xỉu bất ngờ, hội đồng có thể bị rơi vào trạng thái lưỡng lự (`Bivalent`) mãi mãi không bao giờ chốt xong. | Định lý nền tảng buộc các kỹ sư thiết kế **etcd (Raft)**, **Google Spanner (Paxos)**, **ZooKeeper (Zab)** phải chọn nguyên tắc: Bảo vệ tính đúng đắn dữ liệu (**Safety**) 100% mọi lúc, còn việc bầu cử kết thúc (**Liveness**) thì dựa vào **Timeout ngẫu nhiên** khi mạng ổn định (*Partially Synchronous*). |
+| **`Crash-Stop` vs `Crash-Recovery` vs `Byzantine Faults`** | • **Crash-Stop**: Nhân viên nghỉ việc hẳn, không bao giờ quay lại.<br/>• **Crash-Recovery**: Nhân viên ngất xỉu, mất trí nhớ tạm thời (RAM), lúc tỉnh dậy phải mở sổ tay (Disk WAL) ra đọc lại.<br/>• **Byzantine**: Nội gián cố tình nói dối, báo cáo 2 nơi 2 con số trái ngược nhau. | Các Database nội bộ như **CockroachDB, TiKV, etcd, MongoDB** được thiết kế theo mô hình **Crash-Recovery** (cần $2f+1$ node, bắt buộc `fsync` trạng thái ra WAL trước khi trả lời). Còn Blockchain (Tendermint, PBFT) phải chống lỗi **Byzantine** nên cần tối thiểu $3f+1$ node. |
+| **`Physical Clock (NTP / Monotonic)` vs `Logical Clock (Lamport & Vector Clock)`** | • **NTP (Wall Clock)**: Đồng hồ treo tường xem giờ hành chính (có thể bị chỉnh vặn lùi lại).<br/>• **Monotonic Clock**: Đồng hồ bấm giờ thể thao (chỉ tiến lên, dùng đo thời gian chờ).<br/>• **Logical Clock**: Số thứ tự đánh dấu trên từng tờ biên bản để biết tờ nào viết sau tờ nào. | **Cassandra** dùng nhãn thời gian vật lý cho *Last-Write-Wins* (dễ mất dữ liệu nếu lệch NTP). **Dynamo / Riak** dùng **Vector Clocks** để phát hiện 2 giỏ hàng sửa song song. **CockroachDB / MongoDB** kết hợp cả hai thành **HLC (Hybrid Logical Clock)**, còn **Spanner** dùng đồng hồ nguyên tử **TrueTime**. |
+| **`Happens-Before (a -> b)` vs `Concurrent (a \|\| b)`** | • **`a -> b` (Nhân quả)**: Tin nhắn trả lời `b` được viết sau khi người đó đã đọc tin nhắn câu hỏi `a`.<br/>• **`a \|\| b` (Đồng thời)**: Hai người ở hai phòng kín cùng viết lên bảng của mình mà chưa hề nhìn thấy bài của nhau. | Trong **Amazon Dynamo / Riak / CouchDB**, nếu phiên bản `V2` biết về `V1` (`V1 -> V2`), DB tự động lấy `V2` đè lên `V1`. Nhưng nếu 2 người cùng sửa 1 bản ghi trên 2 node bị đứt cáp (`V_A \|\| V_B`), DB phát hiện đây là 2 nhánh độc lập (**Siblings**) và giữ lại cả hai để gộp (`Merge`)! |
+
+---
+
 ### 1. Bài toán thực tế & Mental Model: Tại sao gọi hàm qua mạng không giống gọi hàm trong bộ nhớ?
 
 Ở Phần I (Chương 1 đến Chương 7), mọi thành phần của Storage Engine (B-Tree, LSM-Tree, Buffer Pool, Write-Ahead Log) đều vận hành bên trong **một máy chủ vật lý đơn lẻ (Single-Node)**. Khi mô-đun thực thi truy vấn gọi hàm `storage.write(key, value)`, CPU chỉ đơn giản đẩy địa chỉ trả về vào ngăn xếp (*Call Stack*) trong RAM và nhảy tới vùng nhớ chứa mã máy của hàm đó.
@@ -43,21 +74,27 @@ Sự khác biệt vật lý giữa hai môi trường này được thể hiện
 2. **Kịch bản 2 — Node B bị treo hoặc sập trước khi xử lý (`Remote Crash / GC Pause`)**: Gói tin đã tới Node B, nhưng tiến trình trên B bị sập nguồn ngay trước khi ghi xuống đĩa, hoặc đang bị đóng băng tạm thời bởi một đợt *Stop-The-World Garbage Collection*.
 3. **Kịch bản 3 — Đã thực thi thành công nhưng mất gói tin chiều về (`Executed, ACK Lost`)**: Node B đã nhận yêu cầu, **đã ghi dữ liệu xuống đĩa và `fsync` thành công**, đồng thời đã gửi gói tin xác nhận (`ACK`) quay lại. Tuy nhiên, gói tin `ACK` bị rơi trên đường về hoặc bị kẹt mạng đến trễ sau mốc `2000 ms`.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào 3 cột dọc từ trái sang phải**: Cột 1 là `Node A` (máy gửi lệnh), cột giữa `Unreliable Network` là đường dây cáp mạng chập chờn, và cột 3 là `Node B` (máy chủ Database lưu trữ). Thời gian trôi từ trên xuống dưới.
+> 2. **Theo dõi mũi tên số `1`**: `Node A` bắn lệnh trừ `100 USD` qua mạng và bấm đồng hồ đếm ngược `2000 ms`.
+> 3. **Nhìn vào hộp ghi chú màu vàng ở giữa và mũi tên đứt nét `ACK`**: Dù xảy ra kịch bản 1 (rớt chiều đi), kịch bản 2 (`Node B` sập), hay kịch bản 3 (`Node B` đã trừ tiền xong nhưng rớt gói `ACK` chiều về), thì tại mốc `t = 2000ms` ở đáy hình, **màn hình của `Node A` đều trống trơn giống hệt nhau** — đẩy `Node A` vào thế tiến thoái lưỡng nan: gửi lại thì sợ trừ tiền 2 lần, mà dừng lại thì sợ đơn hàng chưa thanh toán!
+
 ```mermaid
 sequenceDiagram
     participant A as Node A (Client / Coordinator)
     participant Net as Unreliable Network
     participant B as Node B (Storage Node)
 
-    A->>Net: 1. Send RPC: deduct(account_1, $100) [timeout = 2000ms]
-    Note over Net,B: Kịch bản 1: Request rơi trên mạng (chưa trừ tiền)<br/>Kịch bản 2: Node B crash trước khi xử lý (chưa trừ tiền)<br/>Kịch bản 3: B ĐÃ TRỪ $100 & commit xong,<br/>nhưng gói ACK bị rơi trên đường về!
+    A->>Net: 1. Send RPC: deduct(account_1, 100 USD) [timeout = 2000ms]
+    Note over Net,B: Kịch bản 1: Request rơi trên mạng (chưa trừ tiền)<br/>Kịch bản 2: Node B crash trước khi xử lý (chưa trừ tiền)<br/>Kịch bản 3: B ĐÃ TRỪ 100 USD & commit xong,<br/>nhưng gói ACK bị rơi trên đường về!
     B-->>Net: ACK (Dropped / Delayed > 2000ms)
     Note over A: ⏰ Timeout tại t = 2000ms!<br/>Node A mù thông tin: Nên Retry hay dừng lại?
 ```
 
 ### 3. Ví dụ chạy tay (Worked Example): Thảm hoạ trừ tiền hai lần và Thiết kế Idempotency Key
 
-Để thấy rõ hậu quả của Partial Failure, hãy khảo sát kịch bản thanh toán giữa dịch vụ **Order Service (Node A)** và cơ sở dữ liệu **Ledger DB (Node B)** với tài khoản `account_1` đang có số dư ban đầu là **`$500`**.
+Để thấy rõ hậu quả của Partial Failure, hãy khảo sát kịch bản thanh toán giữa dịch vụ **Order Service (Node A)** và cơ sở dữ liệu **Ledger DB (Node B)** với tài khoản `account_1` đang có số dư ban đầu là **`500 USD`**.
 
 #### Trường hợp A: Thao tác KHÔNG có tính luỹ đẳng (Non-Idempotent Retry)
 
@@ -69,16 +106,22 @@ Hãy theo dõi từng bước khi Order Service thực hiện retry ngây thơ �
 
 | Mốc thời gian | Hành động tại Node A (Order Service) | Mạng truyền tin | Hành động & Trạng thái tại Node B (Ledger DB) |
 | :--- | :--- | :--- | :--- |
-| **`t = 0 ms`** | Khởi tạo giao dịch trừ `$100`. Gửi RPC lần 1: `deduct(account_1, 100)`. | Gói tin đi tới B sau `15 ms`. | Số dư ban đầu: `balance = $500`. |
-| **`t = 15 ms`** | Đang chờ phản hồi (Timer đếm ngược từ `2000 ms`). | — | Nhận lệnh `deduct(account_1, 100)`. Thực thi trừ tiền: `balance = $500 - $100 = $400`. Ghi WAL & Commit xong. |
+| **`t = 0 ms`** | Khởi tạo giao dịch trừ `100 USD`. Gửi RPC lần 1: `deduct(account_1, 100)`. | Gói tin đi tới B sau `15 ms`. | Số dư ban đầu: `balance = 500 USD`. |
+| **`t = 15 ms`** | Đang chờ phản hồi (Timer đếm ngược từ `2000 ms`). | — | Nhận lệnh `deduct(account_1, 100)`. Thực thi trừ tiền: `balance = 500 - 100 = 400 USD`. Ghi WAL & Commit xong. |
 | **`t = 25 ms`** | Vẫn đang chờ... | Gói tin `ACK(OK)` bị rớt do nghẽn Switch! | Gửi `ACK(OK)` về cho Node A. |
 | **`t = 2000 ms`** | **Hết hạn Timeout!** Vì không thấy `ACK`, Node A tưởng gói tin lần 1 chưa tới B nên tự động **Retry lần 2**: gửi lại `deduct(account_1, 100)`. | Gói tin Retry đi tới B lúc `t = 2020 ms`. | — |
-| **`t = 2020 ms`** | Chờ phản hồi của lần Retry... | — | Nhận lệnh `deduct(account_1, 100)`. Vì không biết đây là bản tin gửi lại, Node B thực thi trừ tiền lần nữa: **`balance = $400 - $100 = $300`**! |
-| **`t = 2035 ms`** | Nhận `ACK(OK)`. Giao dịch báo thành công. | Gói tin `ACK(OK)` về tới A. | **Hậu quả**: Khách hàng chỉ mua đơn hàng `$100` nhưng bị trừ mất **`$200`**! |
+| **`t = 2020 ms`** | Chờ phản hồi của lần Retry... | — | Nhận lệnh `deduct(account_1, 100)`. Vì không biết đây là bản tin gửi lại, Node B thực thi trừ tiền lần nữa: **`balance = 400 - 100 = 300 USD`**! |
+| **`t = 2035 ms`** | Nhận `ACK(OK)`. Giao dịch báo thành công. | Gói tin `ACK(OK)` về tới A. | **Hậu quả**: Khách hàng chỉ mua đơn hàng `100 USD` nhưng bị trừ mất **`200 USD`**! |
 
 #### Trường hợp B: Khắc phục triệt để bằng `Idempotency Key` (`Request ID`) và Bảng Deduplication
 
 Để biến một thao tác vốn không luỹ đẳng thành **Idempotent**, Node A bắt buộc phải sinh ra một mã định danh không trùng lặp trên toàn cục (**`request_id` / `idempotency_key`**, ví dụ `req_tx_9001`) trước khi gửi lần đầu tiên, và **giữ nguyên mã `request_id` này trong mọi lần Retry của cùng một nghiệp vụ**. Về phía Node B, hệ thống lưu trữ cả trạng thái dữ liệu lẫn lịch sử `processed_requests` trong **cùng một giao dịch nguyên tử (Atomic Local Transaction)**:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào cặp từ khoá `BEGIN TRANSACTION` và `COMMIT` bọc ngoài cùng**: Toàn bộ 3 bước bên trong phải được Database thực hiện như một gói không thể tách rời (hoặc thành công cả hai bảng `accounts` và `processed_requests`, hoặc không làm gì cả).
+> 2. **Theo dõi Bước 1 & Bước 2 (Chốt chặn chống trùng lặp)**: Ngay khi nhận lệnh, `Node B` tra sổ `processed_requests` xem mã `req_tx_9001` đã từng xuất hiện chưa. Nếu có rồi, lập tức trả lại biên lai cũ và thoát ra.
+> 3. **Kết quả ở Bước 3**: Chỉ khi mã `req_tx_9001` hoàn toàn mới, `Node B` mới trừ `100 USD` trong bảng `accounts` đồng thời ghi ngay mã `req_tx_9001` vào sổ `processed_requests` trước khi `COMMIT`.
 
 ```text
 // Logic xử lý chuẩn tại Node B (Storage Node) trong 1 Local Transaction:
@@ -96,10 +139,10 @@ COMMIT;
 
 Chạy tay lại kịch bản mất `ACK` với cơ chế `Idempotency Key`:
 1. **`t = 0 ms`**: Node A sinh `request_id = "req_tx_9001"`, gửi `deduct(req_id="req_tx_9001", account_1, 100)`.
-2. **`t = 15 ms`**: Node B kiểm tra bảng `processed_requests`, chưa thấy `"req_tx_9001"`. Node B trừ số dư từ `$500` xuống **`$400`**, đồng thời ghi bản ghi `("req_tx_9001", "OK: new_balance=400")` vào bảng `processed_requests` trong cùng một lượt Commit xuống WAL.
+2. **`t = 15 ms`**: Node B kiểm tra bảng `processed_requests`, chưa thấy `"req_tx_9001"`. Node B trừ số dư từ `500 USD` xuống **`400 USD`**, đồng thời ghi bản ghi `("req_tx_9001", "OK: new_balance=400")` vào bảng `processed_requests` trong cùng một lượt Commit xuống WAL.
 3. **`t = 25 ms`**: Gói tin `ACK` trả về từ Node B bị đứt cáp làm rơi mất.
 4. **`t = 2000 ms`**: Node A bị Timeout và thực hiện Retry, nhưng **vẫn gửi kèm chính xác `req_id="req_tx_9001"`**.
-5. **`t = 2020 ms`**: Node B nhận gói tin Retry, tra cứu thấy `"req_tx_9001"` đã nằm trong `processed_requests`. Node B **bỏ qua bước trừ tiền**, trích xuất kết quả cũ `"OK: new_balance=400"` và gửi lại cho Node A. Số dư của `account_1` được bảo toàn tuyệt đối ở mức **`$400`**!
+5. **`t = 2020 ms`**: Node B nhận gói tin Retry, tra cứu thấy `"req_tx_9001"` đã nằm trong `processed_requests`. Node B **bỏ qua bước trừ tiền**, trích xuất kết quả cũ `"OK: new_balance=400"` và gửi lại cho Node A. Số dư của `account_1` được bảo toàn tuyệt đối ở mức **`400 USD`**!
 
 > [!IMPORTANT]
 > **Nguyên tắc thiết kế bất di bất dịch trong Hệ thống phân tán**:
@@ -125,6 +168,12 @@ Bài toán này được mô hình hoá thành câu chuyện của hai vị tư�
 #### Phân tích từng bước: Tại sao chuỗi xác nhận kéo dài tới vô cực?
 
 Hãy theo dõi suy luận logic của hai vị tướng qua từng lượt tin nhắn:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào hai cột ngoài cùng**: Bên trái là trại của `Tướng A`, bên phải là trại của `Tướng B`, ở giữa là `(Thung lũng địch)` nơi người đưa thư có thể bị bắt bất cứ lúc nào.
+> 2. **Theo dõi mũi tên ngang theo trình tự từ trên xuống dưới (`Tin nhắn 1 -> Tin nhắn 2 -> Tin nhắn 3`)**: Mỗi khi một bên gửi thư đi, hãy đọc dòng chữ trong ngoặc đơn `(...)` ngay bên dưới mũi tên để thấy nỗi sợ của người vừa gửi thư.
+> 3. **Kết quả ở đáy sơ đồ**: Dù gửi bao nhiêu lượt xác nhận (`ACK`, `ACK của ACK`...), người vừa thả bức thư cuối cùng ra khỏi tay luôn rơi vào trạng thái mù thông tin (không biết bức thư cuối đó có qua nổi thung lũng hay không), dẫn tới vòng lặp vô tận.
 
 ```text
 [Đỉnh đồi A - Tướng A]                    (Thung lũng địch)                    [Đỉnh đồi B - Tướng B]
@@ -183,6 +232,12 @@ Năm `1985`, ba nhà khoa học Michael Fischer, Nancy Lynch và Mike Paterson �
    - **Cấu hình Bivalent (Lưỡng trị — Kết quả chưa định đoạt / Đang lưỡng lự)**: Là trạng thái hệ thống như đang đứng trên đỉnh một con dốc hai chiều:
      - Nếu gói tin của Node A đến đích trước gói tin của Node B $\rightarrow$ cả cụm sẽ nghiêng hẳn sang quyết định **`1`**.
      - Ngược lại, nếu gói tin của Node B đến đích trước gói tin của Node A $\rightarrow$ cả cụm sẽ nghiêng hẳn sang quyết định **`0`**.
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào ô trên cùng `Cấu hình Bivalent C₀`**: Đây là trạng thái xuất phát khi cả cụm Database đang "lưỡng lự" 50-50, chưa chốt được kết quả là `0` (Abort) hay `1` (Commit).
+> 2. **Theo dõi 2 nhánh rẽ sang trái và giữa**: Nếu mạng thông suốt để gói tin `e'` hoặc `e` tới đích bình thường, hệ thống sẽ rơi vào ô `1-valent` hoặc `0-valent` (đã chốt hạ xong).
+> 3. **Theo dõi nhánh rẽ bên phải (`Kẻ thù mạng trì hoãn...`)**: Kẻ điều phối mạng bất đồng bộ cố tình ngâm gói tin quyết định lại đúng lúc, ép hệ thống trượt sang ô `Bivalent C₁` rồi `C₂ -> C₃ -> ...` lặp vô tận, khiến thuật toán đồng thuận không bao giờ dừng lại được!
 
 ```mermaid
 flowchart TD
@@ -243,6 +298,12 @@ Ba mô hình đồng bộ mạng định nghĩa các giả định về **cận 
 
 Các kiểu hỏng hóc của một máy chủ trong hệ thống phân tán được xếp thành một hệ thống phân cấp bao hàm nhau (mô hình bên ngoài bao gồm tất cả các trường hợp lỗi của mô hình bên trong):
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn sơ đồ như các hộp búp bê Nga lồng vào nhau từ trong ra ngoài**: Hộp trong cùng (`1. Crash-Stop`) là kiểu lỗi "hiền lành" và dễ xử lý nhất; càng đi ra lớp vỏ ngoài cùng (`4. Byzantine`), mức độ hiểm độc của lỗi càng tăng lên.
+> 2. **Theo dõi lớp hộp thứ 2 và thứ 3 (`Crash-Recovery` & `Omission`)**: Đây là ranh giới mà 99% các Database doanh nghiệp (CockroachDB, TiKV, Cassandra, PostgreSQL, etcd) lựa chọn để thiết kế — máy chủ có thể sập nguồn rồi khởi động lại (mất sạch RAM, chỉ còn Disk WAL) hoặc rớt gói tin mạng, nhưng không bao giờ cố tình làm giả dữ liệu.
+> 3. **Kết quả ở lớp vỏ ngoài cùng (`4. Byzantine Failures`)**: Bao trùm mọi loại lỗi bên trong cộng thêm trường hợp node bị hỏng bit phần cứng hoặc bị hacker chiếm quyền gửi tin nhắn lừa đảo hai mặt.
+
 ```text
 +-------------------------------------------------------------------------+
 | 4. Byzantine Failures (Lỗi tuỳ ý / Độc hại / Hỏng bit phần cứng)         |
@@ -288,6 +349,12 @@ Mỗi bo mạch chủ sử dụng một tinh thể thạch anh (*Quartz Crystal*
 
 Hãy xem điều gì xảy ra nếu cơ sở dữ liệu dùng nhãn thời gian vật lý cục bộ (*Wall-Clock Timestamp*) để giải quyết xung đột theo quy tắc **Last-Write-Wins (LWW — Bản ghi có timestamp lớn hơn sẽ thắng)**:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào cột ngoài cùng bên trái (`[Thời gian chuẩn Quốc tế UTC]`)**: Đây là thời gian thực tế ngoài đời. `Client 1` ghi `"V1_CU"` lúc `.100`, còn `Client 2` ghi `"V2_MOI"` lúc `.120` (tức `"V2_MOI"` mới hơn `"V1_CU"` tới `20 ms`).
+> 2. **Theo dõi đồng hồ bị lệch trên `Node A` (cột giữa) và `Node B` (cột phải)**: Vì đồng hồ `Node A` chạy nhanh `+50ms`, nó đóng dấu `"V1_CU"` là `.150`. Còn đồng hồ `Node B` chạy chậm `-20ms`, nên dù `"V2_MOI"` xảy ra sau nhưng lại bị đóng dấu nhỏ hơn là `.100`.
+> 3. **Kết quả ở đáy sơ đồ (`KẾT QUẢ KHI ĐỒNG BỘ`)**: Khi Database (như Cassandra LWW) gộp dữ liệu chỉ bằng cách so sánh con số timestamp (`.150 > .100`), nó ngây thơ tưởng `"V1_CU"` là bản mới hơn nên giữ lại `"V1_CU"` và **âm thầm xoá mất bản ghi mới `"V2_MOI"`** của khách hàng!
+
 ```text
 [Thời gian chuẩn Quốc tế UTC]        [Node A (Đồng hồ chạy NHANH +50ms)]        [Node B (Đồng hồ chạy CHẬM -20ms)]
 -----------------------------------------------------------------------------------------------------------------
@@ -306,6 +373,12 @@ Hệ thống so sánh ts(.150) > ts(.100) nên giữ lại "V1_CU" và XÓA BỎ
 ```
 
 Để làm chủ thời gian trong hệ thống phân tán, kỹ sư hệ thống phải phân biệt rõ 3 nhóm đồng hồ hoàn toàn khác nhau dưới đây:
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào ô gốc trên cùng và 3 nhánh lớn**: Thế giới đồng hồ trong Database phân tán được chia làm 3 họ: `1. Physical Clocks` (đồng hồ phần cứng trên từng máy), `2. Logical Clocks` (đồng hồ đếm số bước nhân quả), và `3. Hybrid & Bounded-Uncertainty Clocks` (sự kết hợp hiện đại của cả hai).
+> 2. **Theo dõi nhánh trái (`Physical`) và nhánh giữa (`Logical`)**: Ở nhánh `Physical`, hãy chú ý sự đối lập giữa `Time-of-Day Clock` (có thể nhảy lùi khi đồng bộ NTP) và `Monotonic Clock` (chỉ tiến lên, chuyên dùng bấm giờ Timeout). Ở nhánh `Logical`, `Lamport` dùng 1 con số nguyên còn `Vector Clocks` dùng mảng $N$ số để bắt xung đột.
+> 3. **Kết quả ở nhánh phải (`HybridBounded`)**: Là hai vũ khí tối tân đang chạy trong các NewSQL thực tế: `HLC` (dùng trong CockroachDB, MongoDB, YugabyteDB, TiKV) và `TrueTime API` (dùng GPS + đồng hồ nguyên tử trong Google Spanner).
 
 ```mermaid
 flowchart TD
@@ -371,6 +444,12 @@ Mỗi Node $i$ duy trì một biến số nguyên đơn lẻ $L_i$ (khởi tạo
 
 Xét một cụm gồm 3 node: **`Node A`, `Node B`, `Node C`**, ban đầu đều có bộ đếm Lamport $L_A = 0, L_B = 0, L_C = 0$. Hãy theo dõi các sự kiện diễn ra theo trình tự sau:
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào 3 đường thẳng đứng của `Node A`, `Node B`, `Node C`**: Mỗi đường là dòng đời của một máy chủ, bắt đầu từ trên đỉnh với bộ đếm bằng `0` (`LA=0, LB=0, LC=0`).
+> 2. **Theo dõi nhánh bên trái (`Node A -> Node B`)**: `Node A` tự làm sự kiện `A1` (tăng `LA = 1`), rồi gửi tin nhắn `m1` ở sự kiện `A2` (tăng `LA = 2`). Khi mũi tên `msg m1 (t=2)` chạm vào `Node B`, `Node B` lấy `max(0, 2) + 1 = 3`!
+> 3. **Đối chiếu với nhánh cô lập bên phải (`Node C`)**: `Node C` không hề gửi hay nhận tin nhắn nào với `A` và `B`, nhưng tự làm 2 việc nội bộ nên `LC` cũng tăng lên `1` rồi `2`. Hãy để ý: dù `LA(A1) = 1 < LC(C2) = 2`, hai sự kiện này hoàn toàn độc lập chứ không hề có mũi tên nhân quả nào nối giữa chúng!
+
 ```text
 Node A (LA=0)               Node B (LB=0)               Node C (LC=0)
      |                           |                           |
@@ -413,6 +492,18 @@ Node A (LA=0)               Node B (LB=0)               Node C (LC=0)
 - Phần tử $V_i[i]$ là bộ đếm thời gian logic của chính Node $i$.
 - Phần tử $V_i[k]$ (với $k \ne i$) là **phiên bản mới nhất của Node $k$ mà Node $i$ đã từng được nghe kể lại** thông qua chuỗi tin nhắn nhân quả.
 
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn vào 3 trục ngang `A`, `B`, `C` và mũi tên `Time` chạy từ trái sang phải**: Mỗi trục ngang là một máy chủ (`Node A`, `Node B`, `Node C`). Ở đầu bên trái, cả 3 máy đều xuất phát từ trạng thái chưa có gì: `A:0`, `B:0`, `C:0` (tức vector `[A:0, B:0, C:0]`, các thành phần bằng `0` được lược giản trên hình cho gọn).
+> 2. **Theo dõi từng bước nhảy con số theo các mũi tên xiên từ trái qua phải**:
+>    - Dưới đáy trục `C`, sự kiện đầu tiên xảy ra làm `C` tăng lên **`(C:1)`** rồi bắn mũi tên lên trục `B`.
+>    - Trục `B` nhận tin từ `C`, gộp lại và tăng bộ đếm của `B` lên thành **`(B:1, C:1)`**, rồi bước kế tiếp trên `B` tăng thành **`(B:2, C:1)`** và bắn mũi tên lên `A`.
+>    - Trục `A` nhận tin từ `B`, tăng nhịp của `A` lên thành **`(A:1, B:2, C:1)`**, rồi bước tiếp theo thành **`(A:2, B:2, C:1)`** và bắn mũi tên ngược xuống `B` để tạo ra điểm trung tâm **`(A:2, B:4, C:1)`**.
+> 3. **Kết quả — Hiểu 3 vùng màu lấy điểm `(A:2, B:4, C:1)` làm tâm**:
+>    - **Vùng phễu màu xanh dương bên trái (`Cause` — Nguyên nhân)**: Mọi sự kiện nằm trong vùng này đều có tất cả các số $\le (A:2, B:4, C:1)$ — nghĩa là chúng xảy ra trước và là nguyên nhân dẫn tới sự kiện tâm.
+>    - **Vùng phễu màu tím hồng bên phải (`Effect` — Kết quả)**: Mọi sự kiện trong vùng này đều có các số $\ge (A:2, B:4, C:1)$ (ví dụ `(A:3, B:3, C:3)` hay `(A:4, B:5, C:5)`) — nghĩa là chúng là hậu duệ sinh ra sau sự kiện tâm.
+>    - **Vùng nền trắng ở trên và dưới (`Independent` — Độc lập / Xung đột đồng thời)**: Hãy nhìn ô **`(B:3, C:2)`** ở trục `C` bên dưới: so với tâm **`(A:2, B:4, C:1)`**, ô dưới có `C:2 > C:1` nhưng lại có `B:3 < B:4` (và `A:0 < A:2`). Không bên nào bao hàm được bên nào $\implies$ Hai sự kiện này diễn ra **đồng thời (`Concurrent / Siblings`)** mà không hề biết tới nhau!
+
 ![Minh hoạ Vector Clocks trên 3 tiến trình](./images/vector-clock.svg "Cơ chế cập nhật Vector Clocks giữa các tiến trình phân tán")
 *Hình 8.1: Cách Vector Clocks theo dõi quan hệ nhân quả (Causality) và phát hiện các sự kiện diễn ra đồng thời giữa 3 node*
 
@@ -437,6 +528,12 @@ Giả sử một khách hàng mua sắm trên hệ thống thương mại điệ
 | **Bước 4 (Ghi song song!)** | Cùng lúc đang đứt mạng, khách hàng mở Laptop (định tuyến vào **Node C**, nơi mới chỉ có bản `V2 = [2, 0, 0]`) và thêm `"Màn hình 4K"` vào giỏ hàng. | **Node C** | Từ `V2 = [2, 0, 0]`, tăng vị trí `vC`:<br/>`[2, 0, 0] -> [2, 0, 1]` | `Cart3_C = ["Sách", "Bàn phím", "Màn hình"]`<br/>**`V3_C = [2, 0, 1]`** | Bản cập nhật trên Node C cũng xuất phát từ `V2`, hoàn toàn không hề biết việc khách vừa xoá `"Bàn phím"` và thêm `"Chuột"` bên Node B! |
 | **Bước 5 (Phát hiện Siblings)** | Mạng kết nối trở lại! Client thực hiện lệnh Đọc giỏ hàng từ cả `Node B` và `Node C`, nhận về hai phiên bản **`V3_B = [2, 1, 0]`** và **`V3_C = [2, 0, 1]`**. | **Coordinator / Client** | So sánh từng vị trí giữa `[2, 1, 0]` và `[2, 0, 1]`:<br/>• Tại `B`: `1 > 0`<br/>• Tại `C`: `0 < 1` | Phát hiện **2 Siblings xung đột**:<br/>• `Cart3_B` (`[2, 1, 0]`)<br/>• `Cart3_C` (`[2, 0, 1]`) | Vì không vector nào lớn hơn hoàn toàn vector kia (`[2, 1, 0] || [2, 0, 1]`), hệ thống **KHÔNG tự ý xoá đè bản nào**, mà giữ lại cả hai nhánh (**Siblings**) trả về cho ứng dụng! |
 | **Bước 6 (Hợp nhất / Merge)** | Ứng dụng gộp giỏ hàng (Union các mặt hàng để không làm mất đồ khách đã chọn) rồi gửi lệnh ghi bản hợp nhất vào **Node A**. | **Node A** | Gộp `max([2, 1, 0], [2, 0, 1]) = [2, 1, 1]`, sau đó tăng vị trí `vA`:<br/>`[2, 1, 1] -> [3, 1, 1]` | `Cart4 = ["Sách", "Bàn phím", "Chuột", "Màn hình"]`<br/>**`V4 = [3, 1, 1]`** | Lúc này `[2, 1, 0] < [3, 1, 1]` và `[2, 0, 1] < [3, 1, 1]`. Bản `V4` chính thức khép lại nhánh rẽ (reconcile) và ghi đè hợp lệ lên cả hai bản cũ! |
+
+> [!NOTE]
+> **Cách đọc sơ đồ cho người mới:**
+> 1. **Nhìn từ đỉnh xuống `[1, 0, 0] -> [2, 0, 0]`**: Khi mạng bình thường, mỗi lần khách sửa giỏ hàng trên `Node A`, số đầu tiên tăng từ `1` lên `2`. Vì `[1, 0, 0] < [2, 0, 0]` ở mọi vị trí, bản sau đè thẳng lên bản trước.
+> 2. **Theo dõi điểm rẽ nhánh chữ V ở giữa (lúc đứt mạng)**: Từ gốc `[2, 0, 0]`, nhánh trái trên `Node B` tăng số thứ hai thành **`[2, 1, 0]`**, còn nhánh phải trên `Node C` tăng số thứ ba thành **`[2, 0, 1]`**. Khi so sánh `[2, 1, 0]` với `[2, 0, 1]`, vị trí giữa `1 > 0` nhưng vị trí cuối `0 < 1` $\implies$ Hệ thống phát hiện ngay đây là 2 nhánh sửa song song (`Siblings`).
+> 3. **Kết quả ở mũi tên chụm lại dưới đáy (`[3, 1, 1]`)**: Sau khi gộp giỏ hàng, `Node A` lấy `max` từng vị trí của hai nhánh (`max([2,1,0], [2,0,1]) = [2,1,1]`) rồi cộng `1` vào vị trí của `A` thành **`[3, 1, 1]`** — khép lại xung đột hoàn hảo!
 
 ```text
 Sơ đồ phân nhánh và hợp nhất (Fork & Join) của Vector Clock trong ví dụ trên:

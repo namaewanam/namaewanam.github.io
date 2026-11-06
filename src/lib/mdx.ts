@@ -25,7 +25,7 @@ const processor = unified()
 	.use(rehypeRaw)
 	.use(rehypeSlug)
 	.use(rehypeKatex, { strict: false })
-	.use(rehypeHighlight, { detect: true, ignoreMissing: true })
+	.use(rehypeHighlight, { detect: false, ignoreMissing: true })
 	.use(rehypeStringify);
 
 const CALLOUT_ICONS: Record<string, string> = {
